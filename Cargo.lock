@@ -101,13 +101,12 @@ dependencies = [
 
 [[package]]
 name = "qubit-lock"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6942fb9f29fafb51112060201c5bf6f2ee7605f5ab46198c33d5fb33113adf9e"
+checksum = "d423ace0dbbefdffcede2a2b1fc1f220629eb88db85aa374d2821cbfc22fc67d"
 dependencies = [
  "log",
  "parking_lot",
- "qubit-function",
  "thiserror",
  "tokio",
 ]
