@@ -1,0 +1,30 @@
+[package]
+name = "qubit-dcl"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Haixing Hu <starfish.hu@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/qubit-ltd/rs-dcl"
+description = "Reusable double-checked lock executor for Rust lock abstractions"
+homepage = "https://github.com/qubit-ltd/rs-dcl"
+documentation = "https://docs.rs/qubit-dcl"
+readme = "README.md"
+keywords = ["lock", "double-checked", "executor", "concurrency"]
+categories = ["concurrency"]
+exclude = [
+    "coverage.sh",
+    ".circleci/*",
+    "align-ci.sh",
+    "ci-check.sh",
+]
+
+[lib]
+name = "qubit_dcl"
+doctest = true
+
+[dependencies]
+log = "0.4"
+thiserror = "2.0"
+qubit-function = "0.10"
+qubit-lock = "0.2"
