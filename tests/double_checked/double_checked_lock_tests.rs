@@ -31,6 +31,11 @@ mod tests {
     mod test_double_checked_lock {
         use super::*;
 
+        fn increment_unit_task(value: &mut i32) -> Result<(), io::Error> {
+            *value += 1;
+            Ok(())
+        }
+
         #[test]
         fn test_call_with_runs_without_manual_executor_build() {
             let data = ArcMutex::new(10);
@@ -57,14 +62,24 @@ mod tests {
 
             let result = DoubleCheckedLock::on(data.clone())
                 .when(|| false)
-                .execute_with(|value: &mut i32| {
-                    *value += 1;
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
             assert_eq!(data.read(|value| *value), 10);
+        }
+
+        #[test]
+        fn test_execute_with_runs_function_pointer_task() {
+            let data = ArcMutex::new(10);
+
+            let result = DoubleCheckedLock::on(data.clone())
+                .when(|| true)
+                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(())));
+            assert_eq!(data.read(|value| *value), 11);
         }
 
         #[test]
@@ -130,6 +145,46 @@ mod tests {
             assert!(matches!(first, ExecutionResult::Success(2)));
             assert!(matches!(second, ExecutionResult::Success(3)));
             assert_eq!(data.read(|value| *value), 3);
+        }
+
+        #[test]
+        fn test_lock_builder_log_methods_are_chainable_before_call() {
+            let data = ArcMutex::new(1);
+
+            let result = DoubleCheckedLock::on(data)
+                .log_unmet_condition(log::Level::Info, "condition not met")
+                .log_prepare_failure(log::Level::Warn, "prepare failed")
+                .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
+                .log_prepare_rollback_failure(log::Level::Debug, "prepare rollback failed")
+                .when(|| true)
+                .call(|| Ok::<i32, io::Error>(42))
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(42)));
+        }
+
+        #[test]
+        fn test_ready_builder_log_methods_are_chainable_before_execute() {
+            let data = ArcMutex::new(1);
+            let executed = Arc::new(AtomicBool::new(false));
+
+            let result = DoubleCheckedLock::on(data)
+                .when(|| true)
+                .log_unmet_condition(log::Level::Info, "condition not met")
+                .log_prepare_failure(log::Level::Warn, "prepare failed")
+                .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
+                .log_prepare_rollback_failure(log::Level::Debug, "prepare rollback failed")
+                .execute({
+                    let executed = executed.clone();
+                    move || {
+                        executed.store(true, Ordering::Release);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(())));
+            assert!(executed.load(Ordering::Acquire));
         }
     }
 }

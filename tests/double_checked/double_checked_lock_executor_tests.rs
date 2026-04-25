@@ -35,6 +35,10 @@ mod tests {
     mod test_double_checked_lock_executor {
         use super::*;
 
+        fn no_op_task() -> Result<(), io::Error> {
+            Ok(())
+        }
+
         fn increment_unit_task(value: &mut i32) -> Result<(), io::Error> {
             *value += 1;
             Ok(())
@@ -141,14 +145,16 @@ mod tests {
             assert!(matches!(context.peek_result(), ExecutionResult::Success(3)));
             assert!(matches!(context.get_result(), ExecutionResult::Success(3)));
 
-            let finished = executor.execute(|| Ok::<(), io::Error>(())).finish();
+            let finished = executor
+                .execute(no_op_task as fn() -> Result<(), io::Error>)
+                .finish();
             assert!(finished);
 
             let skipped = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| false)
                 .build()
-                .execute(|| Ok::<(), io::Error>(()))
+                .execute(no_op_task as fn() -> Result<(), io::Error>)
                 .finish();
             assert!(!skipped);
         }

@@ -88,7 +88,7 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(|value: &mut i32| Ok::<i32, io::Error>(*value))
+                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
                 .get_result();
 
             assert!(matches!(

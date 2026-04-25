@@ -14,6 +14,7 @@ mod tests {
             Arc,
             atomic::{
                 AtomicBool,
+                AtomicUsize,
                 Ordering,
             },
         },
@@ -265,6 +266,64 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(1)));
+        }
+
+        #[test]
+        fn test_prepare_success_without_commit_preserves_success() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data.clone())
+                .when(|| true)
+                .prepare(|| Ok::<(), io::Error>(()))
+                .build();
+
+            let result = executor
+                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(2)));
+            assert_eq!(data.read(|value| *value), 2);
+        }
+
+        #[test]
+        fn test_prepare_success_without_rollback_preserves_task_failure() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .prepare(|| Ok::<(), io::Error>(()))
+                .build();
+
+            let result = executor
+                .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::TaskFailed(_))
+            ));
+        }
+
+        #[test]
+        fn test_prepare_success_without_rollback_preserves_condition_failure() {
+            let data = ArcMutex::new(1);
+            let checks = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data.clone())
+                .when({
+                    let checks = checks.clone();
+                    move || checks.fetch_add(1, Ordering::AcqRel) == 0
+                })
+                .prepare(|| Ok::<(), io::Error>(()))
+                .build();
+
+            let result = executor
+                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::ConditionNotMet));
+            assert_eq!(data.read(|value| *value), 1);
+            assert_eq!(checks.load(Ordering::Acquire), 2);
         }
     }
 }
