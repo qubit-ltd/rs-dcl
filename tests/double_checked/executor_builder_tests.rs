@@ -8,10 +8,7 @@
  ******************************************************************************/
 #[cfg(test)]
 mod tests {
-    use qubit_dcl::{
-        DoubleCheckedLockExecutor,
-        double_checked::ExecutionResult,
-    };
+    use qubit_dcl::{DoubleCheckedLockExecutor, double_checked::ExecutionResult};
     use qubit_lock::ArcMutex;
 
     mod test_executor_builder {
@@ -42,6 +39,10 @@ mod tests {
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
                 .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
                 .log_prepare_rollback_failure(log::Level::Info, "prepare rollback failed")
+                .disable_unmet_condition_logging()
+                .disable_prepare_failure_logging()
+                .disable_prepare_commit_failure_logging()
+                .disable_prepare_rollback_failure_logging()
                 .on(data)
                 .when(|| true)
                 .build();

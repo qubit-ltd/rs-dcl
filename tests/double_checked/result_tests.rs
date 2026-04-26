@@ -8,10 +8,7 @@
  ******************************************************************************/
 #[cfg(test)]
 mod tests {
-    use qubit_dcl::double_checked::{
-        ExecutionResult,
-        ExecutorError,
-    };
+    use qubit_dcl::double_checked::{ExecutionResult, ExecutorError};
 
     mod test_execution_result {
         use super::*;
@@ -100,13 +97,6 @@ mod tests {
 
         #[test]
         fn test_execution_result_failure_constructors() {
-            let lock_result = ExecutionResult::<(), String>::lock_poisoned("poisoned lock");
-            assert!(matches!(
-                lock_result,
-                ExecutionResult::Failed(ExecutorError::LockPoisoned(message))
-                    if message == "poisoned lock"
-            ));
-
             let error = ExecutorError::TaskFailed("task failed".to_string());
             let task_result = ExecutionResult::<(), String>::from_executor_error(error);
             assert!(matches!(

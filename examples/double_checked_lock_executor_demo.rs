@@ -16,17 +16,10 @@
 
 use std::sync::{
     Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
-    },
+    atomic::{AtomicBool, Ordering},
 };
 
-use qubit_dcl::DoubleCheckedLockExecutor;
-use qubit_lock::lock::{
-    ArcMutex,
-    Lock,
-};
+use qubit_dcl::{ArcMutex, DoubleCheckedLockExecutor, Lock};
 
 #[derive(Debug, thiserror::Error)]
 #[allow(dead_code)]

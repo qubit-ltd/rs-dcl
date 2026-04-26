@@ -155,20 +155,6 @@ where
         })
     }
 
-    /// Builds a failed result with [`ExecutorError::LockPoisoned`].
-    ///
-    /// # Parameters
-    ///
-    /// * `msg` - Lock poisoning diagnostic message.
-    ///
-    /// # Returns
-    ///
-    /// A failed result containing the lock poisoning message.
-    #[inline]
-    pub fn lock_poisoned(msg: impl Into<String>) -> Self {
-        ExecutionResult::Failed(ExecutorError::LockPoisoned(msg.into()))
-    }
-
     /// Wraps an arbitrary [`ExecutorError`] as [`ExecutionResult::Failed`].
     ///
     /// # Parameters

@@ -12,25 +12,15 @@ mod tests {
         io,
         sync::{
             Arc,
-            atomic::{
-                AtomicBool,
-                AtomicUsize,
-                Ordering,
-            },
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
     };
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
-        double_checked::{
-            ExecutionResult,
-            ExecutorError,
-        },
+        double_checked::{ExecutionResult, ExecutorError},
     };
-    use qubit_lock::{
-        ArcMutex,
-        lock::Lock,
-    };
+    use qubit_lock::{ArcMutex, lock::Lock};
 
     mod test_executor_ready_builder {
         use super::*;
@@ -259,6 +249,10 @@ mod tests {
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
                 .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
                 .log_prepare_rollback_failure(log::Level::Info, "prepare rollback failed")
+                .disable_unmet_condition_logging()
+                .disable_prepare_failure_logging()
+                .disable_prepare_commit_failure_logging()
+                .disable_prepare_rollback_failure_logging()
                 .build();
 
             let result = executor

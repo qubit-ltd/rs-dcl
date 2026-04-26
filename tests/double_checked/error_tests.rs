@@ -8,7 +8,7 @@
  ******************************************************************************/
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::{error::Error, io};
 
     use qubit_dcl::double_checked::ExecutorError;
 
@@ -50,13 +50,6 @@ mod tests {
         }
 
         #[test]
-        fn test_executor_error_lock_poisoned_display() {
-            let error = ExecutorError::<String>::LockPoisoned("Lock poisoned".to_string());
-            let display = format!("{}", error);
-            assert_eq!(display, "Lock poisoned: Lock poisoned");
-        }
-
-        #[test]
         fn test_executor_error_debug() {
             let error = ExecutorError::<String>::TaskFailed("Debug test".to_string());
             let debug_str = format!("{:?}", error);
@@ -74,9 +67,24 @@ mod tests {
 
         #[test]
         fn test_executor_error_is_error_trait() {
-            let error = ExecutorError::<String>::TaskFailed("Test".to_string());
+            let error = ExecutorError::<io::Error>::TaskFailed(io::Error::other("Test"));
             // This will compile if it implements Error trait
             let _error_trait: &dyn std::error::Error = &error;
+        }
+
+        #[test]
+        fn test_executor_error_source_exposes_task_error() {
+            let error = ExecutorError::<io::Error>::TaskFailed(io::Error::other("source error"));
+
+            let source = error.source().expect("task error should be source");
+            assert_eq!(source.to_string(), "source error");
+        }
+
+        #[test]
+        fn test_executor_error_source_is_none_for_prepare_failures() {
+            let error = ExecutorError::<io::Error>::PrepareFailed("prepare failed".to_string());
+
+            assert!(error.source().is_none());
         }
     }
 }

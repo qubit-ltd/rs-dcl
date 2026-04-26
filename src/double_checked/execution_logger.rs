@@ -33,29 +33,29 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct ExecutionLogger {
     /// Log level for the condition-unmet message; `None` skips it.
-    pub unmet_condition_level: Option<log::Level>,
+    unmet_condition_level: Option<log::Level>,
 
     /// Message logged when the execution condition is not met.
-    pub unmet_condition_message: String,
+    unmet_condition_message: String,
 
     /// Log level for prepare-action failure lines; `None` skips them.
-    pub prepare_failed_level: Option<log::Level>,
+    prepare_failed_level: Option<log::Level>,
 
     /// Prefix for prepare-failure lines, formatted as `"{prefix}: {error}"`.
-    pub prepare_failed_message: String,
+    prepare_failed_message: String,
 
     /// Log level for prepare-commit failure lines; `None` skips them.
-    pub prepare_commit_failed_level: Option<log::Level>,
+    prepare_commit_failed_level: Option<log::Level>,
 
     /// Prefix for prepare-commit failure lines, formatted as `"{prefix}: {error}"`.
-    pub prepare_commit_failed_message: String,
+    prepare_commit_failed_message: String,
 
     /// Log level for prepare-rollback failure lines; `None` skips them.
-    pub prepare_rollback_failed_level: Option<log::Level>,
+    prepare_rollback_failed_level: Option<log::Level>,
 
     /// Prefix for prepare-rollback failure lines, formatted as
     /// `"{prefix}: {error}"`.
-    pub prepare_rollback_failed_message: String,
+    prepare_rollback_failed_message: String,
 }
 
 impl Default for ExecutionLogger {
@@ -85,6 +85,62 @@ impl Default for ExecutionLogger {
 }
 
 impl ExecutionLogger {
+    /// Returns the configured level for unmet-condition logging.
+    ///
+    /// [`None`] means the event does not emit a log line.
+    #[inline]
+    pub fn unmet_condition_level(&self) -> Option<log::Level> {
+        self.unmet_condition_level
+    }
+
+    /// Returns the message used for unmet-condition logging.
+    #[inline]
+    pub fn unmet_condition_message(&self) -> &str {
+        &self.unmet_condition_message
+    }
+
+    /// Returns the configured level for prepare-action failures.
+    ///
+    /// [`None`] means the event does not emit a log line.
+    #[inline]
+    pub fn prepare_failed_level(&self) -> Option<log::Level> {
+        self.prepare_failed_level
+    }
+
+    /// Returns the message prefix used for prepare-action failures.
+    #[inline]
+    pub fn prepare_failed_message(&self) -> &str {
+        &self.prepare_failed_message
+    }
+
+    /// Returns the configured level for prepare-commit failures.
+    ///
+    /// [`None`] means the event does not emit a log line.
+    #[inline]
+    pub fn prepare_commit_failed_level(&self) -> Option<log::Level> {
+        self.prepare_commit_failed_level
+    }
+
+    /// Returns the message prefix used for prepare-commit failures.
+    #[inline]
+    pub fn prepare_commit_failed_message(&self) -> &str {
+        &self.prepare_commit_failed_message
+    }
+
+    /// Returns the configured level for prepare-rollback failures.
+    ///
+    /// [`None`] means the event does not emit a log line.
+    #[inline]
+    pub fn prepare_rollback_failed_level(&self) -> Option<log::Level> {
+        self.prepare_rollback_failed_level
+    }
+
+    /// Returns the message prefix used for prepare-rollback failures.
+    #[inline]
+    pub fn prepare_rollback_failed_message(&self) -> &str {
+        &self.prepare_rollback_failed_message
+    }
+
     /// Updates logging for the case where the double-checked condition is not met
     /// (the tester returns `false` before or after taking the lock).
     ///
@@ -102,6 +158,15 @@ impl ExecutionLogger {
     pub fn set_unmet_condition(&mut self, level: Option<log::Level>, message: impl Into<String>) {
         self.unmet_condition_level = level;
         self.unmet_condition_message = message.into();
+    }
+
+    /// Disables logging for unmet double-checked conditions.
+    ///
+    /// This keeps the stored message unchanged so a later call to
+    /// [`Self::set_unmet_condition`] can re-enable the event with a new message.
+    #[inline]
+    pub fn disable_unmet_condition(&mut self) {
+        self.unmet_condition_level = None;
     }
 
     /// Updates logging for a failed optional prepare action (before the lock is taken).
@@ -122,6 +187,12 @@ impl ExecutionLogger {
     ) {
         self.prepare_failed_level = level;
         self.prepare_failed_message = message_prefix.into();
+    }
+
+    /// Disables logging for prepare-action failures.
+    #[inline]
+    pub fn disable_prepare_failure(&mut self) {
+        self.prepare_failed_level = None;
     }
 
     /// Updates logging for a failed prepare commit action (after a successful task
@@ -145,6 +216,12 @@ impl ExecutionLogger {
         self.prepare_commit_failed_message = message_prefix.into();
     }
 
+    /// Disables logging for prepare-commit failures.
+    #[inline]
+    pub fn disable_prepare_commit_failure(&mut self) {
+        self.prepare_commit_failed_level = None;
+    }
+
     /// Updates logging for a failed prepare rollback action (after a failed second
     /// check or task when prepare had completed).
     ///
@@ -164,6 +241,12 @@ impl ExecutionLogger {
     ) {
         self.prepare_rollback_failed_level = level;
         self.prepare_rollback_failed_message = message_prefix.into();
+    }
+
+    /// Disables logging for prepare-rollback failures.
+    #[inline]
+    pub fn disable_prepare_rollback_failure(&mut self) {
+        self.prepare_rollback_failed_level = None;
     }
 
     /// Emits the condition-unmet log line if enabled.

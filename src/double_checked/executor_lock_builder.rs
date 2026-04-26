@@ -17,10 +17,7 @@ use std::marker::PhantomData;
 
 use qubit_function::Tester;
 
-use super::{
-    ExecutionLogger,
-    executor_ready_builder::ExecutorReadyBuilder,
-};
+use super::{ExecutionLogger, executor_ready_builder::ExecutorReadyBuilder};
 use crate::lock::Lock;
 
 /// Builder state after a lock has been attached.
@@ -58,6 +55,13 @@ where
         self
     }
 
+    /// Disables logging when the double-checked condition is not met.
+    #[inline]
+    pub fn disable_unmet_condition_logging(mut self) -> Self {
+        self.logger.disable_unmet_condition();
+        self
+    }
+
     /// Configures logging when the prepare action fails.
     #[inline]
     pub fn log_prepare_failure(
@@ -66,6 +70,13 @@ where
         message_prefix: impl Into<String>,
     ) -> Self {
         self.logger.set_prepare_failure(Some(level), message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare action fails.
+    #[inline]
+    pub fn disable_prepare_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_failure();
         self
     }
 
@@ -81,6 +92,13 @@ where
         self
     }
 
+    /// Disables logging when the prepare commit action fails.
+    #[inline]
+    pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_commit_failure();
+        self
+    }
+
     /// Configures logging when the prepare rollback action fails.
     #[inline]
     pub fn log_prepare_rollback_failure(
@@ -90,6 +108,13 @@ where
     ) -> Self {
         self.logger
             .set_prepare_rollback_failure(Some(level), message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare rollback action fails.
+    #[inline]
+    pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_rollback_failure();
         self
     }
 

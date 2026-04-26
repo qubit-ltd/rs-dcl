@@ -18,7 +18,7 @@
 - **完整双重检查流程**：锁外条件判断 → 可选加锁前 prepare → 写锁 → 锁内再判断 → 任务；释锁后可选对 prepare 做 **提交** 或 **回滚**。
 - **多种执行入口**：无受保护数据参数的 `call` / `execute`，以及带 `&mut T` 的 `call_with` / `execute_with`。
 - **明确的结果类型**：`ExecutionContext` 与 `ExecutionResult` 区分成功、条件未满足、任务失败以及 prepare 收尾阶段失败（`ExecutorError`）。
-- **可配置日志**：基于 `log` 与 `ExecutionLogger`，在 builder 上为「条件未满足」与 prepare 各阶段配置日志。
+- **可配置日志**：基于 `log` 与 `ExecutionLogger`，在 builder 上为「条件未满足」与 prepare 各阶段配置日志，也可按事件关闭日志。
 
 ## 工作方式
 
@@ -26,11 +26,13 @@
 2. 若第一次通过，可配置在加锁前执行 **prepare**；持锁后再次检测条件并执行任务。
 3. 若已执行过 prepare 且需收尾：任务整体成功时可选 **commit_prepare**；内层检查或任务未成功时可选 **rollback_prepare**（均在释放写锁之后执行）。
 
+executor 不捕获 tester、prepare 回调或任务中的 panic。若任务在 prepare 成功后 panic，panic 会继续向外传播，且不会执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
+
 ## 安装
 
 ```toml
 [dependencies]
-qubit-dcl = "0.1.0"
+qubit-dcl = "0.2.0"
 ```
 
 `qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。
@@ -122,7 +124,8 @@ cargo run --example double_checked_lock_executor_demo
 - 入口：`DoubleCheckedLockExecutor::builder()`。
 - 绑定锁：`.on(lock)`，要求 `L: Lock<T>`。
 - 设置双重条件：`.when(tester)`。
-- 可选：`.prepare`、`.rollback_prepare`、`.commit_prepare`；以及各类 `.log_*` 用于诊断日志。
+- 可选：`.prepare`、`.rollback_prepare`、`.commit_prepare`。
+- 诊断日志：`.log_unmet_condition`、`.log_prepare_failure`、`.log_prepare_commit_failure`、`.log_prepare_rollback_failure`；对应的 `.disable_*_logging` 方法可关闭某类日志。
 - 结束：`.build()` 得到可复用执行器。
 
 ## 项目结构
@@ -134,6 +137,10 @@ cargo run --example double_checked_lock_executor_demo
 ## 质量检查
 
 ```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 ./align-ci.sh
 ./ci-check.sh
 ./coverage.sh json

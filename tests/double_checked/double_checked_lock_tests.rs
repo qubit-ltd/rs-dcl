@@ -12,21 +12,12 @@ mod tests {
         io,
         sync::{
             Arc,
-            atomic::{
-                AtomicBool,
-                Ordering,
-            },
+            atomic::{AtomicBool, Ordering},
         },
     };
 
-    use qubit_dcl::{
-        DoubleCheckedLock,
-        double_checked::ExecutionResult,
-    };
-    use qubit_lock::{
-        ArcMutex,
-        lock::Lock,
-    };
+    use qubit_dcl::{DoubleCheckedLock, double_checked::ExecutionResult};
+    use qubit_lock::{ArcMutex, lock::Lock};
 
     mod test_double_checked_lock {
         use super::*;
@@ -156,6 +147,10 @@ mod tests {
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
                 .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
                 .log_prepare_rollback_failure(log::Level::Debug, "prepare rollback failed")
+                .disable_unmet_condition_logging()
+                .disable_prepare_failure_logging()
+                .disable_prepare_commit_failure_logging()
+                .disable_prepare_rollback_failure_logging()
                 .when(|| true)
                 .call(|| Ok::<i32, io::Error>(42))
                 .get_result();
@@ -174,6 +169,10 @@ mod tests {
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
                 .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
                 .log_prepare_rollback_failure(log::Level::Debug, "prepare rollback failed")
+                .disable_unmet_condition_logging()
+                .disable_prepare_failure_logging()
+                .disable_prepare_commit_failure_logging()
+                .disable_prepare_rollback_failure_logging()
                 .execute({
                     let executed = executed.clone();
                     move || {

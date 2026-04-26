@@ -18,17 +18,9 @@ pub mod double_checked;
 pub mod lock;
 
 pub use double_checked::{
-    DoubleCheckedLock,
-    DoubleCheckedLockExecutor,
-    DoubleCheckedLockLockBuilder,
-    DoubleCheckedLockReadyBuilder,
-    ExecutionContext,
-    ExecutionLogger,
-    ExecutionResult,
-    ExecutorBuilder,
-    ExecutorError,
-    ExecutorLockBuilder,
-    ExecutorReadyBuilder,
+    DoubleCheckedLock, DoubleCheckedLockBuilder, DoubleCheckedLockExecutor,
+    DoubleCheckedLockReadyBuilder, ExecutionContext, ExecutionLogger, ExecutionResult,
+    ExecutorBuilder, ExecutorError, ExecutorLockBuilder, ExecutorReadyBuilder,
 };
 pub use qubit_lock::ArcMutex;
 pub use qubit_lock::lock::Lock;

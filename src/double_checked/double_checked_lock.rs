@@ -17,18 +17,10 @@
 
 use std::fmt::Display;
 
-use qubit_function::{
-    Callable,
-    CallableWith,
-    Runnable,
-    RunnableWith,
-    Tester,
-};
+use qubit_function::{Callable, CallableWith, Runnable, RunnableWith, Tester};
 
 use super::{
-    DoubleCheckedLockExecutor,
-    ExecutionContext,
-    executor_lock_builder::ExecutorLockBuilder,
+    DoubleCheckedLockExecutor, ExecutionContext, executor_lock_builder::ExecutorLockBuilder,
     executor_ready_builder::ExecutorReadyBuilder,
 };
 use crate::lock::Lock;
@@ -68,11 +60,11 @@ pub struct DoubleCheckedLock;
 impl DoubleCheckedLock {
     /// Starts one-shot double-checked lock configuration by attaching a lock.
     #[inline]
-    pub fn on<L, T>(lock: L) -> DoubleCheckedLockLockBuilder<L, T>
+    pub fn on<L, T>(lock: L) -> DoubleCheckedLockBuilder<L, T>
     where
         L: Lock<T>,
     {
-        DoubleCheckedLockLockBuilder {
+        DoubleCheckedLockBuilder {
             inner: DoubleCheckedLockExecutor::builder().on(lock),
         }
     }
@@ -80,11 +72,11 @@ impl DoubleCheckedLock {
 
 /// Convenience builder state with lock attached.
 #[derive(Clone)]
-pub struct DoubleCheckedLockLockBuilder<L, T> {
+pub struct DoubleCheckedLockBuilder<L, T> {
     inner: ExecutorLockBuilder<L, T>,
 }
 
-impl<L, T> DoubleCheckedLockLockBuilder<L, T>
+impl<L, T> DoubleCheckedLockBuilder<L, T>
 where
     L: Lock<T>,
 {
@@ -92,6 +84,13 @@ where
     #[inline]
     pub fn log_unmet_condition(mut self, level: log::Level, message: impl Into<String>) -> Self {
         self.inner = self.inner.log_unmet_condition(level, message);
+        self
+    }
+
+    /// Disables logging when the double-checked condition is not met.
+    #[inline]
+    pub fn disable_unmet_condition_logging(mut self) -> Self {
+        self.inner = self.inner.disable_unmet_condition_logging();
         self
     }
 
@@ -106,6 +105,13 @@ where
         self
     }
 
+    /// Disables logging when the prepare action fails.
+    #[inline]
+    pub fn disable_prepare_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_failure_logging();
+        self
+    }
+
     /// Configures logging when the prepare commit action fails.
     #[inline]
     pub fn log_prepare_commit_failure(
@@ -114,6 +120,13 @@ where
         message_prefix: impl Into<String>,
     ) -> Self {
         self.inner = self.inner.log_prepare_commit_failure(level, message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare commit action fails.
+    #[inline]
+    pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_commit_failure_logging();
         self
     }
 
@@ -127,6 +140,13 @@ where
         self.inner = self
             .inner
             .log_prepare_rollback_failure(level, message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare rollback action fails.
+    #[inline]
+    pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_rollback_failure_logging();
         self
     }
 
@@ -159,6 +179,13 @@ where
         self
     }
 
+    /// Disables logging when the double-checked condition is not met.
+    #[inline]
+    pub fn disable_unmet_condition_logging(mut self) -> Self {
+        self.inner = self.inner.disable_unmet_condition_logging();
+        self
+    }
+
     /// Configures logging when the prepare action fails.
     #[inline]
     pub fn log_prepare_failure(
@@ -170,6 +197,13 @@ where
         self
     }
 
+    /// Disables logging when the prepare action fails.
+    #[inline]
+    pub fn disable_prepare_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_failure_logging();
+        self
+    }
+
     /// Configures logging when the prepare commit action fails.
     #[inline]
     pub fn log_prepare_commit_failure(
@@ -178,6 +212,13 @@ where
         message_prefix: impl Into<String>,
     ) -> Self {
         self.inner = self.inner.log_prepare_commit_failure(level, message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare commit action fails.
+    #[inline]
+    pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_commit_failure_logging();
         self
     }
 
@@ -194,12 +235,19 @@ where
         self
     }
 
+    /// Disables logging when the prepare rollback action fails.
+    #[inline]
+    pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
+        self.inner = self.inner.disable_prepare_rollback_failure_logging();
+        self
+    }
+
     /// Sets the prepare action.
     #[inline]
     pub fn prepare<Rn, E>(mut self, prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         self.inner = self.inner.prepare(prepare_action);
         self
@@ -210,7 +258,7 @@ where
     pub fn rollback_prepare<Rn, E>(mut self, rollback_prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         self.inner = self.inner.rollback_prepare(rollback_prepare_action);
         self
@@ -221,7 +269,7 @@ where
     pub fn commit_prepare<Rn, E>(mut self, commit_prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         self.inner = self.inner.commit_prepare(commit_prepare_action);
         self
@@ -237,9 +285,8 @@ where
     #[inline]
     pub fn call<C, R, E>(self, task: C) -> ExecutionContext<R, E>
     where
-        C: Callable<R, E> + Send + 'static,
-        R: Send + 'static,
-        E: Display + Send + 'static,
+        C: Callable<R, E>,
+        E: Display,
     {
         self.inner.build().call(task)
     }
@@ -248,8 +295,8 @@ where
     #[inline]
     pub fn execute<Rn, E>(self, task: Rn) -> ExecutionContext<(), E>
     where
-        Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        Rn: Runnable<E>,
+        E: Display,
     {
         self.inner.build().execute(task)
     }
@@ -258,9 +305,8 @@ where
     #[inline]
     pub fn call_with<C, R, E>(self, task: C) -> ExecutionContext<R, E>
     where
-        C: CallableWith<T, R, E> + Send + 'static,
-        R: Send + 'static,
-        E: Display + Send + 'static,
+        C: CallableWith<T, R, E>,
+        E: Display,
     {
         self.inner.build().call_with(task)
     }
@@ -269,8 +315,8 @@ where
     #[inline]
     pub fn execute_with<Rn, E>(self, task: Rn) -> ExecutionContext<(), E>
     where
-        Rn: RunnableWith<T, E> + Send + 'static,
-        E: Display + Send + 'static,
+        Rn: RunnableWith<T, E>,
+        E: Display,
     {
         self.inner.build().execute_with(task)
     }

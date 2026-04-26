@@ -66,9 +66,6 @@ where
         /// The error that occurred during prepare rollback
         rollback: String,
     },
-
-    /// Lock poisoned error
-    LockPoisoned(String),
 }
 
 impl<E> fmt::Display for ExecutorError<E>
@@ -102,11 +99,24 @@ where
                     original, rollback
                 )
             }
-            ExecutorError::LockPoisoned(msg) => {
-                write!(f, "Lock poisoned: {}", msg)
-            }
         }
     }
 }
 
-impl<E> Error for ExecutorError<E> where E: fmt::Display + fmt::Debug {}
+impl<E> Error for ExecutorError<E>
+where
+    E: Error + 'static,
+{
+    /// Returns the underlying task error as the standard error source.
+    ///
+    /// Prepare lifecycle failures store their messages as strings and therefore
+    /// do not expose a structured source error.
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ExecutorError::TaskFailed(error) => Some(error),
+            ExecutorError::PrepareFailed(_)
+            | ExecutorError::PrepareCommitFailed(_)
+            | ExecutorError::PrepareRollbackFailed { .. } => None,
+        }
+    }
+}

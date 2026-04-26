@@ -13,21 +13,11 @@
 //!
 //! Haixing Hu
 
-use std::{
-    fmt::Display,
-    marker::PhantomData,
-};
+use std::{fmt::Display, marker::PhantomData};
 
-use qubit_function::{
-    ArcRunnable,
-    ArcTester,
-    Runnable,
-};
+use qubit_function::{ArcRunnable, ArcTester, Runnable};
 
-use super::{
-    ExecutionLogger,
-    double_checked_lock_executor::DoubleCheckedLockExecutor,
-};
+use super::{ExecutionLogger, double_checked_lock_executor::DoubleCheckedLockExecutor};
 use crate::lock::Lock;
 
 /// Builder state after the required condition tester has been configured.
@@ -78,6 +68,13 @@ where
         self
     }
 
+    /// Disables logging when the double-checked condition is not met.
+    #[inline]
+    pub fn disable_unmet_condition_logging(mut self) -> Self {
+        self.logger.disable_unmet_condition();
+        self
+    }
+
     /// Configures logging when the prepare action fails.
     #[inline]
     pub fn log_prepare_failure(
@@ -86,6 +83,13 @@ where
         message_prefix: impl Into<String>,
     ) -> Self {
         self.logger.set_prepare_failure(Some(level), message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare action fails.
+    #[inline]
+    pub fn disable_prepare_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_failure();
         self
     }
 
@@ -101,6 +105,13 @@ where
         self
     }
 
+    /// Disables logging when the prepare commit action fails.
+    #[inline]
+    pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_commit_failure();
+        self
+    }
+
     /// Configures logging when the prepare rollback action fails.
     #[inline]
     pub fn log_prepare_rollback_failure(
@@ -110,6 +121,13 @@ where
     ) -> Self {
         self.logger
             .set_prepare_rollback_failure(Some(level), message_prefix);
+        self
+    }
+
+    /// Disables logging when the prepare rollback action fails.
+    #[inline]
+    pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
+        self.logger.disable_prepare_rollback_failure();
         self
     }
 
@@ -133,7 +151,7 @@ where
     pub fn prepare<Rn, E>(mut self, prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         let mut action = prepare_action;
         self.prepare_action = Some(ArcRunnable::new(move || {
@@ -159,7 +177,7 @@ where
     pub fn rollback_prepare<Rn, E>(mut self, rollback_prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         let mut action = rollback_prepare_action;
         self.rollback_prepare_action = Some(ArcRunnable::new(move || {
@@ -185,7 +203,7 @@ where
     pub fn commit_prepare<Rn, E>(mut self, commit_prepare_action: Rn) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        E: Display,
     {
         let mut action = commit_prepare_action;
         self.commit_prepare_action = Some(ArcRunnable::new(move || {

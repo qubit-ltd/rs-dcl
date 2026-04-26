@@ -14,26 +14,14 @@
 //!
 //! Haixing Hu
 
-use std::{
-    fmt::Display,
-    marker::PhantomData,
-};
+use std::{fmt::Display, marker::PhantomData};
 
 use qubit_function::{
-    ArcRunnable,
-    ArcTester,
-    Callable,
-    CallableWith,
-    Runnable,
-    RunnableWith,
-    Tester,
+    ArcRunnable, ArcTester, Callable, CallableWith, Runnable, RunnableWith, Tester,
 };
 
 use super::{
-    ExecutionContext,
-    ExecutionLogger,
-    ExecutionResult,
-    executor_builder::ExecutorBuilder,
+    ExecutionContext, ExecutionLogger, ExecutionResult, executor_builder::ExecutorBuilder,
     executor_ready_builder::ExecutorReadyBuilder,
 };
 use crate::lock::Lock;
@@ -62,15 +50,24 @@ use crate::lock::Lock;
 /// # Examples
 ///
 /// Use [`DoubleCheckedLockExecutor::builder`] to attach a lock (for example
-/// [`crate::ArcMutex`]), set a [`Tester`](qubit_function::Tester) with
-/// [`ExecutorLockBuilder::when`], then call [`Self::call`], [`Self::execute`],
-/// [`Self::call_with`], or [`Self::execute_with`] on the built executor.
+/// [`crate::ArcMutex`]), set a [`Tester`] with
+/// [`ExecutorLockBuilder::when`](super::ExecutorLockBuilder::when), then call
+/// [`Self::call`], [`Self::execute`], [`Self::call_with`], or
+/// [`Self::execute_with`] on the built executor.
+///
+/// Panics from the tester, prepare callbacks, or task are not caught by the
+/// executor. If a task panics after prepare succeeds, the panic propagates and
+/// prepare rollback is not run.
+///
+/// Cloned executors share their configured prepare callbacks. Concurrent calls
+/// may therefore complete prepare in several threads before one call wins the
+/// second condition check; calls that lose the second check run prepare rollback
+/// if it is configured.
 ///
 /// ```rust
 /// use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 ///
-/// use qubit_dcl::{DoubleCheckedLockExecutor, Lock};
-/// use qubit_lock::ArcMutex;
+/// use qubit_dcl::{ArcMutex, DoubleCheckedLockExecutor, Lock};
 /// use qubit_dcl::double_checked::ExecutionResult;
 ///
 /// fn main() {
@@ -142,7 +139,7 @@ impl DoubleCheckedLockExecutor<(), ()> {
     ///
     /// A builder in the initial state. Attach a lock with
     /// [`ExecutorBuilder::on`], then configure a tester with
-    /// [`ExecutorLockBuilder::when`].
+    /// [`ExecutorLockBuilder::when`](super::ExecutorLockBuilder::when).
     #[inline]
     pub fn builder() -> ExecutorBuilder {
         ExecutorBuilder::default()
@@ -192,9 +189,8 @@ where
     #[inline]
     pub fn call<C, R, E>(&self, task: C) -> ExecutionContext<R, E>
     where
-        C: Callable<R, E> + Send + 'static,
-        R: Send + 'static,
-        E: Display + Send + 'static,
+        C: Callable<R, E>,
+        E: Display,
     {
         let mut task = task;
         let result = self.execute_with_write_lock(move |_data| task.call());
@@ -214,8 +210,8 @@ where
     #[inline]
     pub fn execute<Rn, E>(&self, task: Rn) -> ExecutionContext<(), E>
     where
-        Rn: Runnable<E> + Send + 'static,
-        E: Display + Send + 'static,
+        Rn: Runnable<E>,
+        E: Display,
     {
         let mut task = task;
         let result = self.execute_with_write_lock(move |_data| task.run());
@@ -236,9 +232,8 @@ where
     #[inline]
     pub fn call_with<C, R, E>(&self, task: C) -> ExecutionContext<R, E>
     where
-        C: CallableWith<T, R, E> + Send + 'static,
-        R: Send + 'static,
-        E: Display + Send + 'static,
+        C: CallableWith<T, R, E>,
+        E: Display,
     {
         let mut task = task;
         let result = self.execute_with_write_lock(move |data| task.call_with(data));
@@ -259,8 +254,8 @@ where
     #[inline]
     pub fn execute_with<Rn, E>(&self, task: Rn) -> ExecutionContext<(), E>
     where
-        Rn: RunnableWith<T, E> + Send + 'static,
-        E: Display + Send + 'static,
+        Rn: RunnableWith<T, E>,
+        E: Display,
     {
         let mut task = task;
         let result = self.execute_with_write_lock(move |data| task.run_with(data));
@@ -286,7 +281,7 @@ where
     /// than returned as a separate `Result`.
     fn execute_with_write_lock<R, E, F>(&self, task: F) -> ExecutionResult<R, E>
     where
-        E: Display + Send + 'static,
+        E: Display,
         F: FnOnce(&mut T) -> Result<R, E>,
     {
         if !self.tester.test() {
@@ -301,7 +296,6 @@ where
 
         let result = self.lock.write(|data| {
             if !self.tester.test() {
-                self.log_unmet_condition();
                 return ExecutionResult::unmet();
             }
             match task(data) {
@@ -309,6 +303,10 @@ where
                 Err(error) => ExecutionResult::task_failed(error),
             }
         });
+
+        if result.is_unmet() {
+            self.log_unmet_condition();
+        }
 
         if prepare_completed {
             self.finalize_prepare(result)
@@ -353,7 +351,7 @@ where
     /// result when prepare commit or prepare rollback fails.
     fn finalize_prepare<R, E>(&self, mut result: ExecutionResult<R, E>) -> ExecutionResult<R, E>
     where
-        E: Display + Send + 'static,
+        E: Display,
     {
         if result.is_success() {
             if let Some(mut commit_prepare_action) = self.commit_prepare_action.clone()

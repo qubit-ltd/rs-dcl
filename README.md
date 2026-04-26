@@ -18,7 +18,7 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 - **Double-checked flow**: first condition check without the lock, optional pre-lock prepare, write lock, second check, then task; after the lock is released, optional prepare commit or rollback.
 - **Execution API**: `call` / `execute` (no direct `&mut T` in the closure) and `call_with` / `execute_with` (mutable access to protected data).
 - **Typed outcomes**: `ExecutionContext` and `ExecutionResult` distinguish success, “condition not met,” task failure, and prepare finalization failures (`ExecutorError`).
-- **Logging hooks** via `log` and configurable `ExecutionLogger` on the builder for unmet conditions and prepare-step failures.
+- **Logging hooks** via `log` and configurable `ExecutionLogger` on the builder for unmet conditions and prepare-step failures; each event can also be disabled from the builder chain.
 
 ## How it works
 
@@ -26,11 +26,13 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
 3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
 
+Panics from the tester, prepare callbacks, or task are not caught. If a task panics after prepare succeeds, the panic propagates and prepare rollback is not run. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+
 ## Installation
 
 ```toml
 [dependencies]
-qubit-dcl = "0.1.0"
+qubit-dcl = "0.2.0"
 ```
 
 `qubit-dcl` already depends on `qubit-lock` and re-exports `ArcMutex` and `Lock`; add a direct `qubit-lock` dependency only if you use types beyond those re-exports.
@@ -122,7 +124,8 @@ cargo run --example double_checked_lock_executor_demo
 - Start with `DoubleCheckedLockExecutor::builder()`.
 - Attach a lock: `.on(lock)` where `L: Lock<T>`.
 - Set the double-checked condition: `.when(tester)`.
-- Optionally: `.prepare`, `.rollback_prepare`, `.commit_prepare` for the prepare pipeline; any of `.log_unmet_condition`, `.log_prepare_failure`, `.log_prepare_commit_failure`, `.log_prepare_rollback_failure` for diagnostics.
+- Optionally: `.prepare`, `.rollback_prepare`, `.commit_prepare` for the prepare pipeline.
+- Configure diagnostics with `.log_unmet_condition`, `.log_prepare_failure`, `.log_prepare_commit_failure`, `.log_prepare_rollback_failure`; disable them with the matching `.disable_*_logging` methods.
 - Finish with `.build()`.
 
 ## Project layout
@@ -134,6 +137,10 @@ cargo run --example double_checked_lock_executor_demo
 ## Quality checks
 
 ```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 ./align-ci.sh
 ./ci-check.sh
 ./coverage.sh json
