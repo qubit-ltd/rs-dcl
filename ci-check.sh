@@ -12,7 +12,7 @@
 # Run this script before committing code to ensure it passes all CircleCI checks
 #
 
-set -e  # Exit immediately on error
+set -euo pipefail
 
 # Color definitions
 RED='\033[0;31m'
@@ -45,7 +45,7 @@ echo "🚀 Starting local CI checks..."
 echo ""
 
 # Check 1: Code formatting
-print_step "1/6 Checking code format (cargo +nightly fmt)..."
+print_step "1/7 Checking code format (cargo +nightly fmt)..."
 
 # Check if nightly toolchain is installed
 if ! rustup toolchain list | grep -q nightly; then
@@ -60,28 +60,29 @@ else
     echo ""
     echo "Please run the following command to fix formatting issues:"
     echo "  cargo +nightly fmt"
-    echo "Or use the format script:"
-    echo "  ./format.sh"
     exit 1
 fi
 echo ""
 
 # Check 2: Clippy linting
-print_step "2/6 Running Clippy checks (cargo +nightly clippy)..."
-if cargo +nightly clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt | grep -q "warning\|error"; then
+print_step "2/7 Running Clippy checks (cargo +nightly clippy)..."
+CLIPPY_LOG=$(mktemp)
+if cargo +nightly clippy --all-targets --all-features -- -D warnings > "$CLIPPY_LOG" 2>&1; then
+    print_success "Clippy checks passed"
+    command rm -f "$CLIPPY_LOG"
+else
     print_error "Clippy found issues"
-    cat /tmp/clippy-output.txt
+    cat "$CLIPPY_LOG"
+    command rm -f "$CLIPPY_LOG"
     echo ""
     echo "Please try to auto-fix with:"
     echo "  cargo +nightly clippy --fix --all-targets --all-features"
     exit 1
-else
-    print_success "Clippy checks passed"
 fi
 echo ""
 
 # Check 3: Build project
-print_step "3/6 Building project (cargo build)..."
+print_step "3/7 Building project (cargo build)..."
 if cargo build --verbose > /dev/null 2>&1; then
     print_success "Debug build succeeded"
 else
@@ -100,7 +101,7 @@ fi
 echo ""
 
 # Check 4: Run tests
-print_step "4/6 Running tests (cargo test)..."
+print_step "4/7 Running tests (cargo test)..."
 if cargo test --verbose; then
     print_success "All tests passed"
 else
@@ -109,10 +110,21 @@ else
 fi
 echo ""
 
-# Check 5: Code coverage
-print_step "5/6 Generating code coverage report..."
+# Check 5: Documentation
+print_step "5/7 Building documentation with warnings denied..."
+if RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --verbose > /dev/null 2>&1; then
+    print_success "Documentation build passed"
+else
+    print_error "Documentation build failed"
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --verbose
+    exit 1
+fi
+echo ""
+
+# Check 6: Code coverage
+print_step "6/7 Generating code coverage report..."
 if command -v cargo-llvm-cov &> /dev/null; then
-    PACKAGE_NAME=$(grep "^name = " Cargo.toml | head -n 1 | sed 's/name = "\(.*\)"/\1/')
+    PACKAGE_NAME=$(awk -F'"' '/^name = / { print $2; exit }' Cargo.toml)
 
     # cargo-llvm-cov needs llvm-profdata AND llvm-cov from llvm-tools-preview on the
     # SAME toolchain Cargo uses in this directory (may differ from `rustup default`).
@@ -120,7 +132,7 @@ if command -v cargo-llvm-cov &> /dev/null; then
     RUST_HOST=""
     RUSTUP_ACTIVE_TOOLCHAIN=""
     if command -v rustup &> /dev/null; then
-        RUSTUP_ACTIVE_TOOLCHAIN=$(rustup show active-toolchain 2>/dev/null | awk '{print $1; exit}')
+        RUSTUP_ACTIVE_TOOLCHAIN=$(rustup show active-toolchain 2>/dev/null | awk '{print $1; exit}' || true)
     fi
     if [ -n "$RUSTUP_ACTIVE_TOOLCHAIN" ]; then
         RUST_SYSROOT=$(rustup run "$RUSTUP_ACTIVE_TOOLCHAIN" rustc --print sysroot 2>/dev/null || true)
@@ -159,40 +171,39 @@ if command -v cargo-llvm-cov &> /dev/null; then
             echo "  (llvm-cov:      $LLVM_COV)"
         fi
     else
-    # Generate text format coverage report.
-    # Stream output with `tee` so compile/test/llvm-cov progress is visible
-    # (command substitution alone buffers everything until completion).
-    # With `set -e`, a failing pipeline can exit before messages — temporarily
-    # disable errexit, capture `cargo llvm-cov` exit from PIPESTATUS, then exit explicitly.
-    COVERAGE_LOG=$(mktemp)
-    set +e
-    cargo llvm-cov --package "$PACKAGE_NAME" \
-        --ignore-filename-regex "(\.cargo/registry|\.rustup/)" 2>&1 | tee "$COVERAGE_LOG"
-    COVERAGE_EXIT=${PIPESTATUS[0]}
-    set -e
-    if [ "$COVERAGE_EXIT" -ne 0 ]; then
-        print_error "cargo llvm-cov failed (exit $COVERAGE_EXIT)"
-        command rm -f "$COVERAGE_LOG"
-        exit 1
-    fi
-
-    # Extract coverage percentage
-    COVERAGE_LINE=$(grep "TOTAL" "$COVERAGE_LOG" || echo "")
-
-    if [ -n "$COVERAGE_LINE" ]; then
-        print_success "Coverage report generated"
-        echo "$COVERAGE_LINE"
-
-        # Check if coverage is below threshold (e.g., 90%) — use awk so we
-        # do not depend on `bc` (often missing on minimal/macOS setups).
-        LINE_COVERAGE=$(echo "$COVERAGE_LINE" | awk '{print $10}' | sed 's/%//')
-        if [ -n "$LINE_COVERAGE" ] && awk -v n="$LINE_COVERAGE" 'BEGIN { if (n + 0 < 90) exit 0; exit 1 }'; then
-            print_warning "Code coverage ($LINE_COVERAGE%) is below 90%"
+        # Generate text format coverage report.
+        # Stream output with `tee` so compile/test/llvm-cov progress is visible
+        # (command substitution alone buffers everything until completion).
+        # Temporarily disable errexit to capture `cargo llvm-cov` from PIPESTATUS.
+        COVERAGE_LOG=$(mktemp)
+        set +e
+        cargo llvm-cov --package "$PACKAGE_NAME" \
+            --ignore-filename-regex "(\.cargo/registry|\.rustup/)" 2>&1 | tee "$COVERAGE_LOG"
+        COVERAGE_EXIT=${PIPESTATUS[0]}
+        set -e
+        if [ "$COVERAGE_EXIT" -ne 0 ]; then
+            print_error "cargo llvm-cov failed (exit $COVERAGE_EXIT)"
+            command rm -f "$COVERAGE_LOG"
+            exit 1
         fi
-    else
-        print_warning "Unable to parse coverage data"
-    fi
-    command rm -f "$COVERAGE_LOG"
+
+        # Extract coverage percentage
+        COVERAGE_LINE=$(grep "TOTAL" "$COVERAGE_LOG" || echo "")
+
+        if [ -n "$COVERAGE_LINE" ]; then
+            print_success "Coverage report generated"
+            echo "$COVERAGE_LINE"
+
+            # Check if coverage is below threshold (e.g., 90%) — use awk so we
+            # do not depend on `bc` (often missing on minimal/macOS setups).
+            LINE_COVERAGE=$(echo "$COVERAGE_LINE" | awk '{print $10}' | sed 's/%//')
+            if [ -n "$LINE_COVERAGE" ] && awk -v n="$LINE_COVERAGE" 'BEGIN { if (n + 0 < 90) exit 0; exit 1 }'; then
+                print_warning "Code coverage ($LINE_COVERAGE%) is below 90%"
+            fi
+        else
+            print_warning "Unable to parse coverage data"
+        fi
+        command rm -f "$COVERAGE_LOG"
     fi
 else
     print_warning "cargo-llvm-cov not installed, skipping coverage check"
@@ -202,13 +213,21 @@ else
 fi
 echo ""
 
-# Check 6: Security audit
-print_step "6/6 Running security audit (cargo audit)..."
+# Check 7: Security audit
+print_step "7/7 Running security audit (cargo audit)..."
 if command -v cargo-audit &> /dev/null; then
-    if cargo audit; then
+    AUDIT_LOG=$(mktemp)
+    if cargo audit 2>&1 | tee "$AUDIT_LOG"; then
         print_success "Security audit passed, no known vulnerabilities found"
+        command rm -f "$AUDIT_LOG"
+    elif grep -qi "couldn't fetch advisory database\\|failed to fetch advisory database\\|error sending request" "$AUDIT_LOG"; then
+        print_warning "Security audit could not fetch the RustSec advisory database; skipping audit check"
+        echo "Try again when network access to https://github.com/RustSec/advisory-db.git is available."
+        command rm -f "$AUDIT_LOG"
     else
         print_error "Security audit found issues"
+        cat "$AUDIT_LOG"
+        command rm -f "$AUDIT_LOG"
         echo ""
         echo "Please review the security issues and consider:"
         echo "  1. Update dependencies: cargo update"
@@ -231,7 +250,3 @@ echo ""
 echo "Your code is ready to commit."
 echo "After pushing, CircleCI will automatically run the same checks."
 echo ""
-
-# Clean up temporary files
-rm -f /tmp/clippy-output.txt
-

@@ -12,7 +12,7 @@
 # Uses cargo-llvm-cov to generate code coverage reports
 #
 
-set -e
+set -euo pipefail
 
 echo "🔍 Starting code coverage testing..."
 
@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 
 # Detect package name from Cargo.toml
 if [ -f "Cargo.toml" ]; then
-    PACKAGE_NAME=$(grep "^name = " Cargo.toml | head -n 1 | sed 's/name = "\(.*\)"/\1/')
+    PACKAGE_NAME=$(awk -F'"' '/^name = / { print $2; exit }' Cargo.toml)
     echo "📦 Detected package: $PACKAGE_NAME"
 else
     echo "❌ Error: Cargo.toml not found in current directory"
@@ -133,24 +133,25 @@ case "$FORMAT_ARG" in
     all)
         echo "📊 Generating all format coverage reports..."
 
-        # HTML
+        # Run tests once and keep coverage artifacts for all report formats.
+        echo "  - Running tests and collecting coverage data..."
+        cargo llvm-cov --package "$PACKAGE_NAME" --no-report \
+            --ignore-filename-regex "$EXCLUDE_PATTERN"
+
         echo "  - Generating HTML report..."
-        cargo llvm-cov --package "$PACKAGE_NAME" --html \
+        cargo llvm-cov report --package "$PACKAGE_NAME" --html \
             --ignore-filename-regex "$EXCLUDE_PATTERN"
 
-        # LCOV
         echo "  - Generating LCOV report..."
-        cargo llvm-cov --package "$PACKAGE_NAME" --lcov --output-path target/llvm-cov/lcov.info \
+        cargo llvm-cov report --package "$PACKAGE_NAME" --lcov --output-path target/llvm-cov/lcov.info \
             --ignore-filename-regex "$EXCLUDE_PATTERN"
 
-        # JSON
         echo "  - Generating JSON report..."
-        cargo llvm-cov --package "$PACKAGE_NAME" --json --output-path target/llvm-cov/coverage.json \
+        cargo llvm-cov report --package "$PACKAGE_NAME" --json --output-path target/llvm-cov/coverage.json \
             --ignore-filename-regex "$EXCLUDE_PATTERN"
 
-        # Cobertura
         echo "  - Generating Cobertura XML report..."
-        cargo llvm-cov --package "$PACKAGE_NAME" --cobertura --output-path target/llvm-cov/cobertura.xml \
+        cargo llvm-cov report --package "$PACKAGE_NAME" --cobertura --output-path target/llvm-cov/cobertura.xml \
             --ignore-filename-regex "$EXCLUDE_PATTERN"
 
         echo "✅ All format reports generated"
@@ -191,7 +192,7 @@ case "$FORMAT_ARG" in
         ;;
 
     *)
-        echo "❌ Error: Unknown format '$1'"
+        echo "❌ Error: Unknown format '$FORMAT_ARG'"
         echo "Run './coverage.sh help' to see available options"
         exit 1
         ;;

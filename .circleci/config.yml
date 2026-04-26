@@ -2,8 +2,8 @@ version: 2.1
 
 # ==============================================================================
 # Configuration
-# This project uses Rust nightly toolchain for all CI jobs
-# Reason: rustfmt requires nightly for imports_layout = "Vertical" feature
+# This project uses Rust nightly toolchain for CI parity with the configured
+# Rust version. The rustfmt configuration itself stays stable-compatible.
 # ==============================================================================
 
 commands:
@@ -115,14 +115,19 @@ jobs:
           name: Run tests and generate coverage report
           command: |
             # Auto-detect package name from Cargo.toml
-            PACKAGE_NAME=$(grep "^name = " Cargo.toml | head -n 1 | sed 's/name = "\(.*\)"/\1/')
+            PACKAGE_NAME=$(awk -F'"' '/^name = / { print $2; exit }' Cargo.toml)
             echo "📦 Detected package: $PACKAGE_NAME"
-            # Generate LCOV report for Coveralls
+            # Run tests once and keep coverage artifacts for report generation
             cargo llvm-cov --package "$PACKAGE_NAME" \
+              --no-report \
+              --ignore-filename-regex "(\.cargo/registry|\.rustup/)"
+            # Generate LCOV report for Coveralls from the existing coverage data
+            cargo llvm-cov report --package "$PACKAGE_NAME" \
               --lcov --output-path coverage.lcov \
               --ignore-filename-regex "(\.cargo/registry|\.rustup/)"
-            # Generate a text report for console output
-            cargo llvm-cov --package "$PACKAGE_NAME" \
+            # Generate a text report for console output from the same coverage data
+            cargo llvm-cov report --package "$PACKAGE_NAME" \
+              --text \
               --ignore-filename-regex "(\.cargo/registry|\.rustup/)" \
               | tee coverage.txt
       - run:
@@ -196,7 +201,7 @@ jobs:
           at: .
       - run:
           name: Generate documentation
-          command: cargo doc --no-deps --verbose
+          command: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --verbose
       # Store the generated documentation as an artifact
       - store_artifacts:
           path: target/doc

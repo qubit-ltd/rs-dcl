@@ -1,16 +1,7 @@
-# Rustfmt configuration file for rs-concurrent (crate: qubit-concurrent)
+# Rustfmt configuration file for rs-dcl (crate: qubit-dcl)
 #
-# This configuration requires nightly Rust for imports formatting.
-# Use `cargo +nightly fmt` or run `./format.sh` to format code.
+# Keep this file compatible with stable rustfmt so both `cargo fmt` and
+# CI-style `cargo +nightly fmt` produce the same result.
 
-# Format imports with vertical layout (each item on its own line within braces)
-# This keeps the `pub use module::{...}` format but puts each item on a separate line
-# Example:
-#   pub use module::{
-#       Item1,
-#       Item2,
-#       Item3,
-#   };
-#
-# Note: This is an unstable feature that requires nightly Rust
-imports_layout = "Vertical"
+edition = "2024"
+newline_style = "Unix"
