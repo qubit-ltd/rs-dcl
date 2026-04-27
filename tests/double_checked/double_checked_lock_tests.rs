@@ -10,12 +10,14 @@
 mod tests {
     use std::{
         io,
+        panic::{AssertUnwindSafe, catch_unwind},
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
         },
     };
 
+    use qubit_dcl::double_checked::ExecutorError;
     use qubit_dcl::{DoubleCheckedLock, double_checked::ExecutionResult};
     use qubit_lock::{ArcMutex, lock::Lock};
 
@@ -184,6 +186,109 @@ mod tests {
 
             assert!(matches!(result, ExecutionResult::Success(())));
             assert!(executed.load(Ordering::Acquire));
+        }
+
+        #[test]
+        fn test_catch_panics_on_ready_builder_catches_task_panic() {
+            let data = ArcMutex::new(10);
+            let result = DoubleCheckedLock::on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("panic in convenient API task");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_catch_panics_on_lock_builder_catches_task_panic() {
+            let data = ArcMutex::new(10);
+            let result = DoubleCheckedLock::on(data)
+                .catch_panics()
+                .when(|| true)
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("panic in lock builder");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_set_catch_panics_on_lock_builder_catches_task_panic() {
+            let data = ArcMutex::new(10);
+            let result = DoubleCheckedLock::on(data)
+                .set_catch_panics(true)
+                .when(|| true)
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("panic with set_catch_panics");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_disable_catch_panics_on_ready_builder_allows_panic() {
+            let data = ArcMutex::new(10);
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                DoubleCheckedLock::on(data)
+                    .when(|| true)
+                    .set_catch_panics(true)
+                    .set_catch_panics(false)
+                    .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                        panic!("panic should propagate");
+                    })
+                    .get_result()
+            }));
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_disable_catch_panics_on_ready_builder_allows_panic_with_disable_method() {
+            let data = ArcMutex::new(10);
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                DoubleCheckedLock::on(data)
+                    .when(|| true)
+                    .catch_panics()
+                    .disable_catch_panics()
+                    .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                        panic!("panic from ready builder disable_catch_panics");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
+        }
+
+        #[test]
+        fn test_disable_catch_panics_on_lock_builder_allows_panic() {
+            let data = ArcMutex::new(10);
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                DoubleCheckedLock::on(data)
+                    .catch_panics()
+                    .disable_catch_panics()
+                    .when(|| true)
+                    .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                        panic!("panic from lock builder disable_catch_panics");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
         }
     }
 }

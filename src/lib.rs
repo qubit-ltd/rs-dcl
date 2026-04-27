@@ -18,7 +18,7 @@ pub mod double_checked;
 pub mod lock;
 
 pub use double_checked::{
-    DoubleCheckedLock, DoubleCheckedLockBuilder, DoubleCheckedLockExecutor,
+    CallbackError, DoubleCheckedLock, DoubleCheckedLockBuilder, DoubleCheckedLockExecutor,
     DoubleCheckedLockReadyBuilder, ExecutionContext, ExecutionLogger, ExecutionResult,
     ExecutorBuilder, ExecutorError, ExecutorLockBuilder, ExecutorReadyBuilder,
 };

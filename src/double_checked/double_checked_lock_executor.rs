@@ -14,15 +14,20 @@
 //!
 //! Haixing Hu
 
-use std::{fmt::Display, marker::PhantomData};
+use std::{
+    any::Any,
+    fmt::Display,
+    marker::PhantomData,
+    panic::{self, AssertUnwindSafe},
+};
 
 use qubit_function::{
     ArcRunnable, ArcTester, Callable, CallableWith, Runnable, RunnableWith, Tester,
 };
 
 use super::{
-    ExecutionContext, ExecutionLogger, ExecutionResult, executor_builder::ExecutorBuilder,
-    executor_ready_builder::ExecutorReadyBuilder,
+    ExecutionContext, ExecutionLogger, ExecutionResult, ExecutorError,
+    executor_builder::ExecutorBuilder, executor_ready_builder::ExecutorReadyBuilder,
 };
 use crate::lock::Lock;
 
@@ -55,9 +60,9 @@ use crate::lock::Lock;
 /// [`Self::call`], [`Self::execute`], [`Self::call_with`], or
 /// [`Self::execute_with`] on the built executor.
 ///
-/// Panics from the tester, prepare callbacks, or task are not caught by the
-/// executor. If a task panics after prepare succeeds, the panic propagates and
-/// prepare rollback is not run.
+/// Panics from the tester, prepare callbacks, or task can be captured with
+/// [`set_catch_panics`](Self::set_catch_panics) and reported as
+/// [`super::ExecutorError::Panic`], so rollback can still be executed.
 ///
 /// Cloned executors share their configured prepare callbacks. Concurrent calls
 /// may therefore complete prepare in several threads before one call wins the
@@ -120,13 +125,16 @@ pub struct DoubleCheckedLockExecutor<L = (), T = ()> {
     logger: ExecutionLogger,
 
     /// Optional action executed after the first check and before locking.
-    prepare_action: Option<ArcRunnable<String>>,
+    prepare_action: Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare must be rolled back.
-    rollback_prepare_action: Option<ArcRunnable<String>>,
+    rollback_prepare_action: Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare should be committed.
-    commit_prepare_action: Option<ArcRunnable<String>>,
+    commit_prepare_action: Option<ArcRunnable<CallbackError>>,
+
+    /// Whether panics from tester, callbacks, and task are captured as errors.
+    catch_panics: bool,
 
     /// Carries the protected data type.
     _phantom: PhantomData<fn() -> T>,
@@ -169,6 +177,7 @@ where
             prepare_action: builder.prepare_action,
             rollback_prepare_action: builder.rollback_prepare_action,
             commit_prepare_action: builder.commit_prepare_action,
+            catch_panics: builder.catch_panics,
             _phantom: builder._phantom,
         }
     }
@@ -262,6 +271,27 @@ where
         ExecutionContext::new(result)
     }
 
+    /// Enables or disables panic capture for tester, callbacks, and task
+    /// execution.
+    #[inline]
+    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+        self.catch_panics = catch_panics;
+        self
+    }
+
+    /// Deprecated alias for [`Self::set_catch_panics`].
+    #[deprecated(note = "Use `set_catch_panics` instead to align with setter naming.")]
+    #[inline]
+    pub fn with_catch_panics(self, catch_panics: bool) -> Self {
+        self.set_catch_panics(catch_panics)
+    }
+
+    /// Returns whether panic capture is enabled.
+    #[inline]
+    pub fn catch_panics(&self) -> bool {
+        self.catch_panics
+    }
+
     /// Runs the configured double-checked sequence under a write lock.
     ///
     /// # Parameters
@@ -284,23 +314,40 @@ where
         E: Display,
         F: FnOnce(&mut T) -> Result<R, E>,
     {
-        if !self.tester.test() {
+        let first_check = match self.try_run("tester", || self.tester.test()) {
+            Ok(v) => v,
+            Err(error) => {
+                return ExecutionResult::from_executor_error(ExecutorError::Panic(error));
+            }
+        };
+
+        if !first_check {
             self.log_unmet_condition();
             return ExecutionResult::unmet();
         }
 
         let prepare_completed = match self.run_prepare_action() {
             Ok(completed) => completed,
-            Err(error) => return ExecutionResult::prepare_failed(error),
+            Err(error) => {
+                return ExecutionResult::from_executor_error(ExecutorError::PrepareFailed(error));
+            }
         };
 
         let result = self.lock.write(|data| {
-            if !self.tester.test() {
+            let passed = match self.try_run("tester", || self.tester.test()) {
+                Ok(v) => v,
+                Err(error) => {
+                    return ExecutionResult::from_executor_error(ExecutorError::Panic(error));
+                }
+            };
+            if !passed {
                 return ExecutionResult::unmet();
             }
-            match task(data) {
-                Ok(value) => ExecutionResult::success(value),
-                Err(error) => ExecutionResult::task_failed(error),
+
+            match self.try_run("task", || task(data)) {
+                Ok(Ok(value)) => ExecutionResult::success(value),
+                Ok(Err(error)) => ExecutionResult::task_failed(error),
+                Err(error) => ExecutionResult::from_executor_error(ExecutorError::Panic(error)),
             }
         });
 
@@ -321,20 +368,22 @@ where
     ///
     /// `Ok(true)` if prepare exists and succeeds, `Ok(false)` if no prepare
     /// action is configured, or `Err(message)` if prepare fails.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err(message)` when the configured prepare action returns an
-    /// error. The message is already converted to [`String`].
-    fn run_prepare_action(&self) -> Result<bool, String> {
+    fn run_prepare_action(&self) -> Result<bool, CallbackError> {
         let Some(mut prepare_action) = self.prepare_action.clone() else {
             return Ok(false);
         };
-        if let Err(error) = prepare_action.run() {
-            self.logger.log_prepare_failed(&error);
-            return Err(error);
+
+        match self.try_run("prepare", move || prepare_action.run()) {
+            Ok(Ok(_)) => Ok(true),
+            Ok(Err(error)) => {
+                self.logger.log_prepare_failed(&error);
+                Err(error)
+            }
+            Err(error) => {
+                self.logger.log_prepare_failed(&error);
+                Err(error)
+            }
         }
-        Ok(true)
     }
 
     /// Commits or rolls back a successfully completed prepare action.
@@ -354,11 +403,22 @@ where
         E: Display,
     {
         if result.is_success() {
-            if let Some(mut commit_prepare_action) = self.commit_prepare_action.clone()
-                && let Err(error) = commit_prepare_action.run()
-            {
-                self.logger.log_prepare_commit_failed(&error);
-                result = ExecutionResult::prepare_commit_failed(error);
+            if let Some(mut commit_prepare_action) = self.commit_prepare_action.clone() {
+                match self.try_run("prepare_commit", move || commit_prepare_action.run()) {
+                    Ok(Ok(_)) => {}
+                    Ok(Err(error)) => {
+                        self.logger.log_prepare_commit_failed(&error);
+                        result = ExecutionResult::from_executor_error(
+                            ExecutorError::PrepareCommitFailed(error),
+                        );
+                    }
+                    Err(error) => {
+                        self.logger.log_prepare_commit_failed(&error);
+                        result = ExecutionResult::from_executor_error(
+                            ExecutorError::PrepareCommitFailed(error),
+                        );
+                    }
+                }
             }
             return result;
         }
@@ -369,17 +429,55 @@ where
             "Condition not met".to_string()
         };
 
-        if let Some(mut rollback_prepare_action) = self.rollback_prepare_action.clone()
-            && let Err(error) = rollback_prepare_action.run()
-        {
-            self.logger.log_prepare_rollback_failed(&error);
-            result = ExecutionResult::prepare_rollback_failed(original, error);
+        if let Some(mut rollback_prepare_action) = self.rollback_prepare_action.clone() {
+            match self.try_run("prepare_rollback", move || rollback_prepare_action.run()) {
+                Ok(Ok(_)) => {}
+                Ok(Err(error)) => {
+                    self.logger.log_prepare_rollback_failed(&error);
+                    result = ExecutionResult::prepare_rollback_failed(original, error.message());
+                }
+                Err(error) => {
+                    self.logger.log_prepare_rollback_failed(&error);
+                    result = ExecutionResult::prepare_rollback_failed(original, error.message());
+                }
+            }
         }
         result
+    }
+
+    /// Runs a callback with optional panic capture.
+    fn try_run<R>(
+        &self,
+        callback_type: &'static str,
+        callback: impl FnOnce() -> R,
+    ) -> Result<R, CallbackError> {
+        if !self.catch_panics {
+            return Ok(callback());
+        }
+
+        match panic::catch_unwind(AssertUnwindSafe(callback)) {
+            Ok(result) => Ok(result),
+            Err(payload) => {
+                let message = panic_payload_to_message(&*payload);
+                Err(CallbackError::with_type(callback_type, message))
+            }
+        }
     }
 
     /// Logs that the double-checked condition was not met.
     fn log_unmet_condition(&self) {
         self.logger.log_unmet_condition();
+    }
+}
+
+type CallbackError = super::executor_error::CallbackError;
+
+fn panic_payload_to_message(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.to_string()
+    } else {
+        format!("{:?}", payload)
     }
 }

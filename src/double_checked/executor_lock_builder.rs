@@ -40,6 +40,9 @@ pub struct ExecutorLockBuilder<L, T> {
     /// Logger carried forward to the ready builder state.
     pub(in crate::double_checked) logger: ExecutionLogger,
 
+    /// Whether panics from tester, callbacks, and task are captured as result errors.
+    pub(in crate::double_checked) catch_panics: bool,
+
     /// Carries the protected data type.
     pub(in crate::double_checked) _phantom: PhantomData<fn() -> T>,
 }
@@ -143,7 +146,30 @@ where
             prepare_action: None,
             rollback_prepare_action: None,
             commit_prepare_action: None,
+            catch_panics: self.catch_panics,
             _phantom: PhantomData,
         }
+    }
+
+    /// Enables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn catch_panics(mut self) -> Self {
+        self.catch_panics = true;
+        self
+    }
+
+    /// Sets whether panic capture for tester, prepare callbacks, and task
+    /// execution is enabled.
+    #[inline]
+    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+        self.catch_panics = catch_panics;
+        self
+    }
+
+    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn disable_catch_panics(mut self) -> Self {
+        self.catch_panics = false;
+        self
     }
 }

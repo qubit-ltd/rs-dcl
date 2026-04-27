@@ -17,6 +17,7 @@ use std::{fmt::Display, marker::PhantomData};
 
 use qubit_function::{ArcRunnable, ArcTester, Runnable};
 
+use super::executor_error::CallbackError;
 use super::{ExecutionLogger, double_checked_lock_executor::DoubleCheckedLockExecutor};
 use crate::lock::Lock;
 
@@ -45,13 +46,16 @@ pub struct ExecutorReadyBuilder<L, T> {
     pub(in crate::double_checked) logger: ExecutionLogger,
 
     /// Optional action executed after the first check and before locking.
-    pub(in crate::double_checked) prepare_action: Option<ArcRunnable<String>>,
+    pub(in crate::double_checked) prepare_action: Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare must be rolled back.
-    pub(in crate::double_checked) rollback_prepare_action: Option<ArcRunnable<String>>,
+    pub(in crate::double_checked) rollback_prepare_action: Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare should be committed.
-    pub(in crate::double_checked) commit_prepare_action: Option<ArcRunnable<String>>,
+    pub(in crate::double_checked) commit_prepare_action: Option<ArcRunnable<CallbackError>>,
+
+    /// Whether panics from tester, callbacks, and task are converted to errors.
+    pub(in crate::double_checked) catch_panics: bool,
 
     /// Carries the protected data type.
     pub(in crate::double_checked) _phantom: PhantomData<fn() -> T>,
@@ -155,7 +159,9 @@ where
     {
         let mut action = prepare_action;
         self.prepare_action = Some(ArcRunnable::new(move || {
-            action.run().map_err(|error| error.to_string())
+            action
+                .run()
+                .map_err(|error| CallbackError::with_type("prepare", error))
         }));
         self
     }
@@ -181,7 +187,9 @@ where
     {
         let mut action = rollback_prepare_action;
         self.rollback_prepare_action = Some(ArcRunnable::new(move || {
-            action.run().map_err(|error| error.to_string())
+            action
+                .run()
+                .map_err(|error| CallbackError::with_type("prepare_rollback", error))
         }));
         self
     }
@@ -207,8 +215,36 @@ where
     {
         let mut action = commit_prepare_action;
         self.commit_prepare_action = Some(ArcRunnable::new(move || {
-            action.run().map_err(|error| error.to_string())
+            action
+                .run()
+                .map_err(|error| CallbackError::with_type("prepare_commit", error))
         }));
+        self
+    }
+
+    /// Enables panic capture for tester, prepare callbacks, and task execution.
+    ///
+    /// When enabled, panic payloads are converted to
+    /// [`super::executor_error::ExecutorError::Panic`] and surfaced through
+    /// [`super::ExecutionResult`].
+    #[inline]
+    pub fn catch_panics(mut self) -> Self {
+        self.catch_panics = true;
+        self
+    }
+
+    /// Sets whether panic capture for tester, prepare callbacks, and task
+    /// execution is enabled.
+    #[inline]
+    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+        self.catch_panics = catch_panics;
+        self
+    }
+
+    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn disable_catch_panics(mut self) -> Self {
+        self.catch_panics = false;
         self
     }
 

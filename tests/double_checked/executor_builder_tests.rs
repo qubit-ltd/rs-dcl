@@ -8,7 +8,15 @@
  ******************************************************************************/
 #[cfg(test)]
 mod tests {
-    use qubit_dcl::{DoubleCheckedLockExecutor, double_checked::ExecutionResult};
+    use std::{
+        io,
+        panic::{AssertUnwindSafe, catch_unwind},
+    };
+
+    use qubit_dcl::{
+        DoubleCheckedLockExecutor,
+        double_checked::{ExecutionResult, ExecutorError},
+    };
     use qubit_lock::ArcMutex;
 
     mod test_executor_builder {
@@ -52,6 +60,69 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(1)));
+        }
+
+        #[test]
+        fn test_builder_catches_panics_when_enabled() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .catch_panics()
+                .on(data)
+                .when(|| true)
+                .build();
+
+            let result = executor
+                .execute(|| -> Result<(), std::io::Error> {
+                    panic!("task panic");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_builder_set_catch_panics_enables_panic_capture() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .set_catch_panics(true)
+                .on(data)
+                .when(|| true)
+                .build();
+
+            let result = executor
+                .call::<fn() -> Result<(), io::Error>, (), io::Error>(|| {
+                    panic!("panic from configured builder");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_builder_disable_catch_panics_allows_panic_propagation() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .catch_panics()
+                .disable_catch_panics()
+                .on(data)
+                .when(|| true)
+                .build();
+
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                executor
+                    .call::<fn() -> Result<(), io::Error>, (), io::Error>(|| {
+                        panic!("panic should propagate");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
         }
     }
 }

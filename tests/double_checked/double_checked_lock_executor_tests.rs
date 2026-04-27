@@ -11,7 +11,7 @@ mod tests {
     use std::{
         cell::Cell,
         io,
-        panic::{AssertUnwindSafe, catch_unwind},
+        panic::{AssertUnwindSafe, catch_unwind, panic_any},
         rc::Rc,
         sync::{
             Arc, Barrier,
@@ -22,7 +22,7 @@ mod tests {
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
-        double_checked::{ExecutionContext, ExecutionResult},
+        double_checked::{ExecutionContext, ExecutionResult, ExecutorError},
     };
     use qubit_lock::{ArcMutex, lock::Lock};
 
@@ -36,6 +36,42 @@ mod tests {
         fn increment_unit_task(value: &mut i32) -> Result<(), io::Error> {
             *value += 1;
             Ok(())
+        }
+
+        /// Returns a deterministic zero-argument task error.
+        fn failing_no_op_task() -> Result<(), io::Error> {
+            Err(io::Error::other("zero argument task failed"))
+        }
+
+        /// Panics from a zero-argument task.
+        fn panicking_no_op_task() -> Result<(), io::Error> {
+            panic!("zero argument task panic");
+        }
+
+        /// Returns a deterministic mutable task error.
+        fn failing_increment_unit_task(_value: &mut i32) -> Result<(), io::Error> {
+            Err(io::Error::other("mutable task failed"))
+        }
+
+        /// Panics from a mutable task.
+        fn panicking_increment_unit_task(_value: &mut i32) -> Result<(), io::Error> {
+            panic!("mutable task panic");
+        }
+
+        /// Increments the mutable value and returns it.
+        fn increment_value_task(value: &mut i32) -> Result<i32, io::Error> {
+            *value += 1;
+            Ok(*value)
+        }
+
+        /// Returns a deterministic mutable value task error.
+        fn failing_increment_value_task(_value: &mut i32) -> Result<i32, io::Error> {
+            Err(io::Error::other("mutable value task failed"))
+        }
+
+        /// Panics from a mutable value task.
+        fn panicking_increment_value_task(_value: &mut i32) -> Result<i32, io::Error> {
+            panic!("mutable value task panic");
         }
 
         #[test]
@@ -110,6 +146,102 @@ mod tests {
             assert_eq!(value, 42);
             assert!(matches!(executed, ExecutionResult::Success(())));
             assert_eq!(counter.load(Ordering::Acquire), 1);
+        }
+
+        #[test]
+        fn test_function_pointer_tasks_cover_error_and_panic_paths() {
+            let failed = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .build()
+                .execute(failing_no_op_task as fn() -> Result<(), io::Error>)
+                .get_result();
+            match failed {
+                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
+                    assert_eq!(error.to_string(), "zero argument task failed");
+                }
+                _ => panic!("expected zero argument task failure"),
+            }
+
+            let panicked = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .catch_panics()
+                .build()
+                .execute(panicking_no_op_task as fn() -> Result<(), io::Error>)
+                .get_result();
+            assert!(matches!(
+                panicked,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+
+            let succeeded_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .build()
+                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .get_result();
+            assert!(matches!(succeeded_with, ExecutionResult::Success(())));
+
+            let failed_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .build()
+                .execute_with(failing_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .get_result();
+            match failed_with {
+                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
+                    assert_eq!(error.to_string(), "mutable task failed");
+                }
+                _ => panic!("expected mutable task failure"),
+            }
+
+            let panicked_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .catch_panics()
+                .build()
+                .execute_with(
+                    panicking_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>,
+                )
+                .get_result();
+            assert!(matches!(
+                panicked_with,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+
+            let called_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .build()
+                .call_with(increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .get_result();
+            assert!(matches!(called_with, ExecutionResult::Success(1)));
+
+            let call_failed_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .build()
+                .call_with(failing_increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .get_result();
+            match call_failed_with {
+                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
+                    assert_eq!(error.to_string(), "mutable value task failed");
+                }
+                _ => panic!("expected mutable value task failure"),
+            }
+
+            let call_panicked_with = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(0))
+                .when(|| true)
+                .catch_panics()
+                .build()
+                .call_with(panicking_increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .get_result();
+            assert!(matches!(
+                call_panicked_with,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
         }
 
         #[test]
@@ -312,6 +444,560 @@ mod tests {
             assert!(caught.is_err());
             assert!(prepared.load(Ordering::Acquire));
             assert!(!rolled_back.load(Ordering::Acquire));
+        }
+
+        #[test]
+        fn test_task_panic_returns_panic_error_when_catch_panics_enabled() {
+            let data = ArcMutex::new(10);
+            let prepared = Arc::new(AtomicBool::new(false));
+            let rolled_back = Arc::new(AtomicBool::new(false));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare({
+                    let prepared = prepared.clone();
+                    move || {
+                        prepared.store(true, Ordering::Release);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .rollback_prepare({
+                    let rolled_back = rolled_back.clone();
+                    move || {
+                        rolled_back.store(true, Ordering::Release);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("task panic");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+            assert!(prepared.load(Ordering::Acquire));
+            assert!(rolled_back.load(Ordering::Acquire));
+        }
+
+        #[test]
+        fn test_set_catch_panics_on_executor_catches_task_panic() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .build()
+                .set_catch_panics(true);
+
+            let result = executor
+                .execute(|| -> Result<(), io::Error> {
+                    panic!("executor set_catch_panics");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_disable_catch_panics_on_executor_allows_panic() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .build()
+                .set_catch_panics(false);
+
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                executor
+                    .execute(|| -> Result<(), io::Error> {
+                        panic!("executor panic should propagate");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
+        }
+
+        #[test]
+        #[allow(deprecated)]
+        fn test_with_catch_panics_alias_and_getter() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .build()
+                .with_catch_panics(true);
+
+            assert!(executor.catch_panics());
+
+            let result = executor
+                .execute(|| -> Result<(), io::Error> {
+                    panic!("executor with_catch_panics");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_task_panic_with_string_payload_is_captured() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("{}", String::from("string payload"));
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                _ => panic!("expected panic error"),
+            };
+
+            assert!(message.contains("string payload"));
+        }
+
+        #[test]
+        fn test_task_panic_with_non_string_payload_is_captured() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic_any(vec![1, 2, 3]);
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                _ => panic!("expected panic error"),
+            };
+
+            assert!(message.contains("Any"));
+        }
+
+        #[test]
+        fn test_first_check_panic_with_catch_panics_returns_panic_error() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| panic!("first check panic"))
+                .catch_panics()
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                _ => panic!("expected panic error"),
+            };
+
+            assert!(message.contains("first check panic"));
+        }
+
+        #[test]
+        fn test_second_check_panic_with_catch_panics_returns_panic_error() {
+            let checks = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(10))
+                .when({
+                    let checks = checks.clone();
+                    move || {
+                        let called = checks.fetch_add(1, Ordering::AcqRel);
+                        if called == 0 {
+                            true
+                        } else {
+                            panic!("second check panic");
+                        }
+                    }
+                })
+                .catch_panics()
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                _ => panic!("expected panic error"),
+            };
+
+            assert_eq!(checks.load(Ordering::Acquire), 2);
+            assert!(message.contains("second check panic"));
+        }
+
+        #[test]
+        fn test_prepare_action_panic_with_catch_panics_returns_prepare_failed() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| -> Result<(), io::Error> {
+                    panic!("prepare action panic");
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareFailed(callback_error))
+                    if callback_error.message() == "prepare action panic"
+            ));
+        }
+
+        #[test]
+        fn test_prepare_commit_action_panic_with_catch_panics_replaces_success() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .commit_prepare(|| -> Result<(), io::Error> {
+                    panic!("commit panic");
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
+                    error.message().to_string()
+                }
+                _ => panic!("expected commit failed error"),
+            };
+
+            assert!(message.contains("commit panic"));
+        }
+
+        #[test]
+        fn test_prepare_rollback_action_panic_with_catch_panics_replaces_result() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .rollback_prepare(|| -> Result<(), io::Error> {
+                    panic!("rollback panic");
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Err(io::Error::other("task failed"))
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    rollback, ..
+                }) => rollback.message().to_string(),
+                _ => panic!("expected rollback failed error"),
+            };
+
+            assert!(message.contains("rollback panic"));
+        }
+
+        #[test]
+        fn test_prepare_success_without_commit_keeps_success_result() {
+            let data = ArcMutex::new(1);
+            let prepare_called = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .prepare({
+                    let prepare_called = prepare_called.clone();
+                    move || {
+                        prepare_called.fetch_add(1, Ordering::AcqRel);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .build();
+
+            let result = executor
+                .call_with(|value: &mut i32| {
+                    *value += 1;
+                    Ok::<i32, io::Error>(*value)
+                })
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(2)));
+            assert_eq!(prepare_called.load(Ordering::Acquire), 1);
+        }
+
+        #[test]
+        fn test_execute_with_returning_prepare_commit_error_keeps_original_error_message() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .commit_prepare(|| Err::<(), io::Error>(io::Error::other("commit callback error")))
+                .build();
+
+            let result = executor
+                .execute_with(|value: &mut i32| {
+                    *value += 1;
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            match result {
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
+                    assert!(error.message().contains("commit callback error"));
+                }
+                _ => panic!("expected prepare commit failed result"),
+            }
+        }
+
+        #[test]
+        fn test_execute_with_returning_prepare_rollback_error_keeps_original_message() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .rollback_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other("rollback callback error"))
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|value: &mut i32| {
+                    *value += 1;
+                    Err::<(), io::Error>(io::Error::other("task failed"))
+                })
+                .get_result();
+
+            match result {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    rollback, ..
+                }) => {
+                    assert!(rollback.message().contains("rollback callback error"));
+                }
+                _ => panic!("expected prepare rollback failed result"),
+            }
+        }
+
+        #[test]
+        fn test_execute_with_prepare_failed_task_error_preserves_task_failure_if_no_rollback() {
+            let data = ArcMutex::new(1);
+            let prepare_calls = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare({
+                    let prepare_calls = prepare_calls.clone();
+                    move || {
+                        prepare_calls.fetch_add(1, Ordering::AcqRel);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|value: &mut i32| {
+                    *value += 1;
+                    Err::<(), io::Error>(io::Error::other("task failed"))
+                })
+                .get_result();
+
+            let task = match result {
+                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => error,
+                _ => panic!("expected task failed result"),
+            };
+
+            assert_eq!(prepare_calls.load(Ordering::Acquire), 1);
+            assert_eq!(task.to_string(), "task failed");
+        }
+
+        #[test]
+        fn test_execute_unit_with_returning_prepare_commit_error_keeps_original_error_message() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .commit_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other("unit commit callback error"))
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|value: &mut i32| {
+                    *value += 1;
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            match result {
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
+                    assert!(error.message().contains("unit commit callback error"));
+                }
+                _ => panic!("expected prepare commit failed result"),
+            }
+        }
+
+        #[test]
+        fn test_execute_unit_with_returning_prepare_rollback_error_preserves_task_failure() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .rollback_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other("unit rollback callback error"))
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|value: &mut i32| {
+                    *value += 1;
+                    Err::<(), io::Error>(io::Error::other("task failed"))
+                })
+                .get_result();
+
+            match result {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    rollback, ..
+                }) => {
+                    assert!(rollback.message().contains("unit rollback callback error"));
+                }
+                _ => panic!("expected prepare rollback failed result"),
+            }
+        }
+
+        #[test]
+        fn test_prepare_commit_success_keeps_success_result() {
+            let data = ArcMutex::new(1);
+            let prepare_called = Arc::new(AtomicUsize::new(0));
+            let commit_called = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .prepare({
+                    let prepare_called = prepare_called.clone();
+                    move || {
+                        prepare_called.fetch_add(1, Ordering::AcqRel);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .commit_prepare({
+                    let commit_called = commit_called.clone();
+                    move || {
+                        commit_called.fetch_add(1, Ordering::AcqRel);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .build();
+
+            let result = executor
+                .call_with(|value: &mut i32| {
+                    *value += 1;
+                    Ok::<i32, io::Error>(*value)
+                })
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::Success(2)));
+            assert_eq!(prepare_called.load(Ordering::Acquire), 1);
+            assert_eq!(commit_called.load(Ordering::Acquire), 1);
+        }
+
+        #[test]
+        fn test_execute_with_second_check_unmet_runs_prepare_rollback_success() {
+            let should_pass = Arc::new(AtomicBool::new(true));
+            let rollback_called = Arc::new(AtomicUsize::new(0));
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(ArcMutex::new(1))
+                .when({
+                    let should_pass = should_pass.clone();
+                    move || should_pass.fetch_and(false, Ordering::AcqRel)
+                })
+                .prepare(|| Ok::<(), io::Error>(()))
+                .rollback_prepare({
+                    let rollback_called = rollback_called.clone();
+                    move || {
+                        rollback_called.fetch_add(1, Ordering::AcqRel);
+                        Ok::<(), io::Error>(())
+                    }
+                })
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
+                .get_result();
+
+            assert!(matches!(result, ExecutionResult::ConditionNotMet));
+            assert_eq!(rollback_called.load(Ordering::Acquire), 1);
+        }
+
+        #[test]
+        fn test_task_panic_with_owned_string_payload_is_captured() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic_any(String::from("owned string payload"));
+                })
+                .get_result();
+
+            let message = match result {
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                _ => panic!("expected panic error"),
+            };
+
+            assert!(message.contains("owned string payload"));
         }
     }
 }

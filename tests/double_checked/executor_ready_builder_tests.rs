@@ -10,6 +10,7 @@
 mod tests {
     use std::{
         io,
+        panic::{AssertUnwindSafe, catch_unwind},
         sync::{
             Arc,
             atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -119,8 +120,8 @@ mod tests {
 
             assert!(matches!(
                 result,
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(message))
-                    if message == "commit failed"
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(callback_error))
+                    if callback_error.message() == "commit failed"
             ));
         }
 
@@ -141,8 +142,8 @@ mod tests {
 
             assert!(matches!(
                 result,
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(message))
-                    if message == "commit failed"
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(callback_error))
+                    if callback_error.message() == "commit failed"
             ));
         }
 
@@ -189,8 +190,8 @@ mod tests {
 
             assert!(matches!(
                 result,
-                ExecutionResult::Failed(ExecutorError::PrepareFailed(message))
-                    if message == "prepare failed"
+                ExecutionResult::Failed(ExecutorError::PrepareFailed(callback_error))
+                    if callback_error.message() == "prepare failed"
             ));
             assert_eq!(data.read(|value| *value), 10);
         }
@@ -211,8 +212,8 @@ mod tests {
 
             assert!(matches!(
                 result,
-                ExecutionResult::Failed(ExecutorError::PrepareFailed(message))
-                    if message == "prepare failed"
+                ExecutionResult::Failed(ExecutorError::PrepareFailed(callback_error))
+                    if callback_error.message() == "prepare failed"
             ));
             assert_eq!(data.read(|value| *value), 10);
         }
@@ -236,7 +237,7 @@ mod tests {
                 ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
                     rollback,
                     ..
-                }) if rollback == "rollback failed"
+                }) if rollback.message() == "rollback failed"
             ));
         }
 
@@ -260,6 +261,67 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(1)));
+        }
+
+        #[test]
+        fn test_ready_builder_set_catch_panics_enables_panic_capture() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .set_catch_panics(true)
+                .build();
+
+            let result = executor
+                .call_with(|_value: &mut i32| -> Result<i32, io::Error> {
+                    panic!("panic from ready builder");
+                })
+                .get_result();
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
+        }
+
+        #[test]
+        fn test_ready_builder_disable_catch_panics_allows_panic() {
+            let data = ArcMutex::new(1);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .disable_catch_panics()
+                .build();
+
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                executor
+                    .call_with(|_value: &mut i32| -> Result<i32, io::Error> {
+                        panic!("panic should propagate");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
+        }
+
+        #[test]
+        fn test_ready_builder_disable_catch_panics_without_prior_set_still_disables_catch() {
+            let data = ArcMutex::new(1);
+            let caught = catch_unwind(AssertUnwindSafe(|| {
+                DoubleCheckedLockExecutor::builder()
+                    .on(data)
+                    .when(|| true)
+                    .catch_panics()
+                    .disable_catch_panics()
+                    .build()
+                    .call_with(|_value: &mut i32| -> Result<i32, io::Error> {
+                        panic!("panic should still propagate");
+                    })
+                    .get_result();
+            }));
+
+            assert!(caught.is_err());
         }
 
         #[test]

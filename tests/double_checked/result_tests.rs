@@ -109,8 +109,47 @@ mod tests {
                 ExecutionResult::<(), String>::prepare_commit_failed("commit failed");
             assert!(matches!(
                 commit_result,
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(message))
-                    if message == "commit failed"
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(callback))
+                    if callback.message() == "commit failed"
+            ));
+        }
+
+        #[test]
+        fn test_execution_result_prepare_failed_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_failed("prepare failed");
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareFailed(callback))
+                    if callback.message() == "prepare failed"
+            ));
+        }
+
+        #[test]
+        fn test_execution_result_prepare_failed_with_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_failed_with_type(
+                "prepare",
+                "prepare failed",
+            );
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareFailed(callback))
+                    if callback.message() == "prepare failed"
+            ));
+        }
+
+        #[test]
+        fn test_execution_result_prepare_rollback_failed_constructor() {
+            let result =
+                ExecutionResult::<(), String>::prepare_rollback_failed("original", "rollback");
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    original,
+                    rollback,
+                }) if original.message() == "original" && rollback.message() == "rollback"
             ));
         }
     }

@@ -150,6 +150,28 @@ where
         self
     }
 
+    /// Enables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn catch_panics(mut self) -> Self {
+        self.inner = self.inner.catch_panics();
+        self
+    }
+
+    /// Sets whether panic capture for tester, prepare callbacks, and task
+    /// execution is enabled.
+    #[inline]
+    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+        self.inner = self.inner.set_catch_panics(catch_panics);
+        self
+    }
+
+    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn disable_catch_panics(mut self) -> Self {
+        self.inner = self.inner.disable_catch_panics();
+        self
+    }
+
     /// Sets the required double-checked condition.
     #[inline]
     pub fn when<Tst>(self, tester: Tst) -> DoubleCheckedLockReadyBuilder<L, T>
@@ -239,6 +261,28 @@ where
     #[inline]
     pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
         self.inner = self.inner.disable_prepare_rollback_failure_logging();
+        self
+    }
+
+    /// Enables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn catch_panics(mut self) -> Self {
+        self.inner = self.inner.catch_panics();
+        self
+    }
+
+    /// Sets whether panic capture for tester, prepare callbacks, and task
+    /// execution is enabled.
+    #[inline]
+    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+        self.inner = self.inner.set_catch_panics(catch_panics);
+        self
+    }
+
+    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    #[inline]
+    pub fn disable_catch_panics(mut self) -> Self {
+        self.inner = self.inner.disable_catch_panics();
         self
     }
 

@@ -15,7 +15,7 @@
 //! Haixing Hu
 use std::fmt;
 
-use crate::double_checked::executor_error::ExecutorError;
+use crate::double_checked::executor_error::{CallbackError, ExecutorError};
 
 /// Task execution result
 ///
@@ -47,10 +47,7 @@ use crate::double_checked::executor_error::ExecutorError;
 ///
 /// Haixing Hu
 #[derive(Debug)]
-pub enum ExecutionResult<T, E>
-where
-    E: std::fmt::Display,
-{
+pub enum ExecutionResult<T, E> {
     /// Execution succeeded with a value
     Success(T),
 
@@ -61,10 +58,7 @@ where
     Failed(ExecutorError<E>),
 }
 
-impl<T, E> ExecutionResult<T, E>
-where
-    E: std::fmt::Display,
-{
+impl<T, E> ExecutionResult<T, E> {
     /// Builds [`ExecutionResult::Success`] with `value`.
     ///
     /// # Parameters
@@ -105,8 +99,8 @@ where
 
     /// Builds a failed result with [`ExecutorError::PrepareFailed`].
     ///
-    /// Accepts any [`fmt::Display`] value (including [`std::error::Error`] and [`String`]);
-    /// the message is stored as a [`String`] via [`ToString`].
+    /// Accepts any [`std::fmt::Display`] value (including [`std::error::Error`] and [`String`]);
+    /// the message is stored in a [`CallbackError`] wrapper.
     ///
     /// # Parameters
     ///
@@ -117,7 +111,9 @@ where
     /// A failed result containing the prepare failure message.
     #[inline]
     pub fn prepare_failed(msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareFailed(msg.to_string()))
+        ExecutionResult::Failed(ExecutorError::PrepareFailed(CallbackError::from_display(
+            msg,
+        )))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareCommitFailed`].
@@ -131,7 +127,30 @@ where
     /// A failed result containing the prepare-commit failure message.
     #[inline]
     pub fn prepare_commit_failed(msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(msg.to_string()))
+        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(
+            CallbackError::from_display(msg),
+        ))
+    }
+
+    /// Builds a failed result with [`ExecutorError::PrepareFailed`] and explicit
+    /// callback type metadata.
+    ///
+    /// The callback type can later be read from
+    /// [`ExecutorError::callback_type`].
+    ///
+    /// # Parameters
+    ///
+    /// * `callback_type` - Callback type tag, e.g. `"prepare"`.
+    /// * `msg` - Failure message.
+    #[inline]
+    pub fn prepare_failed_with_type(
+        callback_type: &'static str,
+        msg: impl std::fmt::Display,
+    ) -> Self {
+        ExecutionResult::Failed(ExecutorError::PrepareFailed(CallbackError::with_type(
+            callback_type,
+            msg,
+        )))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareRollbackFailed`].
@@ -150,8 +169,8 @@ where
         rollback: impl Into<String>,
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-            original: original.into(),
-            rollback: rollback.into(),
+            original: CallbackError::from_display(original.into()),
+            rollback: CallbackError::from_display(rollback.into()),
         })
     }
 
@@ -169,7 +188,7 @@ where
         ExecutionResult::Failed(err)
     }
 
-    /// Checks if the execution was successful
+    /// Checks if the execution was successful.
     ///
     /// # Returns
     ///
@@ -179,7 +198,7 @@ where
         matches!(self, ExecutionResult::Success(_))
     }
 
-    /// Checks if the condition was not met
+    /// Checks if the condition was not met.
     ///
     /// # Returns
     ///
@@ -189,7 +208,7 @@ where
         matches!(self, ExecutionResult::ConditionNotMet)
     }
 
-    /// Checks if the execution failed
+    /// Checks if the execution failed.
     ///
     /// # Returns
     ///
@@ -197,29 +216,6 @@ where
     #[inline]
     pub fn is_failed(&self) -> bool {
         matches!(self, ExecutionResult::Failed(_))
-    }
-
-    /// Unwraps the success value, panicking if not successful
-    ///
-    /// # Returns
-    ///
-    /// The success value stored in [`ExecutionResult::Success`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if this result is [`ExecutionResult::ConditionNotMet`] or
-    /// [`ExecutionResult::Failed`].
-    #[inline]
-    pub fn unwrap(self) -> T {
-        match self {
-            ExecutionResult::Success(v) => v,
-            ExecutionResult::ConditionNotMet => {
-                panic!("Called unwrap on ExecutionResult::ConditionNotMet")
-            }
-            ExecutionResult::Failed(e) => {
-                panic!("Called unwrap on ExecutionResult::Failed: {}", e)
-            }
-        }
     }
 
     /// Converts the result to a standard Result
@@ -240,6 +236,34 @@ where
             ExecutionResult::Success(v) => Ok(Some(v)),
             ExecutionResult::ConditionNotMet => Ok(None),
             ExecutionResult::Failed(e) => Err(e),
+        }
+    }
+}
+
+impl<T, E> ExecutionResult<T, E>
+where
+    E: fmt::Display,
+{
+    /// Unwraps the success value, panicking if not successful
+    ///
+    /// # Returns
+    ///
+    /// The success value stored in [`ExecutionResult::Success`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if this result is [`ExecutionResult::ConditionNotMet`] or
+    /// [`ExecutionResult::Failed`].
+    #[inline]
+    pub fn unwrap(self) -> T {
+        match self {
+            ExecutionResult::Success(v) => v,
+            ExecutionResult::ConditionNotMet => {
+                panic!("Called unwrap on ExecutionResult::ConditionNotMet")
+            }
+            ExecutionResult::Failed(e) => {
+                panic!("Called unwrap on ExecutionResult::Failed: {}", e)
+            }
         }
     }
 }

@@ -10,7 +10,7 @@
 mod tests {
     use std::{error::Error, io};
 
-    use qubit_dcl::double_checked::ExecutorError;
+    use qubit_dcl::double_checked::{CallbackError, ExecutorError};
 
     mod test_executor_error {
         use super::*;
@@ -24,23 +24,25 @@ mod tests {
 
         #[test]
         fn test_executor_error_prepare_failed_display() {
-            let error = ExecutorError::<String>::PrepareFailed("Prepare failed".to_string());
+            let error: ExecutorError<String> =
+                ExecutorError::PrepareFailed(CallbackError::from_display("Prepare failed"));
             let display = format!("{}", error);
             assert_eq!(display, "Preparation action failed: Prepare failed");
         }
 
         #[test]
         fn test_executor_error_prepare_commit_failed_display() {
-            let error = ExecutorError::<String>::PrepareCommitFailed("Commit failed".to_string());
+            let error: ExecutorError<String> =
+                ExecutorError::PrepareCommitFailed(CallbackError::from_display("Commit failed"));
             let display = format!("{}", error);
             assert_eq!(display, "Prepare commit action failed: Commit failed");
         }
 
         #[test]
         fn test_executor_error_prepare_rollback_failed_display() {
-            let error = ExecutorError::<String>::PrepareRollbackFailed {
-                original: "Original error".to_string(),
-                rollback: "Rollback error".to_string(),
+            let error: ExecutorError<String> = ExecutorError::PrepareRollbackFailed {
+                original: CallbackError::from_display("Original error"),
+                rollback: CallbackError::from_display("Rollback error"),
             };
             let display = format!("{}", error);
             assert_eq!(
@@ -82,9 +84,69 @@ mod tests {
 
         #[test]
         fn test_executor_error_source_is_none_for_prepare_failures() {
-            let error = ExecutorError::<io::Error>::PrepareFailed("prepare failed".to_string());
+            let error = ExecutorError::<io::Error>::PrepareFailed(CallbackError::from_display(
+                "prepare failed",
+            ));
 
             assert!(error.source().is_none());
+        }
+
+        #[test]
+        fn test_callback_error_from_display_is_untyped() {
+            let error = CallbackError::from_display("callback failed");
+
+            assert_eq!(error.message(), "callback failed");
+            assert_eq!(error.callback_type(), None);
+            assert!(!error.is_typed());
+        }
+
+        #[test]
+        fn test_callback_error_with_type_records_callback_type() {
+            let error = CallbackError::with_type("prepare", "callback failed");
+
+            assert_eq!(error.message(), "callback failed");
+            assert_eq!(error.callback_type(), Some("prepare"));
+            assert!(error.is_typed());
+        }
+
+        #[test]
+        fn test_executor_error_callback_type_for_rollback_error_prefers_rollback_type() {
+            let error = ExecutorError::<String>::PrepareRollbackFailed {
+                original: CallbackError::with_type("prepare", "prepare failed"),
+                rollback: CallbackError::with_type("rollback", "rollback failed"),
+            };
+
+            assert_eq!(error.callback_type(), Some("rollback"));
+        }
+
+        #[test]
+        fn test_executor_error_callback_type_returns_none_for_task_error() {
+            let error: ExecutorError<String> = ExecutorError::TaskFailed("task failed".to_string());
+            assert_eq!(error.callback_type(), None);
+        }
+
+        #[test]
+        fn test_executor_error_callback_type_for_prepare_failure() {
+            let error: ExecutorError<String> =
+                ExecutorError::PrepareFailed(CallbackError::with_type("prepare", "prepare failed"));
+
+            assert_eq!(error.callback_type(), Some("prepare"));
+        }
+
+        #[test]
+        fn test_executor_error_callback_type_for_prepare_commit_failure() {
+            let error: ExecutorError<String> = ExecutorError::PrepareCommitFailed(
+                CallbackError::with_type("prepare_commit", "prepare commit failed"),
+            );
+
+            assert_eq!(error.callback_type(), Some("prepare_commit"));
+        }
+
+        #[test]
+        fn test_executor_error_callback_type_reflects_panic_error_type() {
+            let error: ExecutorError<String> =
+                ExecutorError::Panic(CallbackError::with_type("task", "task panicked"));
+            assert_eq!(error.callback_type(), Some("task"));
         }
     }
 }
