@@ -25,8 +25,9 @@ doctest = true
 
 [dependencies]
 log = "0.4"
-qubit-function = "0.10"
-qubit-lock = "0.2"
+
+qubit-function = "0.11"
+qubit-lock = "0.3"
 
 [dev-dependencies]
 thiserror = "2.0"
