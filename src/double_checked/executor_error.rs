@@ -13,6 +13,7 @@
 //! # Author
 //!
 //! Haixing Hu
+// qubit-style: allow multiple-public-types
 
 use std::error::Error;
 use std::fmt;
