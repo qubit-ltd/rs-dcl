@@ -13,8 +13,11 @@
 //! checking and prepare lifecycle support.
 //!
 
+mod callback_error;
 mod double_checked_lock;
+mod double_checked_lock_builder;
 mod double_checked_lock_executor;
+mod double_checked_lock_ready_builder;
 mod execution_context;
 mod execution_logger;
 mod execution_result;
@@ -23,14 +26,15 @@ mod executor_error;
 mod executor_lock_builder;
 mod executor_ready_builder;
 
-pub use double_checked_lock::{
-    DoubleCheckedLock, DoubleCheckedLockBuilder, DoubleCheckedLockReadyBuilder,
-};
+pub use callback_error::CallbackError;
+pub use double_checked_lock::DoubleCheckedLock;
+pub use double_checked_lock_builder::DoubleCheckedLockBuilder;
 pub use double_checked_lock_executor::DoubleCheckedLockExecutor;
+pub use double_checked_lock_ready_builder::DoubleCheckedLockReadyBuilder;
 pub use execution_context::ExecutionContext;
 pub use execution_logger::ExecutionLogger;
 pub use execution_result::ExecutionResult;
 pub use executor_builder::ExecutorBuilder;
-pub use executor_error::{CallbackError, ExecutorError};
+pub use executor_error::ExecutorError;
 pub use executor_lock_builder::ExecutorLockBuilder;
 pub use executor_ready_builder::ExecutorReadyBuilder;

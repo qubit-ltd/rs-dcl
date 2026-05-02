@@ -72,7 +72,6 @@ mod tests {
         #[test]
         fn test_executor_error_is_error_trait() {
             let error = ExecutorError::<io::Error>::TaskFailed(io::Error::other("Test"));
-            // This will compile if it implements Error trait
             let _error_trait: &dyn std::error::Error = &error;
         }
 
@@ -91,24 +90,6 @@ mod tests {
             ));
 
             assert!(error.source().is_none());
-        }
-
-        #[test]
-        fn test_callback_error_from_display_is_untyped() {
-            let error = CallbackError::from_display("callback failed");
-
-            assert_eq!(error.message(), "callback failed");
-            assert_eq!(error.callback_type(), None);
-            assert!(!error.is_typed());
-        }
-
-        #[test]
-        fn test_callback_error_with_type_records_callback_type() {
-            let error = CallbackError::with_type("prepare", "callback failed");
-
-            assert_eq!(error.message(), "callback failed");
-            assert_eq!(error.callback_type(), Some("prepare"));
-            assert!(error.is_typed());
         }
 
         #[test]

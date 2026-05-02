@@ -465,7 +465,7 @@ where
     }
 }
 
-type CallbackError = super::executor_error::CallbackError;
+type CallbackError = super::callback_error::CallbackError;
 
 fn panic_payload_to_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
