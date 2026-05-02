@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Execution Logger
 //!
 //! Logging configuration and helpers for the double-checked lock executor.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::fmt;
 
@@ -27,9 +25,6 @@ use std::fmt;
 /// behavior: condition-unmet is silent (`None`); prepare lifecycle lines use
 /// [`log::Level::Error`] with English default prefixes.
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Clone)]
 pub struct ExecutionLogger {
     /// Log level for the condition-unmet message; `None` skips it.

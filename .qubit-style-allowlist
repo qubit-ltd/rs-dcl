@@ -1,0 +1,2 @@
+multiple-public-types | src/double_checked/double_checked_lock.rs | Builder state types are tightly coupled to the fluent double-checked-lock API.
+multiple-public-types | src/double_checked/executor_error.rs | CallbackError and ExecutorError form one public error surface for double-checked execution.

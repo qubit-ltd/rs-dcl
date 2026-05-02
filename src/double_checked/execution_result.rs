@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Execution Result
 //!
 //! Provides the task execution result enum for double-checked locking.
 //!
-//! # Author
-//!
-//! Haixing Hu
 use std::fmt;
 
 use crate::double_checked::executor_error::{CallbackError, ExecutorError};
@@ -43,9 +41,6 @@ use crate::double_checked::executor_error::{CallbackError, ExecutorError};
 ///     ExecutionResult::task_failed("Task failed".to_string());
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug)]
 pub enum ExecutionResult<T, E> {
     /// Execution succeeded with a value

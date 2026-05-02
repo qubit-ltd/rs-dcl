@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Executor Error
 //!
 //! Provides executor error types for the double-checked lock executor.
 //!
-//! # Author
-//!
-//! Haixing Hu
 // qubit-style: allow multiple-public-types
 
 use std::error::Error;
@@ -110,9 +108,6 @@ impl fmt::Display for CallbackError {
 /// println!("Error: {}", error_with_msg);
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 ///
 #[derive(Debug)]
 pub enum ExecutorError<E> {

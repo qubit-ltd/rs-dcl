@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Double-Checked Lock Executor Demo
 //!
 //! Demonstrates the usage of a reusable double-checked lock executor.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::sync::{
     Arc,

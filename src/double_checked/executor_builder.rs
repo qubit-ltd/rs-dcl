@@ -1,16 +1,14 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Initial builder for [`super::DoubleCheckedLockExecutor`].
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::marker::PhantomData;
 
@@ -21,9 +19,6 @@ use crate::lock::Lock;
 ///
 /// This state has no lock yet. Call [`Self::on`] to attach the lock.
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Debug, Default, Clone)]
 pub struct ExecutorBuilder {
     /// Logger carried forward to later builder states.
