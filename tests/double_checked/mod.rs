@@ -7,7 +7,10 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
+mod callback_error_tests;
+mod double_checked_lock_builder_tests;
 mod double_checked_lock_executor_tests;
+mod double_checked_lock_ready_builder_tests;
 mod double_checked_lock_tests;
 mod error_tests;
 mod execution_logger_tests;
