@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Qubit DCL
 //!
 //! Double-checked locking executor for Qubit Rust libraries.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 pub mod double_checked;
 pub mod lock;

@@ -1,17 +1,15 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! Builder state after a lock has been attached for
 //! [`super::DoubleCheckedLockExecutor`].
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::marker::PhantomData;
 
@@ -29,9 +27,6 @@ use crate::lock::Lock;
 /// * `L` - The lock type implementing [`Lock<T>`].
 /// * `T` - The data type protected by the lock.
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Clone)]
 pub struct ExecutorLockBuilder<L, T> {
     /// The lock to store in the executor.

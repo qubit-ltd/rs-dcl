@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Double-Checked Lock Executor
 //!
 //! Provides a reusable executor for double-checked locking workflows.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::{
     any::Any,
@@ -110,9 +108,6 @@ use crate::lock::Lock;
 /// }
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 #[derive(Clone)]
 pub struct DoubleCheckedLockExecutor<L = (), T = ()> {
     /// The lock protecting the target data.
