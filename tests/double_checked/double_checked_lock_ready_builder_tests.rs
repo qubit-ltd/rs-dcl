@@ -12,16 +12,25 @@
 mod tests {
     use std::{
         io,
-        panic::{AssertUnwindSafe, catch_unwind},
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind,
+        },
         sync::{
             Arc,
-            atomic::{AtomicBool, Ordering},
+            atomic::{
+                AtomicBool,
+                Ordering,
+            },
         },
     };
 
     use qubit_dcl::{
         DoubleCheckedLock,
-        double_checked::{ExecutionResult, ExecutorError},
+        double_checked::{
+            ExecutionResult,
+            ExecutorError,
+        },
     };
     use qubit_lock::ArcMutex;
 

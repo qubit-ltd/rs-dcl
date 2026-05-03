@@ -10,9 +10,15 @@
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, io};
+    use std::{
+        error::Error,
+        io,
+    };
 
-    use qubit_dcl::double_checked::{CallbackError, ExecutorError};
+    use qubit_dcl::double_checked::{
+        CallbackError,
+        ExecutorError,
+    };
 
     mod test_executor_error {
         use super::*;

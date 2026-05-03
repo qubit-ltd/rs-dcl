@@ -12,12 +12,18 @@
 mod tests {
     use std::{
         io,
-        panic::{AssertUnwindSafe, catch_unwind},
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind,
+        },
     };
 
     use qubit_dcl::{
         DoubleCheckedLock,
-        double_checked::{ExecutionResult, ExecutorError},
+        double_checked::{
+            ExecutionResult,
+            ExecutorError,
+        },
     };
     use qubit_lock::ArcMutex;
 

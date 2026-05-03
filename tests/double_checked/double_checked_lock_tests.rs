@@ -14,12 +14,21 @@ mod tests {
         io,
         sync::{
             Arc,
-            atomic::{AtomicBool, Ordering},
+            atomic::{
+                AtomicBool,
+                Ordering,
+            },
         },
     };
 
-    use qubit_dcl::{DoubleCheckedLock, double_checked::ExecutionResult};
-    use qubit_lock::{ArcMutex, lock::Lock};
+    use qubit_dcl::{
+        DoubleCheckedLock,
+        double_checked::ExecutionResult,
+    };
+    use qubit_lock::{
+        ArcMutex,
+        lock::Lock,
+    };
 
     mod test_double_checked_lock {
         use super::*;

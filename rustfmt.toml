@@ -1,7 +1,0 @@
-# Rustfmt configuration file for rs-dcl (crate: qubit-dcl)
-#
-# Keep this file compatible with stable rustfmt so both `cargo fmt` and
-# CI-style `cargo +nightly fmt` produce the same result.
-
-edition = "2024"
-newline_style = "Unix"

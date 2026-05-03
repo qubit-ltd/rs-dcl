@@ -13,7 +13,10 @@
 //!
 use std::fmt;
 
-use crate::double_checked::{CallbackError, ExecutorError};
+use crate::double_checked::{
+    CallbackError,
+    ExecutorError,
+};
 
 /// Task execution result
 ///

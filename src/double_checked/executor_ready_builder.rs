@@ -11,12 +11,21 @@
 //! prepare hooks).
 //!
 
-use std::{fmt::Display, marker::PhantomData};
+use std::{
+    fmt::Display,
+    marker::PhantomData,
+};
 
-use qubit_function::{ArcRunnable, ArcTester, Runnable};
+use qubit_function::{
+    ArcRunnable,
+    ArcTester,
+    Runnable,
+};
 
 use super::{
-    CallbackError, ExecutionLogger, double_checked_lock_executor::DoubleCheckedLockExecutor,
+    CallbackError,
+    ExecutionLogger,
+    double_checked_lock_executor::DoubleCheckedLockExecutor,
 };
 use crate::lock::Lock;
 

@@ -16,16 +16,29 @@ use std::{
     any::Any,
     fmt::Display,
     marker::PhantomData,
-    panic::{self, AssertUnwindSafe},
+    panic::{
+        self,
+        AssertUnwindSafe,
+    },
 };
 
 use qubit_function::{
-    ArcRunnable, ArcTester, Callable, CallableWith, Runnable, RunnableWith, Tester,
+    ArcRunnable,
+    ArcTester,
+    Callable,
+    CallableWith,
+    Runnable,
+    RunnableWith,
+    Tester,
 };
 
 use super::{
-    ExecutionContext, ExecutionLogger, ExecutionResult, ExecutorError,
-    executor_builder::ExecutorBuilder, executor_ready_builder::ExecutorReadyBuilder,
+    ExecutionContext,
+    ExecutionLogger,
+    ExecutionResult,
+    ExecutorError,
+    executor_builder::ExecutorBuilder,
+    executor_ready_builder::ExecutorReadyBuilder,
 };
 use crate::lock::Lock;
 
