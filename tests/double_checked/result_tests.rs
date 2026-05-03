@@ -10,7 +10,10 @@
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
-    use qubit_dcl::double_checked::{ExecutionResult, ExecutorError};
+    use qubit_dcl::double_checked::{
+        ExecutionResult,
+        ExecutorError,
+    };
 
     mod test_execution_result {
         use super::*;

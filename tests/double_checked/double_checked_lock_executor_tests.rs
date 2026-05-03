@@ -13,20 +13,36 @@ mod tests {
     use std::{
         cell::Cell,
         io,
-        panic::{AssertUnwindSafe, catch_unwind, panic_any},
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind,
+            panic_any,
+        },
         rc::Rc,
         sync::{
-            Arc, Barrier,
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+            Arc,
+            Barrier,
+            atomic::{
+                AtomicBool,
+                AtomicUsize,
+                Ordering,
+            },
         },
         thread,
     };
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
-        double_checked::{ExecutionContext, ExecutionResult, ExecutorError},
+        double_checked::{
+            ExecutionContext,
+            ExecutionResult,
+            ExecutorError,
+        },
     };
-    use qubit_lock::{ArcMutex, lock::Lock};
+    use qubit_lock::{
+        ArcMutex,
+        lock::Lock,
+    };
 
     mod test_double_checked_lock_executor {
         use super::*;

@@ -12,18 +12,31 @@
 mod tests {
     use std::{
         io,
-        panic::{AssertUnwindSafe, catch_unwind},
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind,
+        },
         sync::{
             Arc,
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+            atomic::{
+                AtomicBool,
+                AtomicUsize,
+                Ordering,
+            },
         },
     };
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
-        double_checked::{ExecutionResult, ExecutorError},
+        double_checked::{
+            ExecutionResult,
+            ExecutorError,
+        },
     };
-    use qubit_lock::{ArcMutex, lock::Lock};
+    use qubit_lock::{
+        ArcMutex,
+        lock::Lock,
+    };
 
     mod test_executor_ready_builder {
         use super::*;

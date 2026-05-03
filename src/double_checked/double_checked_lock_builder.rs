@@ -11,7 +11,10 @@
 
 use qubit_function::Tester;
 
-use super::{DoubleCheckedLockReadyBuilder, executor_lock_builder::ExecutorLockBuilder};
+use super::{
+    DoubleCheckedLockReadyBuilder,
+    executor_lock_builder::ExecutorLockBuilder,
+};
 use crate::lock::Lock;
 
 /// Convenience builder state with lock attached.

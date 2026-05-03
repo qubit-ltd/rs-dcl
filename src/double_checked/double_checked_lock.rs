@@ -13,7 +13,10 @@
 //! [`super::DoubleCheckedLockExecutor`].
 //!
 
-use super::{DoubleCheckedLockBuilder, DoubleCheckedLockExecutor};
+use super::{
+    DoubleCheckedLockBuilder,
+    DoubleCheckedLockExecutor,
+};
 use crate::lock::Lock;
 
 /// Entry type for one-shot double-checked lock execution.

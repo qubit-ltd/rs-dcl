@@ -11,10 +11,17 @@
 
 use std::fmt::Display;
 
-use qubit_function::{Callable, CallableWith, Runnable, RunnableWith};
+use qubit_function::{
+    Callable,
+    CallableWith,
+    Runnable,
+    RunnableWith,
+};
 
 use super::{
-    DoubleCheckedLockExecutor, ExecutionContext, executor_ready_builder::ExecutorReadyBuilder,
+    DoubleCheckedLockExecutor,
+    ExecutionContext,
+    executor_ready_builder::ExecutorReadyBuilder,
 };
 use crate::lock::Lock;
 
