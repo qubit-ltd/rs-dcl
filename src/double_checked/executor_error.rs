@@ -89,13 +89,8 @@ where
             ExecutorError::PrepareCommitFailed(msg) => {
                 write!(f, "Prepare commit action failed: {}", msg)
             }
-            ExecutorError::PrepareRollbackFailed { original, rollback } => {
-                write!(
-                    f,
-                    "Prepare rollback failed: original error = {}, rollback error = {}",
-                    original, rollback
-                )
-            }
+            #[rustfmt::skip]
+            ExecutorError::PrepareRollbackFailed { original, rollback } => write!(f, "Prepare rollback failed: original error = {original}, rollback error = {rollback}"),
         }
     }
 }
@@ -131,10 +126,10 @@ where
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             ExecutorError::TaskFailed(error) => Some(error),
-            ExecutorError::Panic(_)
-            | ExecutorError::PrepareFailed(_)
-            | ExecutorError::PrepareCommitFailed(_)
-            | ExecutorError::PrepareRollbackFailed { .. } => None,
+            ExecutorError::Panic(_) => None,
+            ExecutorError::PrepareFailed(_) => None,
+            ExecutorError::PrepareCommitFailed(_) => None,
+            ExecutorError::PrepareRollbackFailed { .. } => None,
         }
     }
 }
