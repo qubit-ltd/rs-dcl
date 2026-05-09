@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-dcl"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "log",
  "qubit-function",
