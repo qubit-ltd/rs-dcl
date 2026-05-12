@@ -1,6 +1,6 @@
 # Qubit DCL
 
-[![CircleCI](https://circleci.com/gh/qubit-ltd/rs-dcl.svg?style=shield)](https://circleci.com/gh/qubit-ltd/rs-dcl)
+[![Rust CI](https://github.com/qubit-ltd/rs-dcl/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-dcl/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/qubit-ltd/rs-dcl/badge.svg?branch=main)](https://coveralls.io/github/qubit-ltd/rs-dcl?branch=main)
 [![Crates.io](https://img.shields.io/crates/v/qubit-dcl.svg?color=blue)](https://crates.io/crates/qubit-dcl)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
