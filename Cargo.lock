@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-dcl"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "log",
  "qubit-function",
@@ -91,9 +91,9 @@ dependencies = [
 
 [[package]]
 name = "qubit-function"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8efec94edc436712d98c514ae339e246e079853d9eaacb1ac38c7dd50ff4f89a"
+checksum = "43741de765918a040f300ae4879afbf6935c386ec490d4619a76f63b4dd5eda3"
 dependencies = [
  "parking_lot",
  "pastey",
@@ -101,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "qubit-lock"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15180bc5ff265078d6d384ccde799b9e73a10f152ad9f311f5e8f97d2bb4b145"
+checksum = "a426563827821db84940d101c37898d04925397e90b288f0a34a6171a593b547"
 dependencies = [
  "parking_lot",
  "tokio",
