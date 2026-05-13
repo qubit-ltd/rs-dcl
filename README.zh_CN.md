@@ -1,7 +1,7 @@
 # Qubit DCL
 
 [![Rust CI](https://github.com/qubit-ltd/rs-dcl/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-dcl/actions/workflows/ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/qubit-ltd/rs-dcl/badge.svg?branch=main)](https://coveralls.io/github/qubit-ltd/rs-dcl?branch=main)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-dcl/coverage-badge.json)](https://qubit-ltd.github.io/rs-dcl/coverage/)
 [![Crates.io](https://img.shields.io/crates/v/qubit-dcl.svg?color=blue)](https://crates.io/crates/qubit-dcl)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -32,7 +32,7 @@ executor 不捕获 tester、prepare 回调或任务中的 panic。若任务在 p
 
 ```toml
 [dependencies]
-qubit-dcl = "0.4.0"
+qubit-dcl = "0.5.0"
 ```
 
 `qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。
