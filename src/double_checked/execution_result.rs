@@ -130,6 +130,30 @@ impl<T, E> ExecutionResult<T, E> {
         ))
     }
 
+    /// Builds a failed result with [`ExecutorError::PrepareCommitFailed`] and
+    /// explicit callback type metadata.
+    ///
+    /// The callback type can later be read from
+    /// [`ExecutorError::callback_type`].
+    ///
+    /// # Parameters
+    ///
+    /// * `callback_type` - Callback type tag, e.g. `"prepare_commit"`.
+    /// * `msg` - Commit error message or displayable error value.
+    ///
+    /// # Returns
+    ///
+    /// A failed result containing the typed prepare-commit failure message.
+    #[inline]
+    pub fn prepare_commit_failed_with_type(
+        callback_type: &'static str,
+        msg: impl fmt::Display,
+    ) -> Self {
+        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(
+            CallbackError::with_type(callback_type, msg),
+        ))
+    }
+
     /// Builds a failed result with [`ExecutorError::PrepareFailed`] and explicit
     /// callback type metadata.
     ///

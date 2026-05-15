@@ -145,6 +145,21 @@ mod tests {
         }
 
         #[test]
+        fn test_execution_result_prepare_commit_failed_with_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_commit_failed_with_type(
+                "prepare_commit",
+                "commit failed",
+            );
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(callback))
+                    if callback.message() == "commit failed"
+                        && callback.callback_type() == Some("prepare_commit")
+            ));
+        }
+
+        #[test]
         fn test_execution_result_prepare_rollback_failed_constructor() {
             let result =
                 ExecutionResult::<(), String>::prepare_rollback_failed("original", "rollback");
