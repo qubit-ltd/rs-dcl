@@ -26,13 +26,6 @@ use qubit_dcl::{
     Lock,
 };
 
-#[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
-enum ServiceError {
-    #[error("Service is not running")]
-    NotRunning,
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create shared state
     let running = Arc::new(AtomicBool::new(false));
@@ -56,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = executor
         .call_with(|value: &mut i32| {
             *value += 1;
-            Ok::<_, ServiceError>(*value)
+            Ok::<_, std::io::Error>(*value)
         })
         .get_result();
 
@@ -77,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = executor
         .call_with(|value: &mut i32| {
             *value += 1;
-            Ok::<_, ServiceError>(*value)
+            Ok::<_, std::io::Error>(*value)
         })
         .get_result();
 
@@ -101,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = executor
         .call_with(|value: &mut i32| {
             *value += 1;
-            Ok::<_, ServiceError>(*value)
+            Ok::<_, std::io::Error>(*value)
         })
         .get_result();
 
