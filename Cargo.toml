@@ -18,6 +18,8 @@ exclude = [
     "coverage.sh",
     "style-check.sh",
     "update-submodule.sh",
+    ".rs-ci/**",
+    ".gitmodules",
     ".github/*",
     ".llvm-cov.toml",
     ".cargo-audit.toml.example",
