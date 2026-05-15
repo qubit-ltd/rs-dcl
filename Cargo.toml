@@ -34,6 +34,3 @@ log = "0.4"
 
 qubit-function = "0.13"
 qubit-lock = "0.6"
-
-[dev-dependencies]
-thiserror = "2.0"
