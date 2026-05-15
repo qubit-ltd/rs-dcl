@@ -435,9 +435,9 @@ where
         }
 
         let original = if let ExecutionResult::Failed(error) = &result {
-            error.to_string()
+            original_failure_to_callback_error(error)
         } else {
-            "Condition not met".to_string()
+            CallbackError::from_display("Condition not met")
         };
 
         if let Some(mut rollback_prepare_action) = self.rollback_prepare_action.clone() {
@@ -447,7 +447,7 @@ where
                     self.logger.log_prepare_rollback_failed(&error);
                     result = ExecutionResult::from_executor_error(
                         ExecutorError::PrepareRollbackFailed {
-                            original: CallbackError::from_display(original),
+                            original,
                             rollback: error,
                         },
                     );
@@ -456,7 +456,7 @@ where
                     self.logger.log_prepare_rollback_failed(&error);
                     result = ExecutionResult::from_executor_error(
                         ExecutorError::PrepareRollbackFailed {
-                            original: CallbackError::from_display(original),
+                            original,
                             rollback: error,
                         },
                     );
@@ -493,6 +493,23 @@ where
 
 type CallbackError = super::callback_error::CallbackError;
 
+/// Converts the original execution failure into rollback metadata.
+fn original_failure_to_callback_error<E>(error: &ExecutorError<E>) -> CallbackError
+where
+    E: Display,
+{
+    match error {
+        ExecutorError::TaskFailed(error) => {
+            CallbackError::from_display(format!("Task execution failed: {error}"))
+        }
+        ExecutorError::Panic(error)
+        | ExecutorError::PrepareFailed(error)
+        | ExecutorError::PrepareCommitFailed(error) => error.clone(),
+        ExecutorError::PrepareRollbackFailed { .. } => CallbackError::from_display(error),
+    }
+}
+
+/// Converts a panic payload into a stable diagnostic message.
 fn panic_payload_to_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
