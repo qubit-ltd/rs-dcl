@@ -187,12 +187,12 @@ impl<T, E> ExecutionResult<T, E> {
     /// A failed result containing both original and rollback messages.
     #[inline]
     pub fn prepare_rollback_failed(
-        original: impl Into<String>,
-        rollback: impl Into<String>,
+        original: impl fmt::Display,
+        rollback: impl fmt::Display,
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-            original: CallbackError::from_display(original.into()),
-            rollback: CallbackError::from_display(rollback.into()),
+            original: CallbackError::from_display(original),
+            rollback: CallbackError::from_display(rollback),
         })
     }
 
@@ -215,11 +215,11 @@ impl<T, E> ExecutionResult<T, E> {
     #[inline]
     pub fn prepare_rollback_failed_with_type(
         rollback_callback_type: &'static str,
-        original: impl Into<String>,
+        original: impl fmt::Display,
         rollback: impl fmt::Display,
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-            original: CallbackError::from_display(original.into()),
+            original: CallbackError::from_display(original),
             rollback: CallbackError::with_type(rollback_callback_type, rollback),
         })
     }
