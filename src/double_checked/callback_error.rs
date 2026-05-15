@@ -33,7 +33,7 @@ pub struct CallbackError {
     /// Error message produced by the callback.
     message: String,
 
-    /// Concrete type name, when available.
+    /// Callback type label, when available.
     callback_type: Option<&'static str>,
 }
 

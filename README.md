@@ -26,7 +26,7 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
 3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
 
-Panics from the tester, prepare callbacks, or task are not caught. If a task panics after prepare succeeds, the panic propagates and prepare rollback is not run. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or `set_catch_panics(true)` on a built executor, to convert those panics into `ExecutorError::Panic`; when prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
 
 ## Installation
 
@@ -137,7 +137,7 @@ cargo run --example double_checked_lock_executor_demo
 ## Quality checks
 
 ```bash
-cargo fmt --check
+cargo +nightly fmt -- --check --config-path .rs-ci/rustfmt.toml
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps

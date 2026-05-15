@@ -442,11 +442,21 @@ where
                 Ok(Ok(_)) => {}
                 Ok(Err(error)) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::prepare_rollback_failed(original, error.message());
+                    result = ExecutionResult::from_executor_error(
+                        ExecutorError::PrepareRollbackFailed {
+                            original: CallbackError::from_display(original),
+                            rollback: error,
+                        },
+                    );
                 }
                 Err(error) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::prepare_rollback_failed(original, error.message());
+                    result = ExecutionResult::from_executor_error(
+                        ExecutorError::PrepareRollbackFailed {
+                            original: CallbackError::from_display(original),
+                            rollback: error,
+                        },
+                    );
                 }
             }
         }
