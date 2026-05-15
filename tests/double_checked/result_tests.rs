@@ -157,5 +157,24 @@ mod tests {
                 }) if original.message() == "original" && rollback.message() == "rollback"
             ));
         }
+
+        #[test]
+        fn test_execution_result_prepare_rollback_failed_with_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_type(
+                "prepare_rollback",
+                "original",
+                "rollback",
+            );
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    original,
+                    rollback,
+                }) if original.message() == "original"
+                    && rollback.message() == "rollback"
+                    && rollback.callback_type() == Some("prepare_rollback")
+            ));
+        }
     }
 }

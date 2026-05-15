@@ -172,6 +172,34 @@ impl<T, E> ExecutionResult<T, E> {
         })
     }
 
+    /// Builds a failed result with [`ExecutorError::PrepareRollbackFailed`] and
+    /// explicit callback type metadata for the rollback action.
+    ///
+    /// The rollback callback type can later be read from
+    /// [`ExecutorError::callback_type`].
+    ///
+    /// # Parameters
+    ///
+    /// * `rollback_callback_type` - Callback type tag, e.g.
+    ///   `"prepare_rollback"`.
+    /// * `original` - Original failure that triggered prepare rollback.
+    /// * `rollback` - Failure produced by the rollback action.
+    ///
+    /// # Returns
+    ///
+    /// A failed result containing both original and typed rollback messages.
+    #[inline]
+    pub fn prepare_rollback_failed_with_type(
+        rollback_callback_type: &'static str,
+        original: impl Into<String>,
+        rollback: impl fmt::Display,
+    ) -> Self {
+        ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+            original: CallbackError::from_display(original.into()),
+            rollback: CallbackError::with_type(rollback_callback_type, rollback),
+        })
+    }
+
     /// Wraps an arbitrary [`ExecutorError`] as [`ExecutionResult::Failed`].
     ///
     /// # Parameters

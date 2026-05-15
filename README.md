@@ -26,7 +26,7 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
 3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
 
-Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or `set_catch_panics(true)` on a built executor, to convert those panics into `ExecutorError::Panic`; when prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or `set_catch_panics(true)` on a built executor, to capture them. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
 
 ## Installation
 
@@ -82,6 +82,24 @@ let ok = DoubleCheckedLockExecutor::builder()
     .build()
     .execute(|| Ok::<(), std::io::Error>(()))
     .finish();
+assert!(ok);
+```
+
+`finish()` is intentionally lossy: both condition-not-met and execution failure
+return `false`. Use `try_finish()` when you need to preserve task or prepare
+errors:
+
+```rust
+use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
+
+let data = ArcMutex::new(());
+let ok = DoubleCheckedLockExecutor::builder()
+    .on(data)
+    .when(|| true)
+    .build()
+    .execute(|| Ok::<(), std::io::Error>(()))
+    .try_finish()
+    .expect("execution should not fail");
 assert!(ok);
 ```
 
