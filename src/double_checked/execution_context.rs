@@ -11,7 +11,10 @@
 //!
 //! Provides execution context after double-checked lock task execution.
 //!
-use crate::double_checked::execution_result::ExecutionResult;
+use crate::double_checked::{
+    execution_result::ExecutionResult,
+    executor_error::ExecutorError,
+};
 
 /// Execution context (state after task execution)
 ///
@@ -95,7 +98,10 @@ where
 {
     /// Completes execution (for operations without return values)
     ///
-    /// Returns whether the execution was successful
+    /// Returns whether the execution was successful. This convenience method
+    /// intentionally collapses both unmet conditions and execution failures to
+    /// `false`; use [`Self::try_finish`] when the failure details must be
+    /// preserved.
     ///
     /// # Returns
     ///
@@ -105,5 +111,27 @@ where
     pub fn finish(self) -> bool {
         let result = self.get_result();
         result.is_success()
+    }
+
+    /// Completes execution while preserving failure details.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(true)` - Execution succeeded with `()`.
+    /// * `Ok(false)` - The double-checked condition was not met.
+    /// * `Err(ExecutorError<E>)` - Execution failed, preserving the original
+    ///   executor error.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stored [`ExecutorError`] when the underlying result is
+    /// [`ExecutionResult::Failed`].
+    #[inline]
+    pub fn try_finish(self) -> Result<bool, ExecutorError<E>> {
+        match self.get_result() {
+            ExecutionResult::Success(()) => Ok(true),
+            ExecutionResult::ConditionNotMet => Ok(false),
+            ExecutionResult::Failed(error) => Err(error),
+        }
     }
 }

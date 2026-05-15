@@ -26,7 +26,7 @@
 2. 若第一次通过，可配置在加锁前执行 **prepare**；持锁后再次检测条件并执行任务。
 3. 若已执行过 prepare 且需收尾：任务整体成功时可选 **commit_prepare**；内层检查或任务未成功时可选 **rollback_prepare**（均在释放写锁之后执行）。
 
-executor 默认不捕获 tester、prepare 回调或任务中的 panic。可在 builder 上启用 `catch_panics`，或在已构建 executor 上调用 `set_catch_panics(true)`，将这些 panic 转换为 `ExecutorError::Panic`；如果 prepare 已成功，捕获到任务或锁内二次检查 panic 后仍可执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
+executor 默认不捕获 tester、prepare 回调或任务中的 panic。可在 builder 上启用 `catch_panics`，或在已构建 executor 上调用 `set_catch_panics(true)` 来捕获它们。tester 与任务 panic 会变成 `ExecutorError::Panic`；prepare 生命周期 panic 会分别变成 `PrepareFailed`、`PrepareCommitFailed` 或 `PrepareRollbackFailed`。如果 prepare 已成功，捕获到任务或锁内二次检查 panic 后仍可执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
 
 ## 安装
 
@@ -82,6 +82,23 @@ let ok = DoubleCheckedLockExecutor::builder()
     .build()
     .execute(|| Ok::<(), std::io::Error>(()))
     .finish();
+assert!(ok);
+```
+
+`finish()` 是有意简化的接口：条件未满足和执行失败都会返回 `false`。
+如果需要保留任务或 prepare 错误细节，请使用 `try_finish()`：
+
+```rust
+use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
+
+let data = ArcMutex::new(());
+let ok = DoubleCheckedLockExecutor::builder()
+    .on(data)
+    .when(|| true)
+    .build()
+    .execute(|| Ok::<(), std::io::Error>(()))
+    .try_finish()
+    .expect("execution should not fail");
 assert!(ok);
 ```
 

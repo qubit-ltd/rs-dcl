@@ -72,8 +72,11 @@ use crate::lock::Lock;
 /// [`Self::execute_with`] on the built executor.
 ///
 /// Panics from the tester, prepare callbacks, or task can be captured with
-/// [`set_catch_panics`](Self::set_catch_panics) and reported as
-/// [`super::ExecutorError::Panic`], so rollback can still be executed.
+/// [`set_catch_panics`](Self::set_catch_panics). Tester and task panics are
+/// reported as [`super::ExecutorError::Panic`]. Prepare lifecycle panics are
+/// reported through the corresponding prepare, commit, or rollback error
+/// variants, so rollback can still be executed after captured task or second
+/// condition-check panics.
 ///
 /// Cloned executors share their configured prepare callbacks. Concurrent calls
 /// may therefore complete prepare in several threads before one call wins the
