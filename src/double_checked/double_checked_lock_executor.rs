@@ -499,13 +499,8 @@ where
     E: Display,
 {
     match error {
-        ExecutorError::TaskFailed(error) => {
-            CallbackError::from_display(format!("Task execution failed: {error}"))
-        }
-        ExecutorError::Panic(error)
-        | ExecutorError::PrepareFailed(error)
-        | ExecutorError::PrepareCommitFailed(error) => error.clone(),
-        ExecutorError::PrepareRollbackFailed { .. } => CallbackError::from_display(error),
+        ExecutorError::Panic(error) => error.clone(),
+        _ => CallbackError::from_display(error),
     }
 }
 
