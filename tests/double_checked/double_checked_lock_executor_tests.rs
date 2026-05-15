@@ -829,10 +829,14 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-                    rollback, ..
-                }) => {
-                    assert!(rollback.message().contains("rollback callback error"));
+                ExecutionResult::Failed(error) => {
+                    assert_eq!(error.callback_type(), Some("prepare_rollback"));
+                    match error {
+                        ExecutorError::PrepareRollbackFailed { rollback, .. } => {
+                            assert!(rollback.message().contains("rollback callback error"));
+                        }
+                        _ => panic!("expected prepare rollback failed result"),
+                    }
                 }
                 _ => panic!("expected prepare rollback failed result"),
             }
