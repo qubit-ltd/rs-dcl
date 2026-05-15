@@ -10,6 +10,8 @@
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use qubit_dcl::double_checked::{
         ExecutionResult,
         ExecutorError,
@@ -174,11 +176,46 @@ mod tests {
         }
 
         #[test]
+        fn test_execution_result_prepare_rollback_failed_accepts_display_errors() {
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed(
+                io::Error::other("original"),
+                io::Error::other("rollback"),
+            );
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    original,
+                    rollback,
+                }) if original.message() == "original" && rollback.message() == "rollback"
+            ));
+        }
+
+        #[test]
         fn test_execution_result_prepare_rollback_failed_with_type_constructor() {
             let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_type(
                 "prepare_rollback",
                 "original",
                 "rollback",
+            );
+
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    original,
+                    rollback,
+                }) if original.message() == "original"
+                    && rollback.message() == "rollback"
+                    && rollback.callback_type() == Some("prepare_rollback")
+            ));
+        }
+
+        #[test]
+        fn test_execution_result_prepare_rollback_failed_with_type_accepts_display_original() {
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_type(
+                "prepare_rollback",
+                io::Error::other("original"),
+                io::Error::other("rollback"),
             );
 
             assert!(matches!(
