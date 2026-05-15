@@ -756,6 +756,37 @@ mod tests {
         }
 
         #[test]
+        fn test_prepare_rollback_failure_preserves_original_panic_type() {
+            let data = ArcMutex::new(10);
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .catch_panics()
+                .prepare(|| Ok::<(), io::Error>(()))
+                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("rollback failed")))
+                .build();
+
+            let result = executor
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    panic!("task panic");
+                })
+                .get_result();
+
+            match result {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
+                    original,
+                    rollback,
+                }) => {
+                    assert_eq!(original.callback_type(), Some("task"));
+                    assert_eq!(original.message(), "task panic");
+                    assert_eq!(rollback.callback_type(), Some("prepare_rollback"));
+                    assert!(rollback.message().contains("rollback failed"));
+                }
+                _ => panic!("expected prepare rollback failed result"),
+            }
+        }
+
+        #[test]
         fn test_prepare_success_without_commit_keeps_success_result() {
             let data = ArcMutex::new(1);
             let prepare_called = Arc::new(AtomicUsize::new(0));
