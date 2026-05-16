@@ -12,17 +12,15 @@ documentation = "https://docs.rs/qubit-dcl"
 readme = "README.md"
 keywords = ["lock", "double-checked", "executor", "concurrency"]
 categories = ["concurrency"]
-exclude = [
-    "align-ci.sh",
-    "ci-check.sh",
-    "coverage.sh",
-    "style-check.sh",
-    "update-submodule.sh",
-    ".rs-ci/**",
-    ".gitmodules",
-    ".github/*",
-    ".llvm-cov.toml",
-    ".cargo-audit.toml.example",
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/README.zh_CN.md",
+    "/doc/**/user_guide*.md",
+    "/examples/**",
+    "/src/**",
+    "/tests/**",
 ]
 
 [lib]
@@ -33,4 +31,4 @@ doctest = true
 log = "0.4"
 
 qubit-function = "0.13"
-qubit-lock = "0.6"
+qubit-lock = "0.7"
