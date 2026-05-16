@@ -43,6 +43,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with unmet-condition logging configured.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn log_unmet_condition(mut self, level: log::Level, message: impl Into<String>) -> Self {
         self.logger.set_unmet_condition(Some(level), message);
         self
@@ -54,6 +55,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with unmet-condition logging disabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn disable_unmet_condition_logging(mut self) -> Self {
         self.logger.disable_unmet_condition();
         self
@@ -70,6 +72,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare failure logging configured.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn log_prepare_failure(
         mut self,
         level: log::Level,
@@ -85,6 +88,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare failure logging disabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn disable_prepare_failure_logging(mut self) -> Self {
         self.logger.disable_prepare_failure();
         self
@@ -102,6 +106,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare-commit failure logging configured.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn log_prepare_commit_failure(
         mut self,
         level: log::Level,
@@ -118,6 +123,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare-commit failure logging disabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
         self.logger.disable_prepare_commit_failure();
         self
@@ -135,6 +141,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare-rollback failure logging configured.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn log_prepare_rollback_failure(
         mut self,
         level: log::Level,
@@ -151,6 +158,7 @@ impl ExecutorBuilder {
     ///
     /// This builder with prepare-rollback failure logging disabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
         self.logger.disable_prepare_rollback_failure();
         self
@@ -167,6 +175,7 @@ impl ExecutorBuilder {
     ///
     /// The builder state that can configure the required tester.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn on<L, T>(self, lock: L) -> ExecutorLockBuilder<L, T>
     where
         L: Lock<T>,
