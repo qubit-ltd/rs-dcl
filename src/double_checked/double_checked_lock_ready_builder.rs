@@ -37,6 +37,15 @@ where
     L: Lock<T>,
 {
     /// Configures logging when the double-checked condition is not met.
+    ///
+    /// # Parameters
+    ///
+    /// * `level` - Log level used for unmet-condition messages.
+    /// * `message` - Full log message emitted when the condition is not met.
+    ///
+    /// # Returns
+    ///
+    /// This builder with unmet-condition logging configured.
     #[inline]
     pub fn log_unmet_condition(mut self, level: log::Level, message: impl Into<String>) -> Self {
         self.inner = self.inner.log_unmet_condition(level, message);
@@ -44,6 +53,10 @@ where
     }
 
     /// Disables logging when the double-checked condition is not met.
+    ///
+    /// # Returns
+    ///
+    /// This builder with unmet-condition logging disabled.
     #[inline]
     pub fn disable_unmet_condition_logging(mut self) -> Self {
         self.inner = self.inner.disable_unmet_condition_logging();
@@ -51,6 +64,15 @@ where
     }
 
     /// Configures logging when the prepare action fails.
+    ///
+    /// # Parameters
+    ///
+    /// * `level` - Log level used for prepare failure messages.
+    /// * `message_prefix` - Prefix placed before the prepare failure text.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare failure logging configured.
     #[inline]
     pub fn log_prepare_failure(
         mut self,
@@ -62,6 +84,10 @@ where
     }
 
     /// Disables logging when the prepare action fails.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare failure logging disabled.
     #[inline]
     pub fn disable_prepare_failure_logging(mut self) -> Self {
         self.inner = self.inner.disable_prepare_failure_logging();
@@ -69,6 +95,16 @@ where
     }
 
     /// Configures logging when the prepare commit action fails.
+    ///
+    /// # Parameters
+    ///
+    /// * `level` - Log level used for prepare-commit failure messages.
+    /// * `message_prefix` - Prefix placed before the prepare-commit failure
+    ///   text.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare-commit failure logging configured.
     #[inline]
     pub fn log_prepare_commit_failure(
         mut self,
@@ -80,6 +116,10 @@ where
     }
 
     /// Disables logging when the prepare commit action fails.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare-commit failure logging disabled.
     #[inline]
     pub fn disable_prepare_commit_failure_logging(mut self) -> Self {
         self.inner = self.inner.disable_prepare_commit_failure_logging();
@@ -87,6 +127,16 @@ where
     }
 
     /// Configures logging when the prepare rollback action fails.
+    ///
+    /// # Parameters
+    ///
+    /// * `level` - Log level used for prepare-rollback failure messages.
+    /// * `message_prefix` - Prefix placed before the prepare-rollback failure
+    ///   text.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare-rollback failure logging configured.
     #[inline]
     pub fn log_prepare_rollback_failure(
         mut self,
@@ -100,6 +150,10 @@ where
     }
 
     /// Disables logging when the prepare rollback action fails.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare-rollback failure logging disabled.
     #[inline]
     pub fn disable_prepare_rollback_failure_logging(mut self) -> Self {
         self.inner = self.inner.disable_prepare_rollback_failure_logging();
@@ -107,6 +161,10 @@ where
     }
 
     /// Enables panic capture for tester, prepare callbacks, and task execution.
+    ///
+    /// # Returns
+    ///
+    /// This builder with panic capture enabled.
     #[inline]
     pub fn catch_panics(mut self) -> Self {
         self.inner = self.inner.catch_panics();
@@ -115,6 +173,15 @@ where
 
     /// Sets whether panic capture for tester, prepare callbacks, and task
     /// execution is enabled.
+    ///
+    /// # Parameters
+    ///
+    /// * `catch_panics` - `true` to capture panics as execution errors, or
+    ///   `false` to let panics unwind.
+    ///
+    /// # Returns
+    ///
+    /// This builder with the updated panic-capture setting.
     #[inline]
     pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
         self.inner = self.inner.set_catch_panics(catch_panics);
@@ -122,6 +189,10 @@ where
     }
 
     /// Disables panic capture for tester, prepare callbacks, and task execution.
+    ///
+    /// # Returns
+    ///
+    /// This builder with panic capture disabled.
     #[inline]
     pub fn disable_catch_panics(mut self) -> Self {
         self.inner = self.inner.disable_catch_panics();
@@ -129,6 +200,22 @@ where
     }
 
     /// Sets the prepare action.
+    ///
+    /// # Parameters
+    ///
+    /// * `prepare_action` - Fallible action to run after the first condition
+    ///   check and before locking.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare configured.
+    ///
+    /// # Errors
+    ///
+    /// This builder method does not return errors. If `prepare_action` later
+    /// returns an error during execution, the execution result becomes
+    /// [`super::ExecutionResult::Failed`] with
+    /// [`super::ExecutorError::PrepareFailed`].
     #[inline]
     pub fn prepare<Rn, E>(mut self, prepare_action: Rn) -> Self
     where
@@ -140,6 +227,22 @@ where
     }
 
     /// Sets the rollback action for prepare.
+    ///
+    /// # Parameters
+    ///
+    /// * `rollback_prepare_action` - Fallible action to run when prepare
+    ///   completed but the second condition check or task fails.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare rollback configured.
+    ///
+    /// # Errors
+    ///
+    /// This builder method does not return errors. If
+    /// `rollback_prepare_action` later returns an error during execution, the
+    /// execution result becomes [`super::ExecutionResult::Failed`] with
+    /// [`super::ExecutorError::PrepareRollbackFailed`].
     #[inline]
     pub fn rollback_prepare<Rn, E>(mut self, rollback_prepare_action: Rn) -> Self
     where
@@ -151,6 +254,22 @@ where
     }
 
     /// Sets the commit action for prepare.
+    ///
+    /// # Parameters
+    ///
+    /// * `commit_prepare_action` - Fallible action to run when prepare
+    ///   completed and the task succeeds.
+    ///
+    /// # Returns
+    ///
+    /// This builder with prepare commit configured.
+    ///
+    /// # Errors
+    ///
+    /// This builder method does not return errors. If `commit_prepare_action`
+    /// later returns an error during execution, the execution result becomes
+    /// [`super::ExecutionResult::Failed`] with
+    /// [`super::ExecutorError::PrepareCommitFailed`].
     #[inline]
     pub fn commit_prepare<Rn, E>(mut self, commit_prepare_action: Rn) -> Self
     where
@@ -162,12 +281,27 @@ where
     }
 
     /// Builds a reusable [`DoubleCheckedLockExecutor`].
+    ///
+    /// # Returns
+    ///
+    /// A reusable executor containing the configured lock, tester, logger, and
+    /// prepare lifecycle callbacks.
     #[inline]
     pub fn build(self) -> DoubleCheckedLockExecutor<L, T> {
         self.inner.build()
     }
 
     /// Runs a callable task with one-shot executor creation.
+    ///
+    /// # Parameters
+    ///
+    /// * `task` - Zero-argument callable executed after both condition checks
+    ///   pass.
+    ///
+    /// # Returns
+    ///
+    /// An [`ExecutionContext`] containing success, unmet-condition, or failure
+    /// information.
     #[inline]
     pub fn call<C, R, E>(self, task: C) -> ExecutionContext<R, E>
     where
@@ -178,6 +312,16 @@ where
     }
 
     /// Runs a runnable task with one-shot executor creation.
+    ///
+    /// # Parameters
+    ///
+    /// * `task` - Zero-argument runnable executed after both condition checks
+    ///   pass.
+    ///
+    /// # Returns
+    ///
+    /// An [`ExecutionContext`] containing success, unmet-condition, or failure
+    /// information.
     #[inline]
     pub fn execute<Rn, E>(self, task: Rn) -> ExecutionContext<(), E>
     where
@@ -188,6 +332,15 @@ where
     }
 
     /// Runs a callable task with mutable protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `task` - Callable receiving `&mut T` after both condition checks pass.
+    ///
+    /// # Returns
+    ///
+    /// An [`ExecutionContext`] containing success, unmet-condition, or failure
+    /// information.
     #[inline]
     pub fn call_with<C, R, E>(self, task: C) -> ExecutionContext<R, E>
     where
@@ -198,6 +351,15 @@ where
     }
 
     /// Runs a runnable task with mutable protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `task` - Runnable receiving `&mut T` after both condition checks pass.
+    ///
+    /// # Returns
+    ///
+    /// An [`ExecutionContext`] containing success, unmet-condition, or failure
+    /// information.
     #[inline]
     pub fn execute_with<Rn, E>(self, task: Rn) -> ExecutionContext<(), E>
     where

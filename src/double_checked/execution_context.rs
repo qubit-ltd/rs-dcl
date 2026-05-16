@@ -44,7 +44,7 @@ where
 {
     /// Creates a new execution context.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `result` - The execution result
     ///

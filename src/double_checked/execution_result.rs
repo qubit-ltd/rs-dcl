@@ -145,12 +145,12 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// A failed result containing the typed prepare-commit failure message.
     #[inline]
-    pub fn prepare_commit_failed_with_type(
+    pub fn prepare_commit_failed_with_callback_type(
         callback_type: &'static str,
         msg: impl fmt::Display,
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(
-            CallbackError::with_type(callback_type, msg),
+            CallbackError::with_callback_type(callback_type, msg),
         ))
     }
 
@@ -164,15 +164,18 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// * `callback_type` - Callback type tag, e.g. `"prepare"`.
     /// * `msg` - Failure message.
+    ///
+    /// # Returns
+    ///
+    /// A failed result containing the typed prepare failure message.
     #[inline]
-    pub fn prepare_failed_with_type(
+    pub fn prepare_failed_with_callback_type(
         callback_type: &'static str,
-        msg: impl std::fmt::Display,
+        msg: impl fmt::Display,
     ) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareFailed(CallbackError::with_type(
-            callback_type,
-            msg,
-        )))
+        ExecutionResult::Failed(ExecutorError::PrepareFailed(
+            CallbackError::with_callback_type(callback_type, msg),
+        ))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareRollbackFailed`].
@@ -213,14 +216,14 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// A failed result containing both original and typed rollback messages.
     #[inline]
-    pub fn prepare_rollback_failed_with_type(
+    pub fn prepare_rollback_failed_with_callback_type(
         rollback_callback_type: &'static str,
         original: impl fmt::Display,
         rollback: impl fmt::Display,
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
             original: CallbackError::from_display(original),
-            rollback: CallbackError::with_type(rollback_callback_type, rollback),
+            rollback: CallbackError::with_callback_type(rollback_callback_type, rollback),
         })
     }
 

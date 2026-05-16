@@ -156,8 +156,8 @@ mod tests {
         #[test]
         fn test_executor_error_callback_type_for_rollback_error_prefers_rollback_type() {
             let error = ExecutorError::<String>::PrepareRollbackFailed {
-                original: CallbackError::with_type("prepare", "prepare failed"),
-                rollback: CallbackError::with_type("rollback", "rollback failed"),
+                original: CallbackError::with_callback_type("prepare", "prepare failed"),
+                rollback: CallbackError::with_callback_type("rollback", "rollback failed"),
             };
 
             assert_eq!(error.callback_type(), Some("rollback"));
@@ -166,7 +166,7 @@ mod tests {
         #[test]
         fn test_executor_error_callback_type_for_rollback_error_falls_back_to_original_type() {
             let error = ExecutorError::<String>::PrepareRollbackFailed {
-                original: CallbackError::with_type("prepare", "prepare failed"),
+                original: CallbackError::with_callback_type("prepare", "prepare failed"),
                 rollback: CallbackError::from_display("rollback failed"),
             };
 
@@ -181,8 +181,9 @@ mod tests {
 
         #[test]
         fn test_executor_error_callback_type_for_prepare_failure() {
-            let error: ExecutorError<String> =
-                ExecutorError::PrepareFailed(CallbackError::with_type("prepare", "prepare failed"));
+            let error: ExecutorError<String> = ExecutorError::PrepareFailed(
+                CallbackError::with_callback_type("prepare", "prepare failed"),
+            );
 
             assert_eq!(error.callback_type(), Some("prepare"));
         }
@@ -190,7 +191,7 @@ mod tests {
         #[test]
         fn test_executor_error_callback_type_for_prepare_commit_failure() {
             let error: ExecutorError<String> = ExecutorError::PrepareCommitFailed(
-                CallbackError::with_type("prepare_commit", "prepare commit failed"),
+                CallbackError::with_callback_type("prepare_commit", "prepare commit failed"),
             );
 
             assert_eq!(error.callback_type(), Some("prepare_commit"));
@@ -199,7 +200,7 @@ mod tests {
         #[test]
         fn test_executor_error_callback_type_reflects_panic_error_type() {
             let error: ExecutorError<String> =
-                ExecutorError::Panic(CallbackError::with_type("task", "task panicked"));
+                ExecutorError::Panic(CallbackError::with_callback_type("task", "task panicked"));
             assert_eq!(error.callback_type(), Some("task"));
         }
     }
