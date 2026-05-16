@@ -16,8 +16,8 @@ use std::fmt;
 
 /// Common error information for prepare lifecycle callbacks.
 ///
-/// This keeps the error type name together with the message so callers can
-/// classify failures without depending on fragile string matching.
+/// This keeps a semantic callback type label together with the message so
+/// callers can classify failures without depending on fragile string matching.
 ///
 /// # Examples
 ///
@@ -48,11 +48,18 @@ impl CallbackError {
     }
 
     /// Builds a callback error with explicit callback type metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `callback_type` - Semantic callback type label, such as `"prepare"`
+    ///   or `"prepare_rollback"`.
+    /// * `error` - Error message or displayable error value produced by the
+    ///   callback.
     #[inline]
-    pub fn with_type<T: fmt::Display>(source_type: &'static str, error: T) -> Self {
+    pub fn with_type<T: fmt::Display>(callback_type: &'static str, error: T) -> Self {
         Self {
             message: error.to_string(),
-            callback_type: Some(source_type),
+            callback_type: Some(callback_type),
         }
     }
 
