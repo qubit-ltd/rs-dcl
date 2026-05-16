@@ -84,13 +84,13 @@ mod tests {
         }
 
         #[test]
-        fn test_set_catch_panics_false_allows_panic() {
+        fn test_with_panic_capture_false_allows_panic() {
             let data = ArcMutex::new(10);
             let result = catch_unwind(AssertUnwindSafe(|| {
                 DoubleCheckedLock::on(data)
                     .when(|| true)
-                    .set_catch_panics(true)
-                    .set_catch_panics(false)
+                    .with_panic_capture(true)
+                    .with_panic_capture(false)
                     .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
                         panic!("panic should propagate");
                     })

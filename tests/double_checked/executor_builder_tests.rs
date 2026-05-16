@@ -92,10 +92,10 @@ mod tests {
         }
 
         #[test]
-        fn test_builder_set_catch_panics_enables_panic_capture() {
+        fn test_builder_with_panic_capture_enables_panic_capture() {
             let data = ArcMutex::new(1);
             let executor = DoubleCheckedLockExecutor::builder()
-                .set_catch_panics(true)
+                .with_panic_capture(true)
                 .on(data)
                 .when(|| true)
                 .build();
