@@ -32,7 +32,7 @@ Panics from the tester, prepare callbacks, or task are not caught by default. En
 
 ```toml
 [dependencies]
-qubit-dcl = "0.7.0"
+qubit-dcl = "0.8"
 ```
 
 `qubit-dcl` already depends on `qubit-lock` and re-exports `ArcMutex` and `Lock`; add a direct `qubit-lock` dependency only if you use types beyond those re-exports.
