@@ -32,7 +32,7 @@ executor 默认不捕获 tester、prepare 回调或任务中的 panic。可在 b
 
 ```toml
 [dependencies]
-qubit-dcl = "0.5.0"
+qubit-dcl = "0.6.0"
 ```
 
 `qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。

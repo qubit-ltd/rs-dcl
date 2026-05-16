@@ -299,22 +299,6 @@ where
         self
     }
 
-    /// Deprecated alias for [`Self::set_catch_panics`].
-    ///
-    /// # Parameters
-    ///
-    /// * `catch_panics` - `true` to convert panic payloads into execution
-    ///   errors, or `false` to let panics unwind normally.
-    ///
-    /// # Returns
-    ///
-    /// This executor with the updated panic-capture setting.
-    #[deprecated(note = "Use `set_catch_panics` instead to align with setter naming.")]
-    #[inline]
-    pub fn with_catch_panics(self, catch_panics: bool) -> Self {
-        self.set_catch_panics(catch_panics)
-    }
-
     /// Returns whether panic capture is enabled.
     ///
     /// # Returns
@@ -567,14 +551,14 @@ where
 ///
 /// # Returns
 ///
-/// The string payload when available, or a debug representation for non-string
-/// panic payloads.
+/// The string payload when available, or a stable generic message for
+/// non-string panic payloads.
 fn panic_payload_to_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
     } else if let Some(message) = payload.downcast_ref::<String>() {
         message.to_string()
     } else {
-        format!("{:?}", payload)
+        "non-string panic payload".to_string()
     }
 }
