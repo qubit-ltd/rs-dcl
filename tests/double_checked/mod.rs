@@ -8,6 +8,7 @@
  *
  ******************************************************************************/
 mod callback_error_tests;
+mod builder_must_use_tests;
 mod double_checked_lock_builder_tests;
 mod double_checked_lock_executor_tests;
 mod double_checked_lock_ready_builder_tests;
