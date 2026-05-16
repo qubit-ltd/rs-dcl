@@ -161,6 +161,7 @@ impl DoubleCheckedLockExecutor<(), ()> {
     /// [`ExecutorBuilder::on`], then configure a tester with
     /// [`ExecutorLockBuilder::when`](super::ExecutorLockBuilder::when).
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn builder() -> ExecutorBuilder {
         ExecutorBuilder::default()
     }
@@ -181,6 +182,7 @@ where
     ///
     /// A reusable executor containing the supplied builder state.
     #[inline]
+    #[must_use = "use the returned executor"]
     pub fn new(builder: ExecutorReadyBuilder<L, T>) -> Self {
         Self {
             lock: builder.lock,

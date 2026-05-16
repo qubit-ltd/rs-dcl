@@ -63,6 +63,7 @@ impl DoubleCheckedLock {
     ///
     /// A convenience builder that can configure the double-checked condition.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn on<L, T>(lock: L) -> DoubleCheckedLockBuilder<L, T>
     where
         L: Lock<T>,
