@@ -71,10 +71,11 @@ use crate::lock::Lock;
 /// [`Self::call`], [`Self::execute`], [`Self::call_with`], or
 /// [`Self::execute_with`] on the built executor.
 ///
-/// Panics from the tester, prepare callbacks, or task can be captured with
-/// [`set_catch_panics`](Self::set_catch_panics). Tester and task panics are
-/// reported as [`super::ExecutorError::Panic`]. Prepare lifecycle panics are
-/// reported through the corresponding prepare, commit, or rollback error
+/// Panics from the tester, prepare callbacks, or task can be captured by
+/// configuring the builder or by deriving a reconfigured executor with
+/// [`with_panic_capture`](Self::with_panic_capture). Tester and task panics
+/// are reported as [`super::ExecutorError::Panic`]. Prepare lifecycle panics
+/// are reported through the corresponding prepare, commit, or rollback error
 /// variants, so rollback can still be executed after captured task or second
 /// condition-check panics.
 ///
@@ -282,8 +283,8 @@ where
         ExecutionContext::new(result)
     }
 
-    /// Enables or disables panic capture for tester, callbacks, and task
-    /// execution.
+    /// Derives an executor with panic capture enabled or disabled for tester,
+    /// callbacks, and task execution.
     ///
     /// # Parameters
     ///
@@ -292,9 +293,10 @@ where
     ///
     /// # Returns
     ///
-    /// This executor with the updated panic-capture setting.
+    /// A reconfigured executor with the updated panic-capture setting.
     #[inline]
-    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
+    #[must_use = "assign or chain the returned executor"]
+    pub fn with_panic_capture(mut self, catch_panics: bool) -> Self {
         self.catch_panics = catch_panics;
         self
     }

@@ -26,13 +26,13 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
 3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
 
-Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or `set_catch_panics(true)` on a built executor, to capture them. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or call `with_panic_capture(true)` on a built executor and use the returned value, to capture them. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-dcl = "0.6.0"
+qubit-dcl = "0.7.0"
 ```
 
 `qubit-dcl` already depends on `qubit-lock` and re-exports `ArcMutex` and `Lock`; add a direct `qubit-lock` dependency only if you use types beyond those re-exports.

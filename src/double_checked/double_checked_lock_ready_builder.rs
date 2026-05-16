@@ -166,6 +166,7 @@ where
     ///
     /// This builder with panic capture enabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn catch_panics(mut self) -> Self {
         self.inner = self.inner.catch_panics();
         self
@@ -183,6 +184,7 @@ where
     ///
     /// This builder with the updated panic-capture setting.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
         self.inner = self.inner.set_catch_panics(catch_panics);
         self
@@ -194,6 +196,7 @@ where
     ///
     /// This builder with panic capture disabled.
     #[inline]
+    #[must_use = "assign or chain the returned builder"]
     pub fn disable_catch_panics(mut self) -> Self {
         self.inner = self.inner.disable_catch_panics();
         self
