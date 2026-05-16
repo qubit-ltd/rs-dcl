@@ -512,6 +512,8 @@ mod tests {
                 .build()
                 .set_catch_panics(true);
 
+            assert!(executor.catch_panics());
+
             let result = executor
                 .execute(|| -> Result<(), io::Error> {
                     panic!("executor set_catch_panics");
@@ -546,30 +548,6 @@ mod tests {
         }
 
         #[test]
-        #[allow(deprecated)]
-        fn test_with_catch_panics_alias_and_getter() {
-            let data = ArcMutex::new(10);
-            let executor = DoubleCheckedLockExecutor::builder()
-                .on(data)
-                .when(|| true)
-                .build()
-                .with_catch_panics(true);
-
-            assert!(executor.catch_panics());
-
-            let result = executor
-                .execute(|| -> Result<(), io::Error> {
-                    panic!("executor with_catch_panics");
-                })
-                .get_result();
-
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
-        }
-
-        #[test]
         fn test_task_panic_with_string_payload_is_captured() {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
@@ -593,7 +571,7 @@ mod tests {
         }
 
         #[test]
-        fn test_task_panic_with_non_string_payload_is_captured() {
+        fn test_task_panic_with_non_string_payload_uses_stable_message() {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
@@ -612,7 +590,7 @@ mod tests {
                 _ => panic!("expected panic error"),
             };
 
-            assert!(message.contains("Any"));
+            assert_eq!(message, "non-string panic payload");
         }
 
         #[test]
