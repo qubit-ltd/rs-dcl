@@ -83,12 +83,20 @@ impl ExecutionLogger {
     /// Returns the configured level for unmet-condition logging.
     ///
     /// [`None`] means the event does not emit a log line.
+    ///
+    /// # Returns
+    ///
+    /// The optional log level for unmet-condition events.
     #[inline]
     pub fn unmet_condition_level(&self) -> Option<log::Level> {
         self.unmet_condition_level
     }
 
     /// Returns the message used for unmet-condition logging.
+    ///
+    /// # Returns
+    ///
+    /// The stored unmet-condition log message.
     #[inline]
     pub fn unmet_condition_message(&self) -> &str {
         &self.unmet_condition_message
@@ -97,12 +105,20 @@ impl ExecutionLogger {
     /// Returns the configured level for prepare-action failures.
     ///
     /// [`None`] means the event does not emit a log line.
+    ///
+    /// # Returns
+    ///
+    /// The optional log level for prepare-action failure events.
     #[inline]
     pub fn prepare_failed_level(&self) -> Option<log::Level> {
         self.prepare_failed_level
     }
 
     /// Returns the message prefix used for prepare-action failures.
+    ///
+    /// # Returns
+    ///
+    /// The prefix placed before prepare-action failure text.
     #[inline]
     pub fn prepare_failed_message(&self) -> &str {
         &self.prepare_failed_message
@@ -111,12 +127,20 @@ impl ExecutionLogger {
     /// Returns the configured level for prepare-commit failures.
     ///
     /// [`None`] means the event does not emit a log line.
+    ///
+    /// # Returns
+    ///
+    /// The optional log level for prepare-commit failure events.
     #[inline]
     pub fn prepare_commit_failed_level(&self) -> Option<log::Level> {
         self.prepare_commit_failed_level
     }
 
     /// Returns the message prefix used for prepare-commit failures.
+    ///
+    /// # Returns
+    ///
+    /// The prefix placed before prepare-commit failure text.
     #[inline]
     pub fn prepare_commit_failed_message(&self) -> &str {
         &self.prepare_commit_failed_message
@@ -125,12 +149,20 @@ impl ExecutionLogger {
     /// Returns the configured level for prepare-rollback failures.
     ///
     /// [`None`] means the event does not emit a log line.
+    ///
+    /// # Returns
+    ///
+    /// The optional log level for prepare-rollback failure events.
     #[inline]
     pub fn prepare_rollback_failed_level(&self) -> Option<log::Level> {
         self.prepare_rollback_failed_level
     }
 
     /// Returns the message prefix used for prepare-rollback failures.
+    ///
+    /// # Returns
+    ///
+    /// The prefix placed before prepare-rollback failure text.
     #[inline]
     pub fn prepare_rollback_failed_message(&self) -> &str {
         &self.prepare_rollback_failed_message

@@ -284,6 +284,15 @@ where
 
     /// Enables or disables panic capture for tester, callbacks, and task
     /// execution.
+    ///
+    /// # Parameters
+    ///
+    /// * `catch_panics` - `true` to convert panic payloads into execution
+    ///   errors, or `false` to let panics unwind normally.
+    ///
+    /// # Returns
+    ///
+    /// This executor with the updated panic-capture setting.
     #[inline]
     pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
         self.catch_panics = catch_panics;
@@ -291,6 +300,15 @@ where
     }
 
     /// Deprecated alias for [`Self::set_catch_panics`].
+    ///
+    /// # Parameters
+    ///
+    /// * `catch_panics` - `true` to convert panic payloads into execution
+    ///   errors, or `false` to let panics unwind normally.
+    ///
+    /// # Returns
+    ///
+    /// This executor with the updated panic-capture setting.
     #[deprecated(note = "Use `set_catch_panics` instead to align with setter naming.")]
     #[inline]
     pub fn with_catch_panics(self, catch_panics: bool) -> Self {
@@ -298,6 +316,11 @@ where
     }
 
     /// Returns whether panic capture is enabled.
+    ///
+    /// # Returns
+    ///
+    /// `true` when tester, prepare callback, and task panics are converted into
+    /// execution errors instead of unwinding.
     #[inline]
     pub fn catch_panics(&self) -> bool {
         self.catch_panics
@@ -379,6 +402,11 @@ where
     ///
     /// `Ok(true)` if prepare exists and succeeds, `Ok(false)` if no prepare
     /// action is configured, or `Err(message)` if prepare fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CallbackError`] when the prepare action returns an error or
+    /// panics while panic capture is enabled.
     fn run_prepare_action(&self) -> Result<bool, CallbackError> {
         let Some(mut prepare_action) = self.prepare_action.clone() else {
             return Ok(false);
@@ -467,6 +495,22 @@ where
     }
 
     /// Runs a callback with optional panic capture.
+    ///
+    /// # Parameters
+    ///
+    /// * `callback_type` - Semantic label used if a captured panic is converted
+    ///   into [`CallbackError`].
+    /// * `callback` - Callback to execute.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(value)` when the callback returns normally, or `Err(error)` when
+    /// panic capture is enabled and the callback panics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CallbackError`] only when `catch_panics` is enabled and
+    /// `callback` panics.
     fn try_run<R>(
         &self,
         callback_type: &'static str,
@@ -480,12 +524,14 @@ where
             Ok(result) => Ok(result),
             Err(payload) => {
                 let message = panic_payload_to_message(&*payload);
-                Err(CallbackError::with_type(callback_type, message))
+                Err(CallbackError::with_callback_type(callback_type, message))
             }
         }
     }
 
     /// Logs that the double-checked condition was not met.
+    ///
+    /// This method has no return value.
     fn log_unmet_condition(&self) {
         self.logger.log_unmet_condition();
     }
@@ -494,6 +540,15 @@ where
 type CallbackError = super::callback_error::CallbackError;
 
 /// Converts the original execution failure into rollback metadata.
+///
+/// # Parameters
+///
+/// * `error` - Failure that caused prepare rollback to run.
+///
+/// # Returns
+///
+/// Callback error metadata suitable for the `original` field of
+/// [`ExecutorError::PrepareRollbackFailed`].
 fn original_failure_to_callback_error<E>(error: &ExecutorError<E>) -> CallbackError
 where
     E: Display,
@@ -505,6 +560,15 @@ where
 }
 
 /// Converts a panic payload into a stable diagnostic message.
+///
+/// # Parameters
+///
+/// * `payload` - Panic payload captured from `catch_unwind`.
+///
+/// # Returns
+///
+/// The string payload when available, or a debug representation for non-string
+/// panic payloads.
 fn panic_payload_to_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()

@@ -25,8 +25,8 @@ mod tests {
         }
 
         #[test]
-        fn test_with_type_records_callback_type() {
-            let error = CallbackError::with_type("prepare", "callback failed");
+        fn test_with_callback_type_records_callback_type() {
+            let error = CallbackError::with_callback_type("prepare", "callback failed");
 
             assert_eq!(error.message(), "callback failed");
             assert_eq!(error.callback_type(), Some("prepare"));

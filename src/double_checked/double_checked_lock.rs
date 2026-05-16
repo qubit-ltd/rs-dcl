@@ -53,6 +53,15 @@ pub struct DoubleCheckedLock;
 
 impl DoubleCheckedLock {
     /// Starts one-shot double-checked lock configuration by attaching a lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `lock` - Lock handle protecting the data used by the one-shot
+    ///   execution.
+    ///
+    /// # Returns
+    ///
+    /// A convenience builder that can configure the double-checked condition.
     #[inline]
     pub fn on<L, T>(lock: L) -> DoubleCheckedLockBuilder<L, T>
     where

@@ -101,6 +101,11 @@ impl<E> ExecutorError<E> {
     ///
     /// This returns `None` for task failures and callback errors without
     /// associated type labels.
+    ///
+    /// # Returns
+    ///
+    /// `Some(label)` for callback failures that carry callback type metadata,
+    /// or `None` for task failures and untyped callback failures.
     #[inline]
     pub fn callback_type(&self) -> Option<&'static str> {
         match self {
@@ -123,6 +128,11 @@ where
     ///
     /// Prepare lifecycle failures store their messages as strings and therefore
     /// do not expose a structured source error.
+    ///
+    /// # Returns
+    ///
+    /// `Some(error)` for [`ExecutorError::TaskFailed`], or `None` for panic and
+    /// prepare lifecycle failures.
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             ExecutorError::TaskFailed(error) => Some(error),

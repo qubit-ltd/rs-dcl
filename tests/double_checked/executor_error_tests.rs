@@ -31,8 +31,9 @@ fn test_executor_error_display_source_and_callback_type() {
     );
     assert_eq!(task_error.callback_type(), None);
 
-    let prepare_error: ExecutorError<io::Error> =
-        ExecutorError::PrepareFailed(CallbackError::with_type("prepare", "prepare failed"));
+    let prepare_error: ExecutorError<io::Error> = ExecutorError::PrepareFailed(
+        CallbackError::with_callback_type("prepare", "prepare failed"),
+    );
     assert_eq!(prepare_error.callback_type(), Some("prepare"));
     assert_eq!(
         prepare_error.to_string(),

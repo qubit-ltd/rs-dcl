@@ -133,8 +133,8 @@ mod tests {
         }
 
         #[test]
-        fn test_execution_result_prepare_failed_with_type_constructor() {
-            let result = ExecutionResult::<(), String>::prepare_failed_with_type(
+        fn test_execution_result_prepare_failed_with_callback_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_failed_with_callback_type(
                 "prepare",
                 "prepare failed",
             );
@@ -147,8 +147,8 @@ mod tests {
         }
 
         #[test]
-        fn test_execution_result_prepare_commit_failed_with_type_constructor() {
-            let result = ExecutionResult::<(), String>::prepare_commit_failed_with_type(
+        fn test_execution_result_prepare_commit_failed_with_callback_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_commit_failed_with_callback_type(
                 "prepare_commit",
                 "commit failed",
             );
@@ -192,8 +192,8 @@ mod tests {
         }
 
         #[test]
-        fn test_execution_result_prepare_rollback_failed_with_type_constructor() {
-            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_type(
+        fn test_execution_result_prepare_rollback_failed_with_callback_type_constructor() {
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_callback_type(
                 "prepare_rollback",
                 "original",
                 "rollback",
@@ -211,8 +211,9 @@ mod tests {
         }
 
         #[test]
-        fn test_execution_result_prepare_rollback_failed_with_type_accepts_display_original() {
-            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_type(
+        fn test_execution_result_prepare_rollback_failed_with_callback_type_accepts_display_original()
+         {
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_callback_type(
                 "prepare_rollback",
                 io::Error::other("original"),
                 io::Error::other("rollback"),
