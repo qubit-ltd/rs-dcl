@@ -68,13 +68,13 @@ mod tests {
         }
 
         #[test]
-        fn test_set_catch_panics_catches_task_panic() {
+        fn test_with_panic_capture_catches_task_panic() {
             let data = ArcMutex::new(10);
             let result = DoubleCheckedLock::on(data)
-                .set_catch_panics(true)
+                .with_panic_capture(true)
                 .when(|| true)
                 .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    panic!("panic with set_catch_panics");
+                    panic!("panic with panic capture");
                 })
                 .get_result();
 

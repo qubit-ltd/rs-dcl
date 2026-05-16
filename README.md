@@ -26,7 +26,7 @@ The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [
 2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
 3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
 
-Panics from the tester, prepare callbacks, or task are not caught by default. Enable `catch_panics` on the builder, or call `with_panic_capture(true)` on a built executor and use the returned value, to capture them. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+Panics from the tester, prepare callbacks, or task are not caught by default. Enable capture with `.catch_panics()`, or use `.with_panic_capture(flag)` when the setting comes from a boolean. Built executors also support `.with_panic_capture(flag)` and return a reconfigured executor. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
 
 ## Installation
 
@@ -142,6 +142,7 @@ cargo run --example double_checked_lock_executor_demo
 - Start with `DoubleCheckedLockExecutor::builder()`.
 - Attach a lock: `.on(lock)` where `L: Lock<T>`.
 - Set the double-checked condition: `.when(tester)`.
+- Configure panic capture with `.catch_panics()`, `.with_panic_capture(flag)`, or `.disable_catch_panics()`.
 - Optionally: `.prepare`, `.rollback_prepare`, `.commit_prepare` for the prepare pipeline.
 - Configure diagnostics with `.log_unmet_condition`, `.log_prepare_failure`, `.log_prepare_commit_failure`, `.log_prepare_rollback_failure`; disable them with the matching `.disable_*_logging` methods.
 - Finish with `.build()`.

@@ -164,8 +164,8 @@ where
         self
     }
 
-    /// Sets whether panic capture for tester, prepare callbacks, and task
-    /// execution is enabled.
+    /// Derives a builder with panic capture enabled or disabled for tester,
+    /// prepare callbacks, and task execution.
     ///
     /// # Parameters
     ///
@@ -174,11 +174,11 @@ where
     ///
     /// # Returns
     ///
-    /// This builder with the updated panic-capture setting.
+    /// A reconfigured builder with the updated panic-capture setting.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn set_catch_panics(mut self, catch_panics: bool) -> Self {
-        self.inner = self.inner.set_catch_panics(catch_panics);
+    pub fn with_panic_capture(mut self, catch_panics: bool) -> Self {
+        self.inner = self.inner.with_panic_capture(catch_panics);
         self
     }
 
