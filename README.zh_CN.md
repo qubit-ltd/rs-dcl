@@ -26,13 +26,13 @@
 2. 若第一次通过，可配置在加锁前执行 **prepare**；持锁后再次检测条件并执行任务。
 3. 若已执行过 prepare 且需收尾：任务整体成功时可选 **commit_prepare**；内层检查或任务未成功时可选 **rollback_prepare**（均在释放写锁之后执行）。
 
-executor 默认不捕获 tester、prepare 回调或任务中的 panic。可在 builder 上启用 `catch_panics`，或在已构建 executor 上调用 `set_catch_panics(true)` 来捕获它们。tester 与任务 panic 会变成 `ExecutorError::Panic`；prepare 生命周期 panic 会分别变成 `PrepareFailed`、`PrepareCommitFailed` 或 `PrepareRollbackFailed`。如果 prepare 已成功，捕获到任务或锁内二次检查 panic 后仍可执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
+executor 默认不捕获 tester、prepare 回调或任务中的 panic。可在 builder 上启用 `catch_panics`，或在已构建 executor 上调用 `with_panic_capture(true)` 并使用返回值来捕获它们。tester 与任务 panic 会变成 `ExecutorError::Panic`；prepare 生命周期 panic 会分别变成 `PrepareFailed`、`PrepareCommitFailed` 或 `PrepareRollbackFailed`。如果 prepare 已成功，捕获到任务或锁内二次检查 panic 后仍可执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
 
 ## 安装
 
 ```toml
 [dependencies]
-qubit-dcl = "0.6.0"
+qubit-dcl = "0.7.0"
 ```
 
 `qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。

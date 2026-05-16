@@ -504,19 +504,19 @@ mod tests {
         }
 
         #[test]
-        fn test_set_catch_panics_on_executor_catches_task_panic() {
+        fn test_with_panic_capture_on_executor_catches_task_panic() {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| true)
                 .build()
-                .set_catch_panics(true);
+                .with_panic_capture(true);
 
             assert!(executor.catch_panics());
 
             let result = executor
                 .execute(|| -> Result<(), io::Error> {
-                    panic!("executor set_catch_panics");
+                    panic!("executor with_panic_capture");
                 })
                 .get_result();
 
@@ -534,7 +534,7 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .build()
-                .set_catch_panics(false);
+                .with_panic_capture(false);
 
             let caught = catch_unwind(AssertUnwindSafe(|| {
                 executor
