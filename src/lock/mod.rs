@@ -10,4 +10,4 @@
 //! Lock trait re-export for double-checked executor generic bounds.
 //!
 
-pub use qubit_lock::lock::Lock;
+pub use qubit_lock::Lock;

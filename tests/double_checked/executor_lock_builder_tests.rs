@@ -28,15 +28,13 @@ mod tests {
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
+        Lock,
         double_checked::{
             ExecutionResult,
             ExecutorError,
         },
     };
-    use qubit_lock::{
-        ArcMutex,
-        lock::Lock,
-    };
+    use qubit_lock::ArcMutex;
 
     mod test_executor_lock_builder {
         use super::*;

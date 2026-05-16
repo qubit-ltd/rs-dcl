@@ -30,4 +30,4 @@ pub use double_checked::{
     ExecutorReadyBuilder,
 };
 pub use qubit_lock::ArcMutex;
-pub use qubit_lock::lock::Lock;
+pub use qubit_lock::Lock;

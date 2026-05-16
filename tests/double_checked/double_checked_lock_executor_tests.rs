@@ -33,16 +33,14 @@ mod tests {
 
     use qubit_dcl::{
         DoubleCheckedLockExecutor,
+        Lock,
         double_checked::{
             ExecutionContext,
             ExecutionResult,
             ExecutorError,
         },
     };
-    use qubit_lock::{
-        ArcMutex,
-        lock::Lock,
-    };
+    use qubit_lock::ArcMutex;
 
     mod test_double_checked_lock_executor {
         use super::*;

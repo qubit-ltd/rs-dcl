@@ -23,12 +23,10 @@ mod tests {
 
     use qubit_dcl::{
         DoubleCheckedLock,
+        Lock,
         double_checked::ExecutionResult,
     };
-    use qubit_lock::{
-        ArcMutex,
-        lock::Lock,
-    };
+    use qubit_lock::ArcMutex;
 
     mod test_double_checked_lock {
         use super::*;
