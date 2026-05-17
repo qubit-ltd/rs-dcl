@@ -1,6 +1,6 @@
 [package]
 name = "qubit-dcl"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -31,4 +31,4 @@ doctest = true
 log = "0.4"
 
 qubit-function = "0.14"
-qubit-lock = "0.7"
+qubit-lock = "0.8"
