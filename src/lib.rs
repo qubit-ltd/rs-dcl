@@ -13,7 +13,6 @@
 //!
 
 pub mod double_checked;
-pub mod lock;
 
 pub use double_checked::{
     CallbackError,

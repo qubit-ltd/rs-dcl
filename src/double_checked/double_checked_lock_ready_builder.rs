@@ -23,7 +23,7 @@ use super::{
     ExecutionContext,
     executor_ready_builder::ExecutorReadyBuilder,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Convenience builder state with tester attached.
 #[derive(Clone)]

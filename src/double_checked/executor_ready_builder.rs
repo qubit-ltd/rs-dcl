@@ -27,7 +27,7 @@ use super::{
     ExecutionLogger,
     double_checked_lock_executor::DoubleCheckedLockExecutor,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Builder state after the required condition tester has been configured.
 ///

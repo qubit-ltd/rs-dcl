@@ -37,6 +37,16 @@ qubit-dcl = "0.9"
 
 `qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。
 
+### 公开 API 路径
+
+从 crate 根路径导入锁 trait：
+
+```rust
+use qubit_dcl::Lock;
+```
+
+旧兼容路径 `qubit_dcl::lock::Lock` 已不再提供。请使用上面的根路径再导出；如果代码明确要直接依赖 `qubit-lock`，也可以改为直接导入 `qubit_lock::Lock`。
+
 ## 快速开始
 
 ```rust
@@ -149,7 +159,6 @@ cargo run --example double_checked_lock_executor_demo
 ## 项目结构
 
 - `src/double_checked`：执行器、各类 builder、执行上下文与结果、错误与日志。
-- `src/lock`：与执行器配合使用的锁相关工具。
 - `tests/double_checked` 与 `tests/docs`：行为测试与 README 一致性测试。
 
 ## 质量检查
