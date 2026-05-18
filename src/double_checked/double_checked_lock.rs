@@ -17,7 +17,7 @@ use super::{
     DoubleCheckedLockBuilder,
     DoubleCheckedLockExecutor,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Entry type for one-shot double-checked lock execution.
 ///

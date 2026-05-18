@@ -16,7 +16,7 @@ use super::{
     ExecutionLogger,
     executor_lock_builder::ExecutorLockBuilder,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Initial builder for [`super::DoubleCheckedLockExecutor`].
 ///

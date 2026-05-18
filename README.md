@@ -37,6 +37,16 @@ qubit-dcl = "0.9"
 
 `qubit-dcl` already depends on `qubit-lock` and re-exports `ArcMutex` and `Lock`; add a direct `qubit-lock` dependency only if you use types beyond those re-exports.
 
+### Public API paths
+
+Import the lock trait from the crate root:
+
+```rust
+use qubit_dcl::Lock;
+```
+
+The old compatibility path `qubit_dcl::lock::Lock` is no longer provided. Use the root re-export above, or import `qubit_lock::Lock` directly when your code intentionally depends on `qubit-lock`.
+
 ## Quick start
 
 ```rust
@@ -150,7 +160,6 @@ cargo run --example double_checked_lock_executor_demo
 ## Project layout
 
 - `src/double_checked`: executor, builders, `ExecutionContext`, `ExecutionResult`, errors, and logging.
-- `src/lock`: lock-related glue used with the executor.
 - `tests/double_checked` and `tests/docs`: unit and README consistency tests.
 
 ## Quality checks

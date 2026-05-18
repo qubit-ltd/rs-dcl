@@ -40,7 +40,7 @@ use super::{
     executor_builder::ExecutorBuilder,
     executor_ready_builder::ExecutorReadyBuilder,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Reusable double-checked lock executor.
 ///

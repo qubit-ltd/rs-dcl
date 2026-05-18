@@ -15,7 +15,7 @@ use super::{
     DoubleCheckedLockReadyBuilder,
     executor_lock_builder::ExecutorLockBuilder,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Convenience builder state with lock attached.
 #[derive(Clone)]

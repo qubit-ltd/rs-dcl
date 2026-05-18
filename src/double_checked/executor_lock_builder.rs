@@ -19,7 +19,7 @@ use super::{
     ExecutionLogger,
     executor_ready_builder::ExecutorReadyBuilder,
 };
-use crate::lock::Lock;
+use qubit_lock::Lock;
 
 /// Builder state after a lock has been attached.
 ///
