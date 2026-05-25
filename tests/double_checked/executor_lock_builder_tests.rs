@@ -141,10 +141,7 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
         }
 
         #[test]

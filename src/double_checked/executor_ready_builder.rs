@@ -111,11 +111,7 @@ where
     /// This builder with prepare failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_failure(
-        mut self,
-        level: log::Level,
-        message_prefix: impl Into<String>,
-    ) -> Self {
+    pub fn log_prepare_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
         self.logger.set_prepare_failure(Some(level), message_prefix);
         self
     }
@@ -145,13 +141,8 @@ where
     /// This builder with prepare-commit failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_commit_failure(
-        mut self,
-        level: log::Level,
-        message_prefix: impl Into<String>,
-    ) -> Self {
-        self.logger
-            .set_prepare_commit_failure(Some(level), message_prefix);
+    pub fn log_prepare_commit_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
+        self.logger.set_prepare_commit_failure(Some(level), message_prefix);
         self
     }
 
@@ -180,13 +171,8 @@ where
     /// This builder with prepare-rollback failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_rollback_failure(
-        mut self,
-        level: log::Level,
-        message_prefix: impl Into<String>,
-    ) -> Self {
-        self.logger
-            .set_prepare_rollback_failure(Some(level), message_prefix);
+    pub fn log_prepare_rollback_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
+        self.logger.set_prepare_rollback_failure(Some(level), message_prefix);
         self
     }
 

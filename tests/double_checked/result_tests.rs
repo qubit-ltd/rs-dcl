@@ -75,10 +75,7 @@ mod tests {
             let converted = result.into_result();
 
             assert!(converted.is_ok());
-            assert_eq!(
-                converted.expect("success should convert to Ok(Some(value))"),
-                Some(42),
-            );
+            assert_eq!(converted.expect("success should convert to Ok(Some(value))"), Some(42),);
         }
 
         #[test]
@@ -112,8 +109,7 @@ mod tests {
                     if message == "task failed"
             ));
 
-            let commit_result =
-                ExecutionResult::<(), String>::prepare_commit_failed("commit failed");
+            let commit_result = ExecutionResult::<(), String>::prepare_commit_failed("commit failed");
             assert!(matches!(
                 commit_result,
                 ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(callback))
@@ -134,10 +130,7 @@ mod tests {
 
         #[test]
         fn test_execution_result_prepare_failed_with_callback_type_constructor() {
-            let result = ExecutionResult::<(), String>::prepare_failed_with_callback_type(
-                "prepare",
-                "prepare failed",
-            );
+            let result = ExecutionResult::<(), String>::prepare_failed_with_callback_type("prepare", "prepare failed");
 
             assert!(matches!(
                 result,
@@ -163,8 +156,7 @@ mod tests {
 
         #[test]
         fn test_execution_result_prepare_rollback_failed_constructor() {
-            let result =
-                ExecutionResult::<(), String>::prepare_rollback_failed("original", "rollback");
+            let result = ExecutionResult::<(), String>::prepare_rollback_failed("original", "rollback");
 
             assert!(matches!(
                 result,
@@ -211,8 +203,7 @@ mod tests {
         }
 
         #[test]
-        fn test_execution_result_prepare_rollback_failed_with_callback_type_accepts_display_original()
-         {
+        fn test_execution_result_prepare_rollback_failed_with_callback_type_accepts_display_original() {
             let result = ExecutionResult::<(), String>::prepare_rollback_failed_with_callback_type(
                 "prepare_rollback",
                 io::Error::other("original"),

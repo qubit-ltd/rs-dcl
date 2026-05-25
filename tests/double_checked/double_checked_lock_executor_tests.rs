@@ -145,10 +145,7 @@ mod tests {
                 .when(|| true)
                 .build();
 
-            let value = executor
-                .call(|| Ok::<i32, io::Error>(42))
-                .get_result()
-                .unwrap();
+            let value = executor.call(|| Ok::<i32, io::Error>(42)).get_result().unwrap();
             let executed = executor
                 .execute({
                     let counter = counter.clone();
@@ -186,10 +183,7 @@ mod tests {
                 .build()
                 .execute(panicking_no_op_task as fn() -> Result<(), io::Error>)
                 .get_result();
-            assert!(matches!(
-                panicked,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
+            assert!(matches!(panicked, ExecutionResult::Failed(ExecutorError::Panic(_))));
 
             let succeeded_with = DoubleCheckedLockExecutor::builder()
                 .on(ArcMutex::new(0))
@@ -217,9 +211,7 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .build()
-                .execute_with(
-                    panicking_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>,
-                )
+                .execute_with(panicking_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
                 .get_result();
             assert!(matches!(
                 panicked_with,
@@ -263,13 +255,9 @@ mod tests {
         #[test]
         fn test_inherent_call_returns_execution_context() {
             let data = ArcMutex::new(0);
-            let executor = DoubleCheckedLockExecutor::builder()
-                .on(data)
-                .when(|| true)
-                .build();
+            let executor = DoubleCheckedLockExecutor::builder().on(data).when(|| true).build();
 
-            let context: ExecutionContext<i32, io::Error> =
-                executor.call(|| Ok::<i32, io::Error>(7));
+            let context: ExecutionContext<i32, io::Error> = executor.call(|| Ok::<i32, io::Error>(7));
 
             assert!(matches!(context.get_result(), ExecutionResult::Success(7)));
         }
@@ -287,9 +275,7 @@ mod tests {
             assert!(matches!(context.peek_result(), ExecutionResult::Success(3)));
             assert!(matches!(context.get_result(), ExecutionResult::Success(3)));
 
-            let finished = executor
-                .execute(no_op_task as fn() -> Result<(), io::Error>)
-                .finish();
+            let finished = executor.execute(no_op_task as fn() -> Result<(), io::Error>).finish();
             assert!(finished);
 
             let skipped = DoubleCheckedLockExecutor::builder()
@@ -493,10 +479,7 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
             assert!(prepared.load(Ordering::Acquire));
             assert!(rolled_back.load(Ordering::Acquire));
         }
@@ -518,10 +501,7 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
         }
 
         #[test]
@@ -601,9 +581,7 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
                 .get_result();
 
             let message = match result {
@@ -634,9 +612,7 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
                 .get_result();
 
             let message = match result {
@@ -661,9 +637,7 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
                 .get_result();
 
             assert!(matches!(
@@ -687,15 +661,11 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
-                    error.message().to_string()
-                }
+                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => error.message().to_string(),
                 _ => panic!("expected commit failed error"),
             };
 
@@ -716,15 +686,13 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Err(io::Error::other("task failed"))
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Err(io::Error::other("task failed")) })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-                    rollback, ..
-                }) => rollback.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { rollback, .. }) => {
+                    rollback.message().to_string()
+                }
                 _ => panic!("expected rollback failed error"),
             };
 
@@ -749,10 +717,7 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-                    original,
-                    rollback,
-                }) => {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { original, rollback }) => {
                     assert_eq!(original.callback_type(), Some("task"));
                     assert_eq!(original.message(), "task panic");
                     assert_eq!(rollback.callback_type(), Some("prepare_rollback"));
@@ -823,9 +788,7 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| {
-                    Err::<(), io::Error>(io::Error::other("rollback callback error"))
-                })
+                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("rollback callback error")))
                 .build();
 
             let result = executor
@@ -890,9 +853,7 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .commit_prepare(|| {
-                    Err::<(), io::Error>(io::Error::other("unit commit callback error"))
-                })
+                .commit_prepare(|| Err::<(), io::Error>(io::Error::other("unit commit callback error")))
                 .build();
 
             let result = executor
@@ -918,9 +879,7 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| {
-                    Err::<(), io::Error>(io::Error::other("unit rollback callback error"))
-                })
+                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("unit rollback callback error")))
                 .build();
 
             let result = executor
@@ -931,9 +890,7 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
-                    rollback, ..
-                }) => {
+                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { rollback, .. }) => {
                     assert!(rollback.message().contains("unit rollback callback error"));
                 }
                 _ => panic!("expected prepare rollback failed result"),
@@ -997,9 +954,7 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    Ok::<(), io::Error>(())
-                })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
