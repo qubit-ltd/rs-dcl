@@ -23,10 +23,7 @@ mod tests {
             assert_eq!(logger.unmet_condition_level(), Some(log::Level::Info));
             assert_eq!(logger.unmet_condition_message(), "Test message");
             assert_eq!(logger.prepare_failed_message(), "Prepare action failed");
-            assert_eq!(
-                logger.prepare_commit_failed_message(),
-                "Prepare commit action failed"
-            );
+            assert_eq!(logger.prepare_commit_failed_message(), "Prepare commit action failed");
             assert_eq!(
                 logger.prepare_rollback_failed_message(),
                 "Prepare rollback action failed"
@@ -50,14 +47,8 @@ mod tests {
             logger.set_unmet_condition(Some(log::Level::Error), "Error occurred");
 
             let cloned = logger.clone();
-            assert_eq!(
-                cloned.unmet_condition_level(),
-                logger.unmet_condition_level()
-            );
-            assert_eq!(
-                cloned.unmet_condition_message(),
-                logger.unmet_condition_message()
-            );
+            assert_eq!(cloned.unmet_condition_level(), logger.unmet_condition_level());
+            assert_eq!(cloned.unmet_condition_message(), logger.unmet_condition_message());
         }
 
         #[test]

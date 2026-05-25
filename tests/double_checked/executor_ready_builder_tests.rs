@@ -181,10 +181,7 @@ mod tests {
                 .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::TaskFailed(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::TaskFailed(_))));
             assert!(rolled_back.load(Ordering::Acquire));
         }
 
@@ -291,10 +288,7 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::Panic(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
         }
 
         #[test]
@@ -367,10 +361,7 @@ mod tests {
                 .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
                 .get_result();
 
-            assert!(matches!(
-                result,
-                ExecutionResult::Failed(ExecutorError::TaskFailed(_))
-            ));
+            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::TaskFailed(_))));
         }
 
         #[test]

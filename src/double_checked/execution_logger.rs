@@ -207,11 +207,7 @@ impl ExecutionLogger {
     /// * `message_prefix` - Text placed before the error; the emitted line has the
     ///   form `"{prefix}: {error}"`.
     #[inline]
-    pub fn set_prepare_failure(
-        &mut self,
-        level: Option<log::Level>,
-        message_prefix: impl Into<String>,
-    ) {
+    pub fn set_prepare_failure(&mut self, level: Option<log::Level>, message_prefix: impl Into<String>) {
         self.prepare_failed_level = level;
         self.prepare_failed_message = message_prefix.into();
     }
@@ -234,11 +230,7 @@ impl ExecutionLogger {
     /// * `message_prefix` - Text placed before the error; the emitted line has the
     ///   form `"{prefix}: {error}"`.
     #[inline]
-    pub fn set_prepare_commit_failure(
-        &mut self,
-        level: Option<log::Level>,
-        message_prefix: impl Into<String>,
-    ) {
+    pub fn set_prepare_commit_failure(&mut self, level: Option<log::Level>, message_prefix: impl Into<String>) {
         self.prepare_commit_failed_level = level;
         self.prepare_commit_failed_message = message_prefix.into();
     }
@@ -261,11 +253,7 @@ impl ExecutionLogger {
     /// * `message_prefix` - Text placed before the error; the emitted line has the
     ///   form `"{prefix}: {error}"`.
     #[inline]
-    pub fn set_prepare_rollback_failure(
-        &mut self,
-        level: Option<log::Level>,
-        message_prefix: impl Into<String>,
-    ) {
+    pub fn set_prepare_rollback_failure(&mut self, level: Option<log::Level>, message_prefix: impl Into<String>) {
         self.prepare_rollback_failed_level = level;
         self.prepare_rollback_failed_message = message_prefix.into();
     }

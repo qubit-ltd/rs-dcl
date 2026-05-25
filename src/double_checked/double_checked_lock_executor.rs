@@ -435,15 +435,11 @@ where
                     Ok(Ok(_)) => {}
                     Ok(Err(error)) => {
                         self.logger.log_prepare_commit_failed(&error);
-                        result = ExecutionResult::from_executor_error(
-                            ExecutorError::PrepareCommitFailed(error),
-                        );
+                        result = ExecutionResult::from_executor_error(ExecutorError::PrepareCommitFailed(error));
                     }
                     Err(error) => {
                         self.logger.log_prepare_commit_failed(&error);
-                        result = ExecutionResult::from_executor_error(
-                            ExecutorError::PrepareCommitFailed(error),
-                        );
+                        result = ExecutionResult::from_executor_error(ExecutorError::PrepareCommitFailed(error));
                     }
                 }
             }
@@ -461,21 +457,17 @@ where
                 Ok(Ok(_)) => {}
                 Ok(Err(error)) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::from_executor_error(
-                        ExecutorError::PrepareRollbackFailed {
-                            original,
-                            rollback: error,
-                        },
-                    );
+                    result = ExecutionResult::from_executor_error(ExecutorError::PrepareRollbackFailed {
+                        original,
+                        rollback: error,
+                    });
                 }
                 Err(error) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::from_executor_error(
-                        ExecutorError::PrepareRollbackFailed {
-                            original,
-                            rollback: error,
-                        },
-                    );
+                    result = ExecutionResult::from_executor_error(ExecutorError::PrepareRollbackFailed {
+                        original,
+                        rollback: error,
+                    });
                 }
             }
         }
@@ -499,11 +491,7 @@ where
     ///
     /// Returns [`CallbackError`] only when `catch_panics` is enabled and
     /// `callback` panics.
-    fn try_run<R>(
-        &self,
-        callback_type: &'static str,
-        callback: impl FnOnce() -> R,
-    ) -> Result<R, CallbackError> {
+    fn try_run<R>(&self, callback_type: &'static str, callback: impl FnOnce() -> R) -> Result<R, CallbackError> {
         if !self.catch_panics {
             return Ok(callback());
         }

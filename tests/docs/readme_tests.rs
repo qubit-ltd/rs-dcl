@@ -26,8 +26,7 @@ fn test_readme_references_current_crate_and_api() {
 /// Ensures README dependency snippets stay in sync with Cargo.toml (`x.y` in README may
 /// abbreviate any `x.y.z…` package version with the same leading `x.y`).
 fn test_readme_dependency_version_matches_cargo_toml() {
-    let cargo_version =
-        extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
+    let cargo_version = extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
     let readme_en_version = extract_readme_dependency_version(README_EN, "qubit-dcl")
         .expect("Failed to extract qubit-dcl version from README.md");
     let readme_zh_version = extract_readme_dependency_version(README_ZH, "qubit-dcl")
