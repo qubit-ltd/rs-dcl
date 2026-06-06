@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -62,7 +60,10 @@ mod tests {
 
             let result = DoubleCheckedLock::on(data.clone())
                 .when(|| false)
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
@@ -75,7 +76,10 @@ mod tests {
 
             let result = DoubleCheckedLock::on(data.clone())
                 .when(|| true)
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(())));
@@ -127,7 +131,8 @@ mod tests {
         #[test]
         fn test_build_still_exposes_reusable_executor() {
             let data = ArcMutex::new(1);
-            let executor = DoubleCheckedLock::on(data.clone()).when(|| true).build();
+            let executor =
+                DoubleCheckedLock::on(data.clone()).when(|| true).build();
 
             let first = executor
                 .call_with(|value: &mut i32| {

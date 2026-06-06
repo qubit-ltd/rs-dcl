@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Callback Error
 //!
 //! Provides callback error information for double-checked execution.
-//!
 
 use std::fmt;
 
@@ -46,8 +43,8 @@ impl CallbackError {
     ///
     /// # Parameters
     ///
-    /// * `error` - Error value whose display text becomes this callback
-    ///   error's message.
+    /// * `error` - Error value whose display text becomes this callback error's
+    ///   message.
     ///
     /// # Returns
     ///
@@ -64,8 +61,8 @@ impl CallbackError {
     ///
     /// # Parameters
     ///
-    /// * `callback_type` - Semantic callback type label, such as `"prepare"`
-    ///   or `"prepare_rollback"`.
+    /// * `callback_type` - Semantic callback type label, such as `"prepare"` or
+    ///   `"prepare_rollback"`.
     /// * `error` - Error message or displayable error value produced by the
     ///   callback.
     ///
@@ -73,7 +70,10 @@ impl CallbackError {
     ///
     /// A callback error with `callback_type` stored as metadata.
     #[inline]
-    pub fn with_callback_type<T: fmt::Display>(callback_type: &'static str, error: T) -> Self {
+    pub fn with_callback_type<T: fmt::Display>(
+        callback_type: &'static str,
+        error: T,
+    ) -> Self {
         Self {
             message: error.to_string(),
             callback_type: Some(callback_type),
@@ -125,7 +125,9 @@ impl fmt::Display for CallbackError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.callback_type {
-            Some(callback_type) => write!(f, "{}: {}", callback_type, self.message),
+            Some(callback_type) => {
+                write!(f, "{}: {}", callback_type, self.message)
+            }
             None => write!(f, "{}", self.message),
         }
     }

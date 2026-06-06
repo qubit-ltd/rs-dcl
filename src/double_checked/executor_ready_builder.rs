@@ -1,15 +1,12 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Ready builder for [`super::DoubleCheckedLockExecutor`] (tester set, optional
 //! prepare hooks).
-//!
 
 use std::{
     fmt::Display,
@@ -38,7 +35,6 @@ use qubit_lock::Lock;
 ///
 /// * `L` - The lock type implementing [`Lock<T>`].
 /// * `T` - The data type protected by the lock.
-///
 #[derive(Clone)]
 pub struct ExecutorReadyBuilder<L, T> {
     /// The lock to store in the executor.
@@ -51,15 +47,19 @@ pub struct ExecutorReadyBuilder<L, T> {
     pub(in crate::double_checked) logger: ExecutionLogger,
 
     /// Optional action executed after the first check and before locking.
-    pub(in crate::double_checked) prepare_action: Option<ArcRunnable<CallbackError>>,
+    pub(in crate::double_checked) prepare_action:
+        Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare must be rolled back.
-    pub(in crate::double_checked) rollback_prepare_action: Option<ArcRunnable<CallbackError>>,
+    pub(in crate::double_checked) rollback_prepare_action:
+        Option<ArcRunnable<CallbackError>>,
 
     /// Optional action executed when prepare should be committed.
-    pub(in crate::double_checked) commit_prepare_action: Option<ArcRunnable<CallbackError>>,
+    pub(in crate::double_checked) commit_prepare_action:
+        Option<ArcRunnable<CallbackError>>,
 
-    /// Whether panics from tester, callbacks, and task are converted to errors.
+    /// Whether panics from tester, callbacks, and task are converted to
+    /// errors.
     pub(in crate::double_checked) catch_panics: bool,
 
     /// Carries the protected data type.
@@ -82,7 +82,11 @@ where
     /// This builder with unmet-condition logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_unmet_condition(mut self, level: log::Level, message: impl Into<String>) -> Self {
+    pub fn log_unmet_condition(
+        mut self,
+        level: log::Level,
+        message: impl Into<String>,
+    ) -> Self {
         self.logger.set_unmet_condition(Some(level), message);
         self
     }
@@ -111,7 +115,11 @@ where
     /// This builder with prepare failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
+    pub fn log_prepare_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
         self.logger.set_prepare_failure(Some(level), message_prefix);
         self
     }
@@ -141,8 +149,13 @@ where
     /// This builder with prepare-commit failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_commit_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
-        self.logger.set_prepare_commit_failure(Some(level), message_prefix);
+    pub fn log_prepare_commit_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
+        self.logger
+            .set_prepare_commit_failure(Some(level), message_prefix);
         self
     }
 
@@ -171,8 +184,13 @@ where
     /// This builder with prepare-rollback failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_rollback_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
-        self.logger.set_prepare_rollback_failure(Some(level), message_prefix);
+    pub fn log_prepare_rollback_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
+        self.logger
+            .set_prepare_rollback_failure(Some(level), message_prefix);
         self
     }
 
@@ -220,9 +238,9 @@ where
     {
         let mut action = prepare_action;
         self.prepare_action = Some(ArcRunnable::new(move || {
-            action
-                .run()
-                .map_err(|error| CallbackError::with_callback_type("prepare", error))
+            action.run().map_err(|error| {
+                CallbackError::with_callback_type("prepare", error)
+            })
         }));
         self
     }
@@ -249,16 +267,19 @@ where
     /// [`super::ExecutorError::PrepareRollbackFailed`].
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn rollback_prepare<Rn, E>(mut self, rollback_prepare_action: Rn) -> Self
+    pub fn rollback_prepare<Rn, E>(
+        mut self,
+        rollback_prepare_action: Rn,
+    ) -> Self
     where
         Rn: Runnable<E> + Send + 'static,
         E: Display,
     {
         let mut action = rollback_prepare_action;
         self.rollback_prepare_action = Some(ArcRunnable::new(move || {
-            action
-                .run()
-                .map_err(|error| CallbackError::with_callback_type("prepare_rollback", error))
+            action.run().map_err(|error| {
+                CallbackError::with_callback_type("prepare_rollback", error)
+            })
         }));
         self
     }
@@ -292,9 +313,9 @@ where
     {
         let mut action = commit_prepare_action;
         self.commit_prepare_action = Some(ArcRunnable::new(move || {
-            action
-                .run()
-                .map_err(|error| CallbackError::with_callback_type("prepare_commit", error))
+            action.run().map_err(|error| {
+                CallbackError::with_callback_type("prepare_commit", error)
+            })
         }));
         self
     }
@@ -333,7 +354,8 @@ where
         self
     }
 
-    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    /// Disables panic capture for tester, prepare callbacks, and task
+    /// execution.
     ///
     /// # Returns
     ///

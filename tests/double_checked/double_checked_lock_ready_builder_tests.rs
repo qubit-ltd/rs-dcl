@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -46,8 +44,14 @@ mod tests {
                 .when(|| true)
                 .log_unmet_condition(log::Level::Info, "condition not met")
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
-                .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
-                .log_prepare_rollback_failure(log::Level::Debug, "prepare rollback failed")
+                .log_prepare_commit_failure(
+                    log::Level::Error,
+                    "prepare commit failed",
+                )
+                .log_prepare_rollback_failure(
+                    log::Level::Debug,
+                    "prepare rollback failed",
+                )
                 .disable_unmet_condition_logging()
                 .disable_prepare_failure_logging()
                 .disable_prepare_commit_failure_logging()
@@ -77,7 +81,10 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
         }
 
         #[test]

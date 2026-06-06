@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -39,7 +37,9 @@ mod tests {
     mod test_executor_ready_builder {
         use super::*;
 
-        fn increment_and_return_task(value: &mut i32) -> Result<i32, io::Error> {
+        fn increment_and_return_task(
+            value: &mut i32,
+        ) -> Result<i32, io::Error> {
             *value += 1;
             Ok(*value)
         }
@@ -82,7 +82,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(11)));
@@ -109,7 +112,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(())));
@@ -124,7 +130,9 @@ mod tests {
                 .on(data)
                 .when(|| true)
                 .prepare(|| Ok::<(), io::Error>(()))
-                .commit_prepare(|| Err::<(), _>(io::Error::other("commit failed")))
+                .commit_prepare(|| {
+                    Err::<(), _>(io::Error::other("commit failed"))
+                })
                 .build();
 
             let result = executor
@@ -146,7 +154,9 @@ mod tests {
                 .when(|| true)
                 .log_unmet_condition(log::Level::Error, "condition not met")
                 .prepare(|| Ok::<(), io::Error>(()))
-                .commit_prepare(|| Err::<(), _>(io::Error::other("commit failed")))
+                .commit_prepare(|| {
+                    Err::<(), _>(io::Error::other("commit failed"))
+                })
                 .build();
 
             let result = executor
@@ -178,10 +188,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
+                .call_with(|_value: &mut i32| {
+                    Err::<i32, _>(io::Error::other("task failed"))
+                })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::TaskFailed(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::TaskFailed(_))
+            ));
             assert!(rolled_back.load(Ordering::Acquire));
         }
 
@@ -195,7 +210,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(
@@ -217,7 +235,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(
@@ -235,11 +256,15 @@ mod tests {
                 .on(data)
                 .when(|| true)
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| Err::<(), _>(io::Error::other("rollback failed")))
+                .rollback_prepare(|| {
+                    Err::<(), _>(io::Error::other("rollback failed"))
+                })
                 .build();
 
             let result = executor
-                .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
+                .call_with(|_value: &mut i32| {
+                    Err::<i32, _>(io::Error::other("task failed"))
+                })
                 .get_result();
 
             assert!(matches!(
@@ -258,8 +283,14 @@ mod tests {
                 .on(data)
                 .when(|| true)
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
-                .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
-                .log_prepare_rollback_failure(log::Level::Info, "prepare rollback failed")
+                .log_prepare_commit_failure(
+                    log::Level::Error,
+                    "prepare commit failed",
+                )
+                .log_prepare_rollback_failure(
+                    log::Level::Info,
+                    "prepare rollback failed",
+                )
                 .disable_unmet_condition_logging()
                 .disable_prepare_failure_logging()
                 .disable_prepare_commit_failure_logging()
@@ -288,7 +319,10 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
         }
 
         #[test]
@@ -313,7 +347,8 @@ mod tests {
         }
 
         #[test]
-        fn test_ready_builder_disable_catch_panics_without_prior_set_still_disables_catch() {
+        fn test_ready_builder_disable_catch_panics_without_prior_set_still_disables_catch()
+         {
             let data = ArcMutex::new(1);
             let caught = catch_unwind(AssertUnwindSafe(|| {
                 DoubleCheckedLockExecutor::builder()
@@ -341,7 +376,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(2)));
@@ -358,10 +396,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(|_value: &mut i32| Err::<i32, _>(io::Error::other("task failed")))
+                .call_with(|_value: &mut i32| {
+                    Err::<i32, _>(io::Error::other("task failed"))
+                })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::TaskFailed(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::TaskFailed(_))
+            ));
         }
 
         #[test]
@@ -378,7 +421,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
