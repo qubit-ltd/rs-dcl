@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Double-Checked Lock Executor Demo
 //!
 //! Demonstrates the usage of a reusable double-checked lock executor.
-//!
 
 use std::sync::{
     Arc,
@@ -31,7 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let running = Arc::new(AtomicBool::new(false));
     let data = ArcMutex::new(42);
 
-    println!("Initial state: running = {}", running.load(Ordering::Acquire));
+    println!(
+        "Initial state: running = {}",
+        running.load(Ordering::Acquire)
+    );
     println!("Initial data: {}", data.read(|d| *d));
 
     let executor = DoubleCheckedLockExecutor::builder()
@@ -58,7 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start the service
     running.store(true, Ordering::Release);
-    println!("Service started: running = {}", running.load(Ordering::Acquire));
+    println!(
+        "Service started: running = {}",
+        running.load(Ordering::Acquire)
+    );
 
     // Now execute should succeed
     let result = executor
@@ -79,7 +82,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Stop the service
     running.store(false, Ordering::Release);
-    println!("Service stopped: running = {}", running.load(Ordering::Acquire));
+    println!(
+        "Service stopped: running = {}",
+        running.load(Ordering::Acquire)
+    );
 
     // Try to execute when service is stopped (should fail)
     let result = executor

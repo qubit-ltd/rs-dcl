@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Execution Result
 //!
 //! Provides the task execution result enum for double-checked locking.
-//!
 use std::fmt;
 
 use crate::double_checked::{
@@ -20,8 +17,8 @@ use crate::double_checked::{
 
 /// Task execution result
 ///
-/// Represents the result of executing a task using an enum to clearly distinguish
-/// between success, unmet conditions, and failure.
+/// Represents the result of executing a task using an enum to clearly
+/// distinguish between success, unmet conditions, and failure.
 ///
 /// # Type Parameters
 ///
@@ -43,7 +40,6 @@ use crate::double_checked::{
 /// let failed: ExecutionResult<i32, String> =
 ///     ExecutionResult::task_failed("Task failed".to_string());
 /// ```
-///
 #[derive(Debug)]
 pub enum ExecutionResult<T, E> {
     /// Execution succeeded with a value
@@ -97,8 +93,9 @@ impl<T, E> ExecutionResult<T, E> {
 
     /// Builds a failed result with [`ExecutorError::PrepareFailed`].
     ///
-    /// Accepts any [`std::fmt::Display`] value (including [`std::error::Error`] and [`String`]);
-    /// the message is stored in a [`CallbackError`] wrapper.
+    /// Accepts any [`std::fmt::Display`] value (including [`std::error::Error`]
+    /// and [`String`]); the message is stored in a [`CallbackError`]
+    /// wrapper.
     ///
     /// # Parameters
     ///
@@ -109,7 +106,9 @@ impl<T, E> ExecutionResult<T, E> {
     /// A failed result containing the prepare failure message.
     #[inline]
     pub fn prepare_failed(msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareFailed(CallbackError::from_display(msg)))
+        ExecutionResult::Failed(ExecutorError::PrepareFailed(
+            CallbackError::from_display(msg),
+        ))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareCommitFailed`].
@@ -123,7 +122,9 @@ impl<T, E> ExecutionResult<T, E> {
     /// A failed result containing the prepare-commit failure message.
     #[inline]
     pub fn prepare_commit_failed(msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(CallbackError::from_display(msg)))
+        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(
+            CallbackError::from_display(msg),
+        ))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareCommitFailed`] and
@@ -141,15 +142,17 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// A failed result containing the typed prepare-commit failure message.
     #[inline]
-    pub fn prepare_commit_failed_with_callback_type(callback_type: &'static str, msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(CallbackError::with_callback_type(
-            callback_type,
-            msg,
-        )))
+    pub fn prepare_commit_failed_with_callback_type(
+        callback_type: &'static str,
+        msg: impl fmt::Display,
+    ) -> Self {
+        ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(
+            CallbackError::with_callback_type(callback_type, msg),
+        ))
     }
 
-    /// Builds a failed result with [`ExecutorError::PrepareFailed`] and explicit
-    /// callback type metadata.
+    /// Builds a failed result with [`ExecutorError::PrepareFailed`] and
+    /// explicit callback type metadata.
     ///
     /// The callback type can later be read from
     /// [`ExecutorError::callback_type`].
@@ -163,11 +166,13 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// A failed result containing the typed prepare failure message.
     #[inline]
-    pub fn prepare_failed_with_callback_type(callback_type: &'static str, msg: impl fmt::Display) -> Self {
-        ExecutionResult::Failed(ExecutorError::PrepareFailed(CallbackError::with_callback_type(
-            callback_type,
-            msg,
-        )))
+    pub fn prepare_failed_with_callback_type(
+        callback_type: &'static str,
+        msg: impl fmt::Display,
+    ) -> Self {
+        ExecutionResult::Failed(ExecutorError::PrepareFailed(
+            CallbackError::with_callback_type(callback_type, msg),
+        ))
     }
 
     /// Builds a failed result with [`ExecutorError::PrepareRollbackFailed`].
@@ -181,7 +186,10 @@ impl<T, E> ExecutionResult<T, E> {
     ///
     /// A failed result containing both original and rollback messages.
     #[inline]
-    pub fn prepare_rollback_failed(original: impl fmt::Display, rollback: impl fmt::Display) -> Self {
+    pub fn prepare_rollback_failed(
+        original: impl fmt::Display,
+        rollback: impl fmt::Display,
+    ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
             original: CallbackError::from_display(original),
             rollback: CallbackError::from_display(rollback),
@@ -212,7 +220,10 @@ impl<T, E> ExecutionResult<T, E> {
     ) -> Self {
         ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed {
             original: CallbackError::from_display(original),
-            rollback: CallbackError::with_callback_type(rollback_callback_type, rollback),
+            rollback: CallbackError::with_callback_type(
+                rollback_callback_type,
+                rollback,
+            ),
         })
     }
 

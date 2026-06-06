@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -39,7 +37,9 @@ mod tests {
     mod test_executor_lock_builder {
         use super::*;
 
-        fn increment_and_return_task(value: &mut i32) -> Result<i32, io::Error> {
+        fn increment_and_return_task(
+            value: &mut i32,
+        ) -> Result<i32, io::Error> {
             *value += 1;
             Ok(*value)
         }
@@ -67,7 +67,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
@@ -77,7 +80,8 @@ mod tests {
         }
 
         #[test]
-        fn test_prepare_rollback_failure_with_logger_replaces_condition_result() {
+        fn test_prepare_rollback_failure_with_logger_replaces_condition_result()
+        {
             let data = ArcMutex::new(10);
             let checks = Arc::new(AtomicUsize::new(0));
             let executor = DoubleCheckedLockExecutor::builder()
@@ -88,11 +92,16 @@ mod tests {
                 })
                 .log_unmet_condition(log::Level::Error, "condition not met")
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| Err::<(), _>(io::Error::other("rollback failed")))
+                .rollback_prepare(|| {
+                    Err::<(), _>(io::Error::other("rollback failed"))
+                })
                 .build();
 
             let result = executor
-                .call_with(increment_and_return_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_and_return_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(
@@ -110,8 +119,14 @@ mod tests {
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .log_prepare_failure(log::Level::Warn, "prepare failed")
-                .log_prepare_commit_failure(log::Level::Error, "prepare commit failed")
-                .log_prepare_rollback_failure(log::Level::Info, "prepare rollback failed")
+                .log_prepare_commit_failure(
+                    log::Level::Error,
+                    "prepare commit failed",
+                )
+                .log_prepare_rollback_failure(
+                    log::Level::Info,
+                    "prepare rollback failed",
+                )
                 .disable_unmet_condition_logging()
                 .disable_prepare_failure_logging()
                 .disable_prepare_commit_failure_logging()
@@ -141,7 +156,10 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
         }
 
         #[test]

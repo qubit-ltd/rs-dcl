@@ -1,14 +1,11 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Initial builder for [`super::DoubleCheckedLockExecutor`].
-//!
 
 use std::marker::PhantomData;
 
@@ -21,13 +18,13 @@ use qubit_lock::Lock;
 /// Initial builder for [`super::DoubleCheckedLockExecutor`].
 ///
 /// This state has no lock yet. Call [`Self::on`] to attach the lock.
-///
 #[derive(Debug, Default, Clone)]
 pub struct ExecutorBuilder {
     /// Logger carried forward to later builder states.
     logger: ExecutionLogger,
 
-    /// Whether panics from tester, callbacks, and task are captured as result errors.
+    /// Whether panics from tester, callbacks, and task are captured as result
+    /// errors.
     catch_panics: bool,
 }
 
@@ -44,7 +41,11 @@ impl ExecutorBuilder {
     /// This builder with unmet-condition logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_unmet_condition(mut self, level: log::Level, message: impl Into<String>) -> Self {
+    pub fn log_unmet_condition(
+        mut self,
+        level: log::Level,
+        message: impl Into<String>,
+    ) -> Self {
         self.logger.set_unmet_condition(Some(level), message);
         self
     }
@@ -73,7 +74,11 @@ impl ExecutorBuilder {
     /// This builder with prepare failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
+    pub fn log_prepare_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
         self.logger.set_prepare_failure(Some(level), message_prefix);
         self
     }
@@ -103,8 +108,13 @@ impl ExecutorBuilder {
     /// This builder with prepare-commit failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_commit_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
-        self.logger.set_prepare_commit_failure(Some(level), message_prefix);
+    pub fn log_prepare_commit_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
+        self.logger
+            .set_prepare_commit_failure(Some(level), message_prefix);
         self
     }
 
@@ -133,8 +143,13 @@ impl ExecutorBuilder {
     /// This builder with prepare-rollback failure logging configured.
     #[inline]
     #[must_use = "assign or chain the returned builder"]
-    pub fn log_prepare_rollback_failure(mut self, level: log::Level, message_prefix: impl Into<String>) -> Self {
-        self.logger.set_prepare_rollback_failure(Some(level), message_prefix);
+    pub fn log_prepare_rollback_failure(
+        mut self,
+        level: log::Level,
+        message_prefix: impl Into<String>,
+    ) -> Self {
+        self.logger
+            .set_prepare_rollback_failure(Some(level), message_prefix);
         self
     }
 
@@ -204,7 +219,8 @@ impl ExecutorBuilder {
         self
     }
 
-    /// Disables panic capture for tester, prepare callbacks, and task execution.
+    /// Disables panic capture for tester, prepare callbacks, and task
+    /// execution.
     ///
     /// # Returns
     ///

@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Executor Error
 //!
 //! Provides executor error types for the double-checked lock executor.
-//!
 
 use std::error::Error;
 use std::fmt;
@@ -37,8 +34,6 @@ use super::CallbackError;
 ///     ExecutorError::PrepareFailed(CallbackError::from_display("Service is not running"));
 /// println!("Error: {}", error_with_msg);
 /// ```
-///
-///
 #[derive(Debug)]
 pub enum ExecutorError<E> {
     /// Task execution failed with original error
@@ -96,8 +91,8 @@ where
 }
 
 impl<E> ExecutorError<E> {
-    /// Returns the callback type label, when the error comes from a callback and
-    /// the type is available.
+    /// Returns the callback type label, when the error comes from a callback
+    /// and the type is available.
     ///
     /// This returns `None` for task failures and callback errors without
     /// associated type labels.

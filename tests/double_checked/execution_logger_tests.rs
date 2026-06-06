@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -22,8 +20,14 @@ mod tests {
 
             assert_eq!(logger.unmet_condition_level(), Some(log::Level::Info));
             assert_eq!(logger.unmet_condition_message(), "Test message");
-            assert_eq!(logger.prepare_failed_message(), "Prepare action failed");
-            assert_eq!(logger.prepare_commit_failed_message(), "Prepare commit action failed");
+            assert_eq!(
+                logger.prepare_failed_message(),
+                "Prepare action failed"
+            );
+            assert_eq!(
+                logger.prepare_commit_failed_message(),
+                "Prepare commit action failed"
+            );
             assert_eq!(
                 logger.prepare_rollback_failed_message(),
                 "Prepare rollback action failed"
@@ -33,7 +37,8 @@ mod tests {
         #[test]
         fn test_execution_logger_debug() {
             let mut logger = ExecutionLogger::default();
-            logger.set_unmet_condition(Some(log::Level::Warn), "Warning message");
+            logger
+                .set_unmet_condition(Some(log::Level::Warn), "Warning message");
 
             let debug_str = format!("{:?}", logger);
             assert!(debug_str.contains("ExecutionLogger"));
@@ -44,11 +49,18 @@ mod tests {
         #[test]
         fn test_execution_logger_clone() {
             let mut logger = ExecutionLogger::default();
-            logger.set_unmet_condition(Some(log::Level::Error), "Error occurred");
+            logger
+                .set_unmet_condition(Some(log::Level::Error), "Error occurred");
 
             let cloned = logger.clone();
-            assert_eq!(cloned.unmet_condition_level(), logger.unmet_condition_level());
-            assert_eq!(cloned.unmet_condition_message(), logger.unmet_condition_message());
+            assert_eq!(
+                cloned.unmet_condition_level(),
+                logger.unmet_condition_level()
+            );
+            assert_eq!(
+                cloned.unmet_condition_message(),
+                logger.unmet_condition_message()
+            );
         }
 
         #[test]

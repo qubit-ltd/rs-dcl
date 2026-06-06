@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
 const SOURCES: &[(&str, &str)] = &[
     (
@@ -19,11 +17,15 @@ const SOURCES: &[(&str, &str)] = &[
     ),
     (
         "double_checked_lock_executor.rs",
-        include_str!("../../src/double_checked/double_checked_lock_executor.rs"),
+        include_str!(
+            "../../src/double_checked/double_checked_lock_executor.rs"
+        ),
     ),
     (
         "double_checked_lock_ready_builder.rs",
-        include_str!("../../src/double_checked/double_checked_lock_ready_builder.rs"),
+        include_str!(
+            "../../src/double_checked/double_checked_lock_ready_builder.rs"
+        ),
     ),
     (
         "executor_builder.rs",
@@ -63,11 +65,16 @@ fn test_builder_value_returning_methods_are_must_use() {
 fn find_missing_must_use_methods() -> Vec<String> {
     SOURCES
         .iter()
-        .flat_map(|(file_name, source)| find_missing_must_use_methods_in_source(file_name, source))
+        .flat_map(|(file_name, source)| {
+            find_missing_must_use_methods_in_source(file_name, source)
+        })
         .collect()
 }
 
-fn find_missing_must_use_methods_in_source(file_name: &str, source: &str) -> Vec<String> {
+fn find_missing_must_use_methods_in_source(
+    file_name: &str,
+    source: &str,
+) -> Vec<String> {
     let lines = source.lines().collect::<Vec<_>>();
     let mut missing = Vec::new();
 
@@ -76,7 +83,9 @@ fn find_missing_must_use_methods_in_source(file_name: &str, source: &str) -> Vec
             continue;
         }
         let signature = collect_signature(&lines, line_index);
-        if !returns_must_use_value(&signature) || has_must_use_attr(&lines, line_index) {
+        if !returns_must_use_value(&signature)
+            || has_must_use_attr(&lines, line_index)
+        {
             continue;
         }
         missing.push(format!(
@@ -115,7 +124,8 @@ fn has_must_use_attr(lines: &[&str], function_line: usize) -> bool {
         if line.starts_with("#[must_use") {
             return true;
         }
-        if line.is_empty() || line.starts_with("///") || line.starts_with("#[") {
+        if line.is_empty() || line.starts_with("///") || line.starts_with("#[")
+        {
             continue;
         }
         break;

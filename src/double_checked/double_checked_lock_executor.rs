@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Double-Checked Lock Executor
 //!
 //! Provides a reusable executor for double-checked locking workflows.
-//!
 
 use std::{
     any::Any,
@@ -55,8 +52,8 @@ use qubit_lock::Lock;
 /// 6. Optional prepare commit or rollback after the lock is released.
 ///
 /// The tester is intentionally run both outside and inside the lock. Any state
-/// read by the first check must therefore use atomics or another synchronization
-/// mechanism that is safe without this executor's lock.
+/// read by the first check must therefore use atomics or another
+/// synchronization mechanism that is safe without this executor's lock.
 ///
 /// # Type Parameters
 ///
@@ -81,8 +78,8 @@ use qubit_lock::Lock;
 ///
 /// Cloned executors share their configured prepare callbacks. Concurrent calls
 /// may therefore complete prepare in several threads before one call wins the
-/// second condition check; calls that lose the second check run prepare rollback
-/// if it is configured.
+/// second condition check; calls that lose the second check run prepare
+/// rollback if it is configured.
 ///
 /// ```rust
 /// use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -124,7 +121,6 @@ use qubit_lock::Lock;
 ///     assert_eq!(data.read(|value| *value), 15);
 /// }
 /// ```
-///
 #[derive(Clone)]
 pub struct DoubleCheckedLockExecutor<L = (), T = ()> {
     /// The lock protecting the target data.
@@ -203,7 +199,8 @@ where
     ///
     /// # Parameters
     ///
-    /// * `task` - The callable task to execute after both condition checks pass.
+    /// * `task` - The callable task to execute after both condition checks
+    ///   pass.
     ///
     /// # Returns
     ///
@@ -224,7 +221,8 @@ where
     ///
     /// # Parameters
     ///
-    /// * `task` - The runnable task to execute after both condition checks pass.
+    /// * `task` - The runnable task to execute after both condition checks
+    ///   pass.
     ///
     /// # Returns
     ///
@@ -259,7 +257,8 @@ where
         E: Display,
     {
         let mut task = task;
-        let result = self.execute_with_write_lock(move |data| task.call_with(data));
+        let result =
+            self.execute_with_write_lock(move |data| task.call_with(data));
         ExecutionContext::new(result)
     }
 
@@ -281,7 +280,8 @@ where
         E: Display,
     {
         let mut task = task;
-        let result = self.execute_with_write_lock(move |data| task.run_with(data));
+        let result =
+            self.execute_with_write_lock(move |data| task.run_with(data));
         ExecutionContext::new(result)
     }
 
@@ -339,7 +339,9 @@ where
         let first_check = match self.try_run("tester", || self.tester.test()) {
             Ok(v) => v,
             Err(error) => {
-                return ExecutionResult::from_executor_error(ExecutorError::Panic(error));
+                return ExecutionResult::from_executor_error(
+                    ExecutorError::Panic(error),
+                );
             }
         };
 
@@ -351,7 +353,9 @@ where
         let prepare_completed = match self.run_prepare_action() {
             Ok(completed) => completed,
             Err(error) => {
-                return ExecutionResult::from_executor_error(ExecutorError::PrepareFailed(error));
+                return ExecutionResult::from_executor_error(
+                    ExecutorError::PrepareFailed(error),
+                );
             }
         };
 
@@ -359,7 +363,9 @@ where
             let passed = match self.try_run("tester", || self.tester.test()) {
                 Ok(v) => v,
                 Err(error) => {
-                    return ExecutionResult::from_executor_error(ExecutorError::Panic(error));
+                    return ExecutionResult::from_executor_error(
+                        ExecutorError::Panic(error),
+                    );
                 }
             };
             if !passed {
@@ -369,7 +375,9 @@ where
             match self.try_run("task", || task(data)) {
                 Ok(Ok(value)) => ExecutionResult::success(value),
                 Ok(Err(error)) => ExecutionResult::task_failed(error),
-                Err(error) => ExecutionResult::from_executor_error(ExecutorError::Panic(error)),
+                Err(error) => ExecutionResult::from_executor_error(
+                    ExecutorError::Panic(error),
+                ),
             }
         });
 
@@ -425,21 +433,32 @@ where
     ///
     /// `result` unchanged when no finalization action fails. Returns a failed
     /// result when prepare commit or prepare rollback fails.
-    fn finalize_prepare<R, E>(&self, mut result: ExecutionResult<R, E>) -> ExecutionResult<R, E>
+    fn finalize_prepare<R, E>(
+        &self,
+        mut result: ExecutionResult<R, E>,
+    ) -> ExecutionResult<R, E>
     where
         E: Display,
     {
         if result.is_success() {
-            if let Some(mut commit_prepare_action) = self.commit_prepare_action.clone() {
-                match self.try_run("prepare_commit", move || commit_prepare_action.run()) {
+            if let Some(mut commit_prepare_action) =
+                self.commit_prepare_action.clone()
+            {
+                match self.try_run("prepare_commit", move || {
+                    commit_prepare_action.run()
+                }) {
                     Ok(Ok(_)) => {}
                     Ok(Err(error)) => {
                         self.logger.log_prepare_commit_failed(&error);
-                        result = ExecutionResult::from_executor_error(ExecutorError::PrepareCommitFailed(error));
+                        result = ExecutionResult::from_executor_error(
+                            ExecutorError::PrepareCommitFailed(error),
+                        );
                     }
                     Err(error) => {
                         self.logger.log_prepare_commit_failed(&error);
-                        result = ExecutionResult::from_executor_error(ExecutorError::PrepareCommitFailed(error));
+                        result = ExecutionResult::from_executor_error(
+                            ExecutorError::PrepareCommitFailed(error),
+                        );
                     }
                 }
             }
@@ -452,22 +471,30 @@ where
             CallbackError::from_display("Condition not met")
         };
 
-        if let Some(mut rollback_prepare_action) = self.rollback_prepare_action.clone() {
-            match self.try_run("prepare_rollback", move || rollback_prepare_action.run()) {
+        if let Some(mut rollback_prepare_action) =
+            self.rollback_prepare_action.clone()
+        {
+            match self.try_run("prepare_rollback", move || {
+                rollback_prepare_action.run()
+            }) {
                 Ok(Ok(_)) => {}
                 Ok(Err(error)) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::from_executor_error(ExecutorError::PrepareRollbackFailed {
-                        original,
-                        rollback: error,
-                    });
+                    result = ExecutionResult::from_executor_error(
+                        ExecutorError::PrepareRollbackFailed {
+                            original,
+                            rollback: error,
+                        },
+                    );
                 }
                 Err(error) => {
                     self.logger.log_prepare_rollback_failed(&error);
-                    result = ExecutionResult::from_executor_error(ExecutorError::PrepareRollbackFailed {
-                        original,
-                        rollback: error,
-                    });
+                    result = ExecutionResult::from_executor_error(
+                        ExecutorError::PrepareRollbackFailed {
+                            original,
+                            rollback: error,
+                        },
+                    );
                 }
             }
         }
@@ -491,7 +518,11 @@ where
     ///
     /// Returns [`CallbackError`] only when `catch_panics` is enabled and
     /// `callback` panics.
-    fn try_run<R>(&self, callback_type: &'static str, callback: impl FnOnce() -> R) -> Result<R, CallbackError> {
+    fn try_run<R>(
+        &self,
+        callback_type: &'static str,
+        callback: impl FnOnce() -> R,
+    ) -> Result<R, CallbackError> {
         if !self.catch_panics {
             return Ok(callback());
         }
@@ -525,7 +556,9 @@ type CallbackError = super::callback_error::CallbackError;
 ///
 /// Callback error metadata suitable for the `original` field of
 /// [`ExecutorError::PrepareRollbackFailed`].
-fn original_failure_to_callback_error<E>(error: &ExecutorError<E>) -> CallbackError
+fn original_failure_to_callback_error<E>(
+    error: &ExecutorError<E>,
+) -> CallbackError
 where
     E: Display,
 {

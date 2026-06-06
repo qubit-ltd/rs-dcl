@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! README consistency tests for qubit-dcl.
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
@@ -23,14 +21,18 @@ fn test_readme_references_current_crate_and_api() {
 }
 
 #[test]
-/// Ensures README dependency snippets stay in sync with Cargo.toml (`x.y` in README may
-/// abbreviate any `x.y.z…` package version with the same leading `x.y`).
+/// Ensures README dependency snippets stay in sync with Cargo.toml (`x.y` in
+/// README may abbreviate any `x.y.z…` package version with the same leading
+/// `x.y`).
 fn test_readme_dependency_version_matches_cargo_toml() {
-    let cargo_version = extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
-    let readme_en_version = extract_readme_dependency_version(README_EN, "qubit-dcl")
-        .expect("Failed to extract qubit-dcl version from README.md");
-    let readme_zh_version = extract_readme_dependency_version(README_ZH, "qubit-dcl")
-        .expect("Failed to extract qubit-dcl version from README.zh_CN.md");
+    let cargo_version = extract_package_version(CARGO_TOML)
+        .expect("Failed to extract version from Cargo.toml");
+    let readme_en_version =
+        extract_readme_dependency_version(README_EN, "qubit-dcl")
+            .expect("Failed to extract qubit-dcl version from README.md");
+    let readme_zh_version =
+        extract_readme_dependency_version(README_ZH, "qubit-dcl")
+            .expect("Failed to extract qubit-dcl version from README.zh_CN.md");
     assert!(
         dotted_numeric_version_compatible(readme_en_version, cargo_version),
         "README.md: qubit-dcl version {readme_en_version:?} is not compatible with package version {cargo_version:?} in Cargo.toml"
@@ -52,7 +54,10 @@ fn extract_package_version(content: &str) -> Option<&str> {
 }
 
 /// Extracts the dependency version for the specified crate from a README file.
-fn extract_readme_dependency_version<'a>(content: &'a str, crate_name: &str) -> Option<&'a str> {
+fn extract_readme_dependency_version<'a>(
+    content: &'a str,
+    crate_name: &str,
+) -> Option<&'a str> {
     let prefix = format!("{} = \"", crate_name);
     for line in content.lines() {
         if let Some(value) = line.trim().strip_prefix(&prefix) {
@@ -62,12 +67,14 @@ fn extract_readme_dependency_version<'a>(content: &'a str, crate_name: &str) -> 
     None
 }
 
-/// Compares a README dependency version string with `[package] version` from Cargo.toml.
+/// Compares a README dependency version string with `[package] version` from
+/// Cargo.toml.
 ///
-/// When the README uses a two-component `x.y` form, it is accepted if the package version
-/// has more components and starts with the same `x.y` (so any `x.y.z`, `x.y.z.w`, … matches).
-/// Otherwise the dotted numeric segments must match exactly (same length, same numbers).
-/// Non-numeric segments fall back to full string equality.
+/// When the README uses a two-component `x.y` form, it is accepted if the
+/// package version has more components and starts with the same `x.y` (so any
+/// `x.y.z`, `x.y.z.w`, … matches). Otherwise the dotted numeric segments must
+/// match exactly (same length, same numbers). Non-numeric segments fall back to
+/// full string equality.
 fn dotted_numeric_version_compatible(readme: &str, package: &str) -> bool {
     fn parse_dotted(v: &str) -> Option<Vec<u32>> {
         let mut out = Vec::new();
@@ -77,7 +84,9 @@ fn dotted_numeric_version_compatible(readme: &str, package: &str) -> bool {
         Some(out)
     }
     match (parse_dotted(readme), parse_dotted(package)) {
-        (Some(r), Some(p)) if r.len() == 2 && p.len() > 2 => r[0] == p[0] && r[1] == p[1],
+        (Some(r), Some(p)) if r.len() == 2 && p.len() > 2 => {
+            r[0] == p[0] && r[1] == p[1]
+        }
         (Some(r), Some(p)) => r == p,
         _ => readme == package,
     }

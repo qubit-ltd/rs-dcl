@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Execution Context
 //!
 //! Provides execution context after double-checked lock task execution.
-//!
 use crate::double_checked::{
     execution_result::ExecutionResult,
     executor_error::ExecutorError,
@@ -29,7 +26,6 @@ use crate::double_checked::{
 ///
 /// * `T` - The type of the task return value
 /// * `E` - The type of the task error
-///
 pub struct ExecutionContext<T, E>
 where
     E: std::fmt::Display,

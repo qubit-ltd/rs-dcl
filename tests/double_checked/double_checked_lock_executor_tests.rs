@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 #[cfg(test)]
 mod tests {
@@ -65,12 +63,16 @@ mod tests {
         }
 
         /// Returns a deterministic mutable task error.
-        fn failing_increment_unit_task(_value: &mut i32) -> Result<(), io::Error> {
+        fn failing_increment_unit_task(
+            _value: &mut i32,
+        ) -> Result<(), io::Error> {
             Err(io::Error::other("mutable task failed"))
         }
 
         /// Panics from a mutable task.
-        fn panicking_increment_unit_task(_value: &mut i32) -> Result<(), io::Error> {
+        fn panicking_increment_unit_task(
+            _value: &mut i32,
+        ) -> Result<(), io::Error> {
             panic!("mutable task panic");
         }
 
@@ -81,12 +83,16 @@ mod tests {
         }
 
         /// Returns a deterministic mutable value task error.
-        fn failing_increment_value_task(_value: &mut i32) -> Result<i32, io::Error> {
+        fn failing_increment_value_task(
+            _value: &mut i32,
+        ) -> Result<i32, io::Error> {
             Err(io::Error::other("mutable value task failed"))
         }
 
         /// Panics from a mutable value task.
-        fn panicking_increment_value_task(_value: &mut i32) -> Result<i32, io::Error> {
+        fn panicking_increment_value_task(
+            _value: &mut i32,
+        ) -> Result<i32, io::Error> {
             panic!("mutable value task panic");
         }
 
@@ -129,7 +135,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
@@ -145,7 +154,10 @@ mod tests {
                 .when(|| true)
                 .build();
 
-            let value = executor.call(|| Ok::<i32, io::Error>(42)).get_result().unwrap();
+            let value = executor
+                .call(|| Ok::<i32, io::Error>(42))
+                .get_result()
+                .unwrap();
             let executed = executor
                 .execute({
                     let counter = counter.clone();
@@ -183,13 +195,19 @@ mod tests {
                 .build()
                 .execute(panicking_no_op_task as fn() -> Result<(), io::Error>)
                 .get_result();
-            assert!(matches!(panicked, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                panicked,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
 
             let succeeded_with = DoubleCheckedLockExecutor::builder()
                 .on(ArcMutex::new(0))
                 .when(|| true)
                 .build()
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
             assert!(matches!(succeeded_with, ExecutionResult::Success(())));
 
@@ -197,7 +215,10 @@ mod tests {
                 .on(ArcMutex::new(0))
                 .when(|| true)
                 .build()
-                .execute_with(failing_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    failing_increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
             match failed_with {
                 ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
@@ -211,7 +232,10 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .build()
-                .execute_with(panicking_increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    panicking_increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
             assert!(matches!(
                 panicked_with,
@@ -222,7 +246,10 @@ mod tests {
                 .on(ArcMutex::new(0))
                 .when(|| true)
                 .build()
-                .call_with(increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    increment_value_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
             assert!(matches!(called_with, ExecutionResult::Success(1)));
 
@@ -230,7 +257,10 @@ mod tests {
                 .on(ArcMutex::new(0))
                 .when(|| true)
                 .build()
-                .call_with(failing_increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    failing_increment_value_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
             match call_failed_with {
                 ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
@@ -244,7 +274,10 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .build()
-                .call_with(panicking_increment_value_task as fn(&mut i32) -> Result<i32, io::Error>)
+                .call_with(
+                    panicking_increment_value_task
+                        as fn(&mut i32) -> Result<i32, io::Error>,
+                )
                 .get_result();
             assert!(matches!(
                 call_panicked_with,
@@ -255,11 +288,18 @@ mod tests {
         #[test]
         fn test_inherent_call_returns_execution_context() {
             let data = ArcMutex::new(0);
-            let executor = DoubleCheckedLockExecutor::builder().on(data).when(|| true).build();
+            let executor = DoubleCheckedLockExecutor::builder()
+                .on(data)
+                .when(|| true)
+                .build();
 
-            let context: ExecutionContext<i32, io::Error> = executor.call(|| Ok::<i32, io::Error>(7));
+            let context: ExecutionContext<i32, io::Error> =
+                executor.call(|| Ok::<i32, io::Error>(7));
 
-            assert!(matches!(context.get_result(), ExecutionResult::Success(7)));
+            assert!(matches!(
+                context.get_result(),
+                ExecutionResult::Success(7)
+            ));
         }
 
         #[test]
@@ -272,10 +312,18 @@ mod tests {
 
             let context = executor.call(|| Ok::<i32, io::Error>(3));
             assert!(context.is_success());
-            assert!(matches!(context.peek_result(), ExecutionResult::Success(3)));
-            assert!(matches!(context.get_result(), ExecutionResult::Success(3)));
+            assert!(matches!(
+                context.peek_result(),
+                ExecutionResult::Success(3)
+            ));
+            assert!(matches!(
+                context.get_result(),
+                ExecutionResult::Success(3)
+            ));
 
-            let finished = executor.execute(no_op_task as fn() -> Result<(), io::Error>).finish();
+            let finished = executor
+                .execute(no_op_task as fn() -> Result<(), io::Error>)
+                .finish();
             assert!(finished);
 
             let skipped = DoubleCheckedLockExecutor::builder()
@@ -297,7 +345,10 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(increment_unit_task as fn(&mut i32) -> Result<(), io::Error>)
+                .execute_with(
+                    increment_unit_task
+                        as fn(&mut i32) -> Result<(), io::Error>,
+                )
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
@@ -328,7 +379,8 @@ mod tests {
         }
 
         #[test]
-        fn test_concurrent_calls_prepare_all_then_roll_back_losing_second_checks() {
+        fn test_concurrent_calls_prepare_all_then_roll_back_losing_second_checks()
+         {
             const WORKERS: usize = 4;
 
             let data = ArcMutex::new(0);
@@ -347,7 +399,8 @@ mod tests {
                         let tester_calls = tester_calls.clone();
                         let first_check_gate = first_check_gate.clone();
                         move || {
-                            let call_index = tester_calls.fetch_add(1, Ordering::AcqRel);
+                            let call_index =
+                                tester_calls.fetch_add(1, Ordering::AcqRel);
                             let current = should_run.load(Ordering::Acquire);
                             if call_index < WORKERS {
                                 first_check_gate.wait();
@@ -393,7 +446,9 @@ mod tests {
 
             let results = handles
                 .into_iter()
-                .map(|handle| handle.join().expect("worker thread should not panic"))
+                .map(|handle| {
+                    handle.join().expect("worker thread should not panic")
+                })
                 .collect::<Vec<_>>();
 
             let success_count = results
@@ -402,7 +457,9 @@ mod tests {
                 .count();
             let unmet_count = results
                 .iter()
-                .filter(|result| matches!(result, ExecutionResult::ConditionNotMet))
+                .filter(|result| {
+                    matches!(result, ExecutionResult::ConditionNotMet)
+                })
                 .count();
 
             assert_eq!(success_count, 1);
@@ -438,9 +495,11 @@ mod tests {
                 .build();
 
             let caught = catch_unwind(AssertUnwindSafe(|| {
-                executor.execute_with(|_value: &mut i32| -> Result<(), io::Error> {
-                    panic!("task panic");
-                });
+                executor.execute_with(
+                    |_value: &mut i32| -> Result<(), io::Error> {
+                        panic!("task panic");
+                    },
+                );
             }));
 
             assert!(caught.is_err());
@@ -479,7 +538,10 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
             assert!(prepared.load(Ordering::Acquire));
             assert!(rolled_back.load(Ordering::Acquire));
         }
@@ -501,7 +563,10 @@ mod tests {
                 })
                 .get_result();
 
-            assert!(matches!(result, ExecutionResult::Failed(ExecutorError::Panic(_))));
+            assert!(matches!(
+                result,
+                ExecutionResult::Failed(ExecutorError::Panic(_))
+            ));
         }
 
         #[test]
@@ -541,7 +606,9 @@ mod tests {
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => {
+                    error.message().to_string()
+                }
                 _ => panic!("expected panic error"),
             };
 
@@ -564,7 +631,9 @@ mod tests {
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => {
+                    error.message().to_string()
+                }
                 _ => panic!("expected panic error"),
             };
 
@@ -581,11 +650,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => {
+                    error.message().to_string()
+                }
                 _ => panic!("expected panic error"),
             };
 
@@ -612,11 +685,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => {
+                    error.message().to_string()
+                }
                 _ => panic!("expected panic error"),
             };
 
@@ -625,7 +702,8 @@ mod tests {
         }
 
         #[test]
-        fn test_prepare_action_panic_with_catch_panics_returns_prepare_failed() {
+        fn test_prepare_action_panic_with_catch_panics_returns_prepare_failed()
+        {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
@@ -637,7 +715,9 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
                 .get_result();
 
             assert!(matches!(
@@ -648,7 +728,8 @@ mod tests {
         }
 
         #[test]
-        fn test_prepare_commit_action_panic_with_catch_panics_replaces_success() {
+        fn test_prepare_commit_action_panic_with_catch_panics_replaces_success()
+        {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
@@ -661,11 +742,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => error.message().to_string(),
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareCommitFailed(error),
+                ) => error.message().to_string(),
                 _ => panic!("expected commit failed error"),
             };
 
@@ -673,7 +758,8 @@ mod tests {
         }
 
         #[test]
-        fn test_prepare_rollback_action_panic_with_catch_panics_replaces_result() {
+        fn test_prepare_rollback_action_panic_with_catch_panics_replaces_result()
+         {
             let data = ArcMutex::new(10);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
@@ -686,13 +772,15 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Err(io::Error::other("task failed")) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Err(io::Error::other("task failed"))
+                })
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { rollback, .. }) => {
-                    rollback.message().to_string()
-                }
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareRollbackFailed { rollback, .. },
+                ) => rollback.message().to_string(),
                 _ => panic!("expected rollback failed error"),
             };
 
@@ -707,7 +795,9 @@ mod tests {
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("rollback failed")))
+                .rollback_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other("rollback failed"))
+                })
                 .build();
 
             let result = executor
@@ -717,10 +807,15 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { original, rollback }) => {
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareRollbackFailed { original, rollback },
+                ) => {
                     assert_eq!(original.callback_type(), Some("task"));
                     assert_eq!(original.message(), "task panic");
-                    assert_eq!(rollback.callback_type(), Some("prepare_rollback"));
+                    assert_eq!(
+                        rollback.callback_type(),
+                        Some("prepare_rollback")
+                    );
                     assert!(rollback.message().contains("rollback failed"));
                 }
                 _ => panic!("expected prepare rollback failed result"),
@@ -755,14 +850,19 @@ mod tests {
         }
 
         #[test]
-        fn test_execute_with_returning_prepare_commit_error_keeps_original_error_message() {
+        fn test_execute_with_returning_prepare_commit_error_keeps_original_error_message()
+         {
             let data = ArcMutex::new(1);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .commit_prepare(|| Err::<(), io::Error>(io::Error::other("commit callback error")))
+                .commit_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other(
+                        "commit callback error",
+                    ))
+                })
                 .build();
 
             let result = executor
@@ -773,7 +873,9 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareCommitFailed(error),
+                ) => {
                     assert!(error.message().contains("commit callback error"));
                 }
                 _ => panic!("expected prepare commit failed result"),
@@ -781,14 +883,19 @@ mod tests {
         }
 
         #[test]
-        fn test_execute_with_returning_prepare_rollback_error_keeps_original_message() {
+        fn test_execute_with_returning_prepare_rollback_error_keeps_original_message()
+         {
             let data = ArcMutex::new(1);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("rollback callback error")))
+                .rollback_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other(
+                        "rollback callback error",
+                    ))
+                })
                 .build();
 
             let result = executor
@@ -802,8 +909,15 @@ mod tests {
                 ExecutionResult::Failed(error) => {
                     assert_eq!(error.callback_type(), Some("prepare_rollback"));
                     match error {
-                        ExecutorError::PrepareRollbackFailed { rollback, .. } => {
-                            assert!(rollback.message().contains("rollback callback error"));
+                        ExecutorError::PrepareRollbackFailed {
+                            rollback,
+                            ..
+                        } => {
+                            assert!(
+                                rollback
+                                    .message()
+                                    .contains("rollback callback error")
+                            );
                         }
                         _ => panic!("expected prepare rollback failed result"),
                     }
@@ -813,7 +927,8 @@ mod tests {
         }
 
         #[test]
-        fn test_execute_with_prepare_failed_task_error_preserves_task_failure_if_no_rollback() {
+        fn test_execute_with_prepare_failed_task_error_preserves_task_failure_if_no_rollback()
+         {
             let data = ArcMutex::new(1);
             let prepare_calls = Arc::new(AtomicUsize::new(0));
             let executor = DoubleCheckedLockExecutor::builder()
@@ -837,7 +952,9 @@ mod tests {
                 .get_result();
 
             let task = match result {
-                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => error,
+                ExecutionResult::Failed(ExecutorError::TaskFailed(error)) => {
+                    error
+                }
                 _ => panic!("expected task failed result"),
             };
 
@@ -846,14 +963,19 @@ mod tests {
         }
 
         #[test]
-        fn test_execute_unit_with_returning_prepare_commit_error_keeps_original_error_message() {
+        fn test_execute_unit_with_returning_prepare_commit_error_keeps_original_error_message()
+         {
             let data = ArcMutex::new(1);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .commit_prepare(|| Err::<(), io::Error>(io::Error::other("unit commit callback error")))
+                .commit_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other(
+                        "unit commit callback error",
+                    ))
+                })
                 .build();
 
             let result = executor
@@ -864,22 +986,31 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareCommitFailed(error)) => {
-                    assert!(error.message().contains("unit commit callback error"));
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareCommitFailed(error),
+                ) => {
+                    assert!(
+                        error.message().contains("unit commit callback error")
+                    );
                 }
                 _ => panic!("expected prepare commit failed result"),
             }
         }
 
         #[test]
-        fn test_execute_unit_with_returning_prepare_rollback_error_preserves_task_failure() {
+        fn test_execute_unit_with_returning_prepare_rollback_error_preserves_task_failure()
+         {
             let data = ArcMutex::new(1);
             let executor = DoubleCheckedLockExecutor::builder()
                 .on(data)
                 .when(|| true)
                 .catch_panics()
                 .prepare(|| Ok::<(), io::Error>(()))
-                .rollback_prepare(|| Err::<(), io::Error>(io::Error::other("unit rollback callback error")))
+                .rollback_prepare(|| {
+                    Err::<(), io::Error>(io::Error::other(
+                        "unit rollback callback error",
+                    ))
+                })
                 .build();
 
             let result = executor
@@ -890,8 +1021,14 @@ mod tests {
                 .get_result();
 
             match result {
-                ExecutionResult::Failed(ExecutorError::PrepareRollbackFailed { rollback, .. }) => {
-                    assert!(rollback.message().contains("unit rollback callback error"));
+                ExecutionResult::Failed(
+                    ExecutorError::PrepareRollbackFailed { rollback, .. },
+                ) => {
+                    assert!(
+                        rollback
+                            .message()
+                            .contains("unit rollback callback error")
+                    );
                 }
                 _ => panic!("expected prepare rollback failed result"),
             }
@@ -934,7 +1071,8 @@ mod tests {
         }
 
         #[test]
-        fn test_execute_with_second_check_unmet_runs_prepare_rollback_success() {
+        fn test_execute_with_second_check_unmet_runs_prepare_rollback_success()
+        {
             let should_pass = Arc::new(AtomicBool::new(true));
             let rollback_called = Arc::new(AtomicUsize::new(0));
             let executor = DoubleCheckedLockExecutor::builder()
@@ -954,7 +1092,9 @@ mod tests {
                 .build();
 
             let result = executor
-                .execute_with(|_value: &mut i32| -> Result<(), io::Error> { Ok::<(), io::Error>(()) })
+                .execute_with(|_value: &mut i32| -> Result<(), io::Error> {
+                    Ok::<(), io::Error>(())
+                })
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
@@ -977,7 +1117,9 @@ mod tests {
                 .get_result();
 
             let message = match result {
-                ExecutionResult::Failed(ExecutorError::Panic(error)) => error.message().to_string(),
+                ExecutionResult::Failed(ExecutorError::Panic(error)) => {
+                    error.message().to_string()
+                }
                 _ => panic!("expected panic error"),
             };
 
