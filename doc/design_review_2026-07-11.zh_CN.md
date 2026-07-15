@@ -71,7 +71,7 @@ if !first_check {
     return ExecutionResult::unmet();
 }
 
-self.lock.write(|data| {
+self.lock.with_write(|data| {
     let second_check = self.tester.test();
     if !second_check {
         return ExecutionResult::unmet();
@@ -88,7 +88,7 @@ let condition_data = data.clone();
 
 let executor = DoubleCheckedLockExecutor::builder()
     .on(data)
-    .when(move || condition_data.read(Option::is_none))
+    .when(move || condition_data.with_read(Option::is_none))
     .build();
 ```
 
@@ -119,7 +119,7 @@ README 通过要求 tester 使用独立原子变量规避这一问题，但这�
 这对通用库是危险契约，因为 panic 往往表示某个不变量可能在中途被破坏。建议：
 
 1. 核心 API 保持 panic 传播，不在持锁 closure 内转换 panic。
-2. 若保留捕获能力，应在 `lock.write(...)` 外层执行 `catch_unwind`，让 guard 先按底层锁语义完成 unwind/poison。
+2. 若保留捕获能力，应在 `lock.with_write(...)` 外层执行 `catch_unwind`，让 guard 先按底层锁语义完成 unwind/poison。
 3. 明确说明任何 panic capture 都不提供受保护数据的回滚。
 4. 对需要回滚的场景，应要求用户任务先计算新值再一次性提交，或使用显式 snapshot/transaction abstraction，而不是依赖通用 `catch_panics`。
 
