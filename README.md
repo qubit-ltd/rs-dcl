@@ -74,7 +74,7 @@ fn main() {
         .get_result();
 
     assert!(matches!(updated, ExecutionResult::Success(15)));
-    assert_eq!(data.read(|value| *value), 15);
+    assert_eq!(data.with_read(|value| *value), 15);
 }
 ```
 
@@ -136,7 +136,7 @@ let updated = DoubleCheckedLock::on(data.clone())
     .get_result();
 
 assert!(matches!(updated, ExecutionResult::Success(15)));
-assert_eq!(data.read(|value| *value), 15);
+assert_eq!(data.with_read(|value| *value), 15);
 ```
 
 ### Example program

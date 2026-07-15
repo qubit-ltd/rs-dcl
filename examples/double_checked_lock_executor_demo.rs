@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Initial state: running = {}",
         running.load(Ordering::Acquire)
     );
-    println!("Initial data: {}", data.read(|d| *d));
+    println!("Initial data: {}", data.with_read(|d| *d));
 
     let executor = DoubleCheckedLockExecutor::builder()
         .on(data.clone())
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Verify the data was updated
-    println!("Final data: {}", data.read(|d| *d));
+    println!("Final data: {}", data.with_read(|d| *d));
 
     // Stop the service
     running.store(false, Ordering::Release);

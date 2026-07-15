@@ -33,5 +33,5 @@ doctest = true
 [dependencies]
 log = "0.4"
 
-qubit-function = "0.15"
-qubit-lock = "0.9"
+qubit-function = { version = "0.16.0", path = "../rs-function", features = ["stateful"] }
+qubit-lock = { version = "0.10.0", path = "../rs-lock" }
