@@ -75,7 +75,7 @@ mod tests {
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
             assert!(rolled_back.load(Ordering::Acquire));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
             assert_eq!(checks.load(Ordering::Acquire), 2);
         }
 

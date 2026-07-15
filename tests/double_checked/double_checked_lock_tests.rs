@@ -51,7 +51,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(updated, ExecutionResult::Success(15)));
-            assert_eq!(data.read(|value| *value), 15);
+            assert_eq!(data.with_read(|value| *value), 15);
         }
 
         #[test]
@@ -67,7 +67,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
         }
 
         #[test]
@@ -83,7 +83,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(())));
-            assert_eq!(data.read(|value| *value), 11);
+            assert_eq!(data.with_read(|value| *value), 11);
         }
 
         #[test]
@@ -149,7 +149,7 @@ mod tests {
 
             assert!(matches!(first, ExecutionResult::Success(2)));
             assert!(matches!(second, ExecutionResult::Success(3)));
-            assert_eq!(data.read(|value| *value), 3);
+            assert_eq!(data.with_read(|value| *value), 3);
         }
     }
 }

@@ -123,7 +123,7 @@ mod tests {
 
             assert!(matches!(first, ExecutionResult::Success(15)));
             assert!(matches!(second, ExecutionResult::Success(22)));
-            assert_eq!(data.read(|value| *value), 22);
+            assert_eq!(data.with_read(|value| *value), 22);
         }
 
         #[test]
@@ -142,7 +142,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
         }
 
         #[test]
@@ -352,7 +352,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
         }
 
         #[test]
@@ -374,7 +374,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(15)));
-            assert_eq!(data.read(|value| *value), 15);
+            assert_eq!(data.with_read(|value| *value), 15);
             assert_eq!(marker.get(), 5);
         }
 
@@ -464,7 +464,7 @@ mod tests {
 
             assert_eq!(success_count, 1);
             assert_eq!(unmet_count, WORKERS - 1);
-            assert_eq!(data.read(|value| *value), 1);
+            assert_eq!(data.with_read(|value| *value), 1);
             assert_eq!(task_count.load(Ordering::Acquire), 1);
             assert_eq!(prepare_count.load(Ordering::Acquire), WORKERS);
             assert_eq!(rollback_count.load(Ordering::Acquire), WORKERS - 1);

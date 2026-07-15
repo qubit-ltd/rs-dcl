@@ -120,7 +120,7 @@ mod tests {
 
             assert!(matches!(result, ExecutionResult::Success(())));
             assert!(committed.load(Ordering::Acquire));
-            assert_eq!(data.read(|value| *value), 11);
+            assert_eq!(data.with_read(|value| *value), 11);
         }
 
         #[test]
@@ -221,7 +221,7 @@ mod tests {
                 ExecutionResult::Failed(ExecutorError::PrepareFailed(callback_error))
                     if callback_error.message() == "prepare failed"
             ));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
         }
 
         #[test]
@@ -246,7 +246,7 @@ mod tests {
                 ExecutionResult::Failed(ExecutorError::PrepareFailed(callback_error))
                     if callback_error.message() == "prepare failed"
             ));
-            assert_eq!(data.read(|value| *value), 10);
+            assert_eq!(data.with_read(|value| *value), 10);
         }
 
         #[test]
@@ -383,7 +383,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::Success(2)));
-            assert_eq!(data.read(|value| *value), 2);
+            assert_eq!(data.with_read(|value| *value), 2);
         }
 
         #[test]
@@ -428,7 +428,7 @@ mod tests {
                 .get_result();
 
             assert!(matches!(result, ExecutionResult::ConditionNotMet));
-            assert_eq!(data.read(|value| *value), 1);
+            assert_eq!(data.with_read(|value| *value), 1);
             assert_eq!(checks.load(Ordering::Acquire), 2);
         }
     }

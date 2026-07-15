@@ -10,7 +10,10 @@
 
 use std::marker::PhantomData;
 
-use qubit_function::Tester;
+use qubit_function::{
+    ArcTester,
+    Tester,
+};
 
 use super::{
     ExecutionLogger,
@@ -203,7 +206,7 @@ where
     {
         ExecutorReadyBuilder {
             lock: self.lock,
-            tester: tester.into_arc(),
+            tester: ArcTester::new(tester),
             logger: self.logger,
             prepare_action: None,
             rollback_prepare_action: None,

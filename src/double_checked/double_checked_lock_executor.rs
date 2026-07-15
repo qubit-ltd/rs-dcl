@@ -107,7 +107,7 @@ use qubit_lock::Lock;
 ///         .get_result();
 ///
 ///     assert!(matches!(updated, ExecutionResult::Success(15)));
-///     assert_eq!(data.read(|value| *value), 15);
+///     assert_eq!(data.with_read(|value| *value), 15);
 ///
 ///     skip.store(true, Ordering::Release);
 ///     let skipped = executor
@@ -118,7 +118,7 @@ use qubit_lock::Lock;
 ///         .get_result();
 ///
 ///     assert!(matches!(skipped, ExecutionResult::ConditionNotMet));
-///     assert_eq!(data.read(|value| *value), 15);
+///     assert_eq!(data.with_read(|value| *value), 15);
 /// }
 /// ```
 #[derive(Clone)]
@@ -359,7 +359,7 @@ where
             }
         };
 
-        let result = self.lock.write(|data| {
+        let result = self.lock.with_write(|data| {
             let passed = match self.try_run("tester", || self.tester.test()) {
                 Ok(v) => v,
                 Err(error) => {

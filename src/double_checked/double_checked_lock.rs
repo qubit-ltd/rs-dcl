@@ -43,7 +43,7 @@ use qubit_lock::Lock;
 ///     .get_result();
 ///
 /// assert!(result.is_success());
-/// assert_eq!(data.read(|value| *value), 15);
+/// assert_eq!(data.with_read(|value| *value), 15);
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DoubleCheckedLock;
