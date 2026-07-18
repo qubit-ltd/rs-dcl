@@ -11,3 +11,4 @@
 
 mod docs;
 mod double_checked;
+mod support;

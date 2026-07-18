@@ -1,0 +1,82 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Runtime construction tests for legal lifecycle typestate combinations.
+
+use std::io;
+
+use qubit_dcl::{
+    ExecutionOutcome,
+    LifecycleDoubleCheckedLockExecutor,
+    PreparationOutcome,
+};
+use qubit_lock::ArcMutex;
+
+/// Verifies the complete prepare/commit/rollback combination builds and runs.
+#[test]
+fn test_builder_full_lifecycle_combination() {
+    let executor =
+        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+            .when(|| true)
+            .prepare(|| Ok::<u32, io::Error>(1))
+            .commit(|_| Ok::<(), io::Error>(()))
+            .rollback(|_, _| Ok::<(), io::Error>(()))
+            .build();
+
+    let report = executor.run(|| Ok::<u32, io::Error>(7));
+
+    assert!(matches!(report.execution(), ExecutionOutcome::Success(7)));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::Committed
+    ));
+}
+
+/// Verifies a lifecycle with commit but no rollback builds and reports its
+/// explicit no-rollback path.
+#[test]
+fn test_builder_commit_without_rollback_combination() {
+    let executor =
+        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+            .when(|| true)
+            .prepare(|| Ok::<u32, io::Error>(1))
+            .commit(|_| Ok::<(), io::Error>(()))
+            .no_rollback()
+            .build();
+
+    let report = executor.run(|| Err::<(), _>(io::Error::other("task")));
+
+    assert!(matches!(
+        report.execution(),
+        ExecutionOutcome::TaskFailed(_)
+    ));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::RollbackNotRequired
+    ));
+}
+
+/// Verifies a lifecycle with rollback but no commit builds and reports its
+/// explicit no-commit path.
+#[test]
+fn test_builder_rollback_without_commit_combination() {
+    let executor =
+        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+            .when(|| true)
+            .prepare(|| Ok::<u32, io::Error>(1))
+            .no_commit()
+            .rollback(|_, _| Ok::<(), io::Error>(()))
+            .build();
+
+    let report = executor.run(|| Ok::<u32, io::Error>(7));
+
+    assert!(matches!(report.execution(), ExecutionOutcome::Success(7)));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::CommitNotRequired
+    ));
+}

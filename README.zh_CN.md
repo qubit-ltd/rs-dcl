@@ -5,174 +5,239 @@
 [![Crates.io](https://img.shields.io/crates/v/qubit-dcl.svg?color=blue)](https://crates.io/crates/qubit-dcl)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![English Doc](https://img.shields.io/badge/docs-English-blue.svg)](README.md)
+[![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-**双重检查锁（double-checked locking）** 的独立 crate：在实现 [`Lock<T>`](https://docs.rs/qubit-dcl) 的锁句柄上，将「锁外先判断 → 可选 prepare → 加写锁 → 再判断 → 执行业务」固定为可复用的 `DoubleCheckedLockExecutor`，并支持可选的 **prepare / 回滚 / 提交** 与结构化执行结果。
+`qubit-dcl` 将双重检查锁（Double-Checked Locking）设计模式封装为可复用
+executor。无锁 predicate 首先排除不需要执行的任务；条件满足后，executor
+获取一个通用的 `qubit_lock::Lock<T>`，再次检查同一个 predicate，并在锁内
+执行任意 task。
 
-本 crate 会再导出 `qubit-lock` 的 [`ArcMutex`](https://crates.io/crates/qubit-lock) 与 `Lock` trait，常见用法下只需在 `Cargo.toml` 中依赖 `qubit-dcl` 即可。
+0.10 是一次有意进行的破坏性重设计。锁所保护的 `T` 只是实现细节，不会传给
+predicate 或 task。
 
-## 特性
+## 并发契约
 
-- **`DoubleCheckedLockExecutor`**：通过 builder 一次配置、多次调用；与 [`qubit-function`](https://crates.io/crates/qubit-function) 的 `Tester`、可运行任务 trait 配合使用。
-- **`DoubleCheckedLock`**：无需先保存 executor，支持 `on(...).when(...).call*` 风格的一次性快捷执行链。
-- **完整双重检查流程**：锁外条件判断 → 可选加锁前 prepare → 写锁 → 锁内再判断 → 任务；释锁后可选对 prepare 做 **提交** 或 **回滚**。
-- **多种执行入口**：无受保护数据参数的 `call` / `execute`，以及带 `&mut T` 的 `call_with` / `execute_with`。
-- **明确的结果类型**：`ExecutionContext` 与 `ExecutionResult` 区分成功、条件未满足、任务失败以及 prepare 收尾阶段失败（`ExecutorError`）。
-- **可配置日志**：基于 `log` 与 `ExecutionLogger`，在 builder 上为「条件未满足」与 prepare 各阶段配置日志，也可按事件关闭日志。
+正确使用 DCL 必须同时遵守以下三条规则：
 
-## 工作方式
+1. predicate 读取 atomic 或具有等价同步语义的 gate。常用协议是 Acquire load
+   配对 Release store。
+2. predicate 不得获取 executor 的同一底层锁，也不应执行阻塞操作。
+3. task 可以在 executor 锁内直接修改 gate。如果 task 不修改 gate，而是在
+   task 返回后或由系统其他路径修改，则修改方必须获取 executor 的同一底层锁。
 
-1. **条件测试会执行两次**（加锁前一次，持写锁后再一次）。第一次判断所依据的状态，必须在不持有本执行器所关联锁的情况下仍可安全访问（例如配合合适内存序的 atomics）。
-2. 若第一次通过，可配置在加锁前执行 **prepare**；持锁后再次检测条件并执行任务。
-3. 若已执行过 prepare 且需收尾：任务整体成功时可选 **commit_prepare**；内层检查或任务未成功时可选 **rollback_prepare**（均在释放写锁之后执行）。
+atomic gate 提供可见性；同一把锁负责在第二次检查成功、task 和 task 外 gate
+转换之间提供互斥。`ptr::read_volatile` 面向 MMIO 等 volatile memory，不能替代
+atomic 同步。
 
-executor 默认不捕获 tester、prepare 回调或任务中的 panic。可用 `.catch_panics()` 启用捕获；如果配置来自布尔值，则用 `.with_panic_capture(flag)`。已构建 executor 也支持 `.with_panic_capture(flag)`，并返回重新配置后的 executor。tester 与任务 panic 会变成 `ExecutorError::Panic`；prepare 生命周期 panic 会分别变成 `PrepareFailed`、`PrepareCommitFailed` 或 `PrepareRollbackFailed`。如果 prepare 已成功，捕获到任务或锁内二次检查 panic 后仍可执行 prepare rollback。克隆后的 executor 并发执行时，可能有多个调用先完成 prepare，再由其中一个调用在锁内二次检查中胜出；锁内二次检查失败的调用会在配置了 rollback 时执行 prepare rollback。
+## 基础 executor
+
+锁类型应直接从其所属 crate 导入：
+
+```rust
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_lock::ArcMutex;
+
+let lock = ArcMutex::new(());
+let gate = Arc::new(AtomicBool::new(true));
+let executor = DoubleCheckedLockExecutor::builder(lock)
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+let outcome = executor.run({
+    let gate = Arc::clone(&gate);
+    move || {
+        // 第二次检查已经成功，task 此时位于 executor 锁内，可以直接关闭
+        // gate，无需重新获取同一把锁。
+        gate.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(42)
+    }
+});
+
+assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+```
+
+第一次检查返回 `false` 时，executor 不调用任何锁方法，直接返回
+`ExecutionOutcome::ConditionNotMet`。task 返回的错误会原样保存在
+`ExecutionOutcome::TaskFailed(E)` 中。
+
+如果由 task 外的路径修改 gate，该路径必须使用同一个锁对象：
+
+```rust
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+use qubit_dcl::DoubleCheckedLockExecutor;
+use qubit_lock::{ArcMutex, Lock};
+
+let lock = ArcMutex::new(());
+let transition_lock = lock.clone();
+let gate = Arc::new(AtomicBool::new(true));
+let executor = DoubleCheckedLockExecutor::builder(lock)
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+transition_lock.with_write({
+    let gate = Arc::clone(&gate);
+    move |_| gate.store(false, Ordering::Release)
+});
+
+let outcome = executor.run(|| Ok::<(), std::io::Error>(()));
+assert!(matches!(
+    outcome,
+    qubit_dcl::ExecutionOutcome::ConditionNotMet
+));
+```
+
+## 生命周期 executor
+
+`LifecycleDoubleCheckedLockExecutor` 在第一次检查之后、加锁之前执行 prepare。
+每次调用都有独立令牌 `P`。task 和解锁完成后，该令牌由 commit 或 rollback
+消费。
+
+```rust
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use qubit_dcl::{
+    ExecutionOutcome,
+    LifecycleDoubleCheckedLockExecutor,
+    PreparationOutcome,
+    RollbackCause,
+};
+use qubit_lock::ArcMutex;
+
+let gate = Arc::new(AtomicBool::new(true));
+let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .catch_panics(true)
+    .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepared"]))
+    .commit(|token| {
+        assert_eq!(token, ["prepared", "task"]);
+        Ok::<(), io::Error>(())
+    })
+    .rollback(|token, cause| {
+        assert!(!token.is_empty());
+        match cause {
+            RollbackCause::ConditionNotMet => {}
+            RollbackCause::TaskFailed(error) => eprintln!("task failed: {error}"),
+            RollbackCause::Panicked(panic) => {
+                eprintln!("panic in {:?}", panic.phase());
+            }
+        }
+        Ok::<(), io::Error>(())
+    })
+    .build();
+
+let report = executor.run_with_token(|token| {
+    token.push("task");
+    Ok::<usize, io::Error>(token.len())
+});
+
+assert!(matches!(
+    report.execution(),
+    ExecutionOutcome::Success(2)
+));
+assert!(matches!(
+    report.preparation(),
+    PreparationOutcome::Committed
+));
+```
+
+typestate builder 只允许三种生命周期组合：
+
+- `prepare -> commit -> rollback -> build`
+- `prepare -> commit -> no_rollback -> build`
+- `prepare -> no_commit -> rollback -> build`
+
+不存在 `no_commit + no_rollback` 组合。没有实际令牌数据时，prepare 可以返回
+`()`，调用方继续使用 `run`，无需改用 `run_with_token`。
+
+## 结果与 panic 语义
+
+`ExecutionReport<R, E, C>` 保留两个相互独立的结果轴：
+
+- `ExecutionOutcome<R, E>` 表示条件检查、task 成功/失败或捕获的 panic。
+- `PreparationOutcome<C>` 表示 prepare、commit、rollback 或明确不需要 finalizer。
+
+commit 失败不会覆盖 task 成功；rollback 失败不会覆盖触发它的 task error 或
+panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error，而 report
+仍然保留其所有权。
+
+默认不捕获 panic。启用 `.catch_panics(true)` 后，panic 信息包含准确的
+`PanicPhase` 和原始 payload。捕获边界位于 `Lock::with_write` 外，因此标准库锁会
+正常观察 unwind 并进入 poisoned 状态；parking-lot 锁则保持其不 poisoning 的
+正常语义。
 
 ## 安装
 
 ```toml
 [dependencies]
-qubit-dcl = "0.9"
+qubit-dcl = "0.10"
+qubit-lock = "0.10"
 ```
 
-`qubit-dcl` 已依赖并再导出 `qubit-lock` 的部分类型；仅当你需要本 crate 未再导出的其它类型时，才额外直接依赖 `qubit-lock`。
+`qubit-dcl` 不再重导出 `Lock`、`ArcMutex` 或其他外部 crate 拥有的类型。使用
+`qubit-lock` API 时必须直接声明该依赖。
 
-### 公开 API 路径
+## 从 0.9 迁移
 
-从 crate 根路径导入锁 trait：
+0.10 删除全部兼容包装、one-shot API、内置 logger，以及接收受保护 `T` 的 task
+closure。完整映射参见 [0.10 迁移指南](doc/user_guide_migration_0_10.zh_CN.md)。
 
-```rust
-use qubit_dcl::Lock;
-```
-
-旧兼容路径 `qubit_dcl::lock::Lock` 已不再提供。请使用上面的根路径再导出；如果代码明确要直接依赖 `qubit-lock`，也可以改为直接导入 `qubit_lock::Lock`。
-
-## 快速开始
-
-```rust
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex, Lock, ExecutionResult};
-
-fn main() {
-    let data = ArcMutex::new(10);
-    let skip = Arc::new(AtomicBool::new(false));
-
-    let executor = DoubleCheckedLockExecutor::builder()
-        .on(data.clone())
-        .when({
-            let skip = skip.clone();
-            move || !skip.load(Ordering::Acquire)
-        })
-        .build();
-
-    let updated = executor
-        .call_with(|value: &mut i32| {
-            *value += 5;
-            Ok::<i32, std::io::Error>(*value)
-        })
-        .get_result();
-
-    assert!(matches!(updated, ExecutionResult::Success(15)));
-    assert_eq!(data.with_read(|value| *value), 15);
-}
-```
-
-### 仅副作用场景（`finish`）
-
-对 `execute` / 无返回值的 `call`，若错误类型为 `E` 且成功时值为 `()`，可在 `ExecutionContext<(), E>` 上调用 `finish()` 得到是否成功：
-
-```rust
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
-
-let data = ArcMutex::new(());
-let ok = DoubleCheckedLockExecutor::builder()
-    .on(data)
-    .when(|| true)
-    .build()
-    .execute(|| Ok::<(), std::io::Error>(()))
-    .finish();
-assert!(ok);
-```
-
-`finish()` 是有意简化的接口：条件未满足和执行失败都会返回 `false`。
-如果需要保留任务或 prepare 错误细节，请使用 `try_finish()`：
-
-```rust
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
-
-let data = ArcMutex::new(());
-let ok = DoubleCheckedLockExecutor::builder()
-    .on(data)
-    .when(|| true)
-    .build()
-    .execute(|| Ok::<(), std::io::Error>(()))
-    .try_finish()
-    .expect("execution should not fail");
-assert!(ok);
-```
-
-### 一次性快捷模式（`DoubleCheckedLock`）
-
-当你不需要复用 executor 实例时，可以直接使用 `DoubleCheckedLock`：
-
-```rust
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use qubit_dcl::{DoubleCheckedLock, ArcMutex, ExecutionResult, Lock};
-
-let data = ArcMutex::new(10);
-let skip = Arc::new(AtomicBool::new(false));
-
-let updated = DoubleCheckedLock::on(data.clone())
-    .when({
-        let skip = skip.clone();
-        move || !skip.load(Ordering::Acquire)
-    })
-    .call_with(|value: &mut i32| {
-        *value += 5;
-        Ok::<i32, std::io::Error>(*value)
-    })
-    .get_result();
-
-assert!(matches!(updated, ExecutionResult::Success(15)));
-assert_eq!(data.with_read(|value| *value), 15);
-```
-
-### 示例程序
-
-`examples/double_checked_lock_executor_demo.rs` 提供可运行示例：
+## 测试
 
 ```bash
-cargo run --example double_checked_lock_executor_demo
-```
-
-## Builder API（概要）
-
-- 入口：`DoubleCheckedLockExecutor::builder()`。
-- 绑定锁：`.on(lock)`，要求 `L: Lock<T>`。
-- 设置双重条件：`.when(tester)`。
-- panic 捕获：`.catch_panics()`、`.with_panic_capture(flag)` 或 `.disable_catch_panics()`。
-- 可选：`.prepare`、`.rollback_prepare`、`.commit_prepare`。
-- 诊断日志：`.log_unmet_condition`、`.log_prepare_failure`、`.log_prepare_commit_failure`、`.log_prepare_rollback_failure`；对应的 `.disable_*_logging` 方法可关闭某类日志。
-- 结束：`.build()` 得到可复用执行器。
-
-## 项目结构
-
-- `src/double_checked`：执行器、各类 builder、执行上下文与结果、错误与日志。
-- `tests/double_checked` 与 `tests/docs`：行为测试与 README 一致性测试。
-
-## 质量检查
-
-```bash
-cargo +nightly fmt -- --check --config-path .rs-ci/rustfmt.toml
-cargo clippy --all-targets --all-features -- -D warnings
+# 使用默认 feature 集运行测试
 cargo test
-RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-./align-ci.sh
+
+# 使用项目声明的全部 feature 运行测试
+cargo test --all-features
+
+# 运行项目 CI 检查
 ./ci-check.sh
-./coverage.sh json
+
+# 检查代码覆盖率
+./coverage.sh
 ```
 
 ## 许可证
 
-Apache-2.0
+Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
+
+本项目基于 Apache License 2.0 授权。完整许可证文本请参阅
+[LICENSE](LICENSE)。
+
+## 贡献
+
+欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
+Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
+
+## 作者
+
+**Haixing Hu** - *Qubit Co. Ltd.*
+
+仓库地址：[https://github.com/qubit-ltd/rs-dcl](https://github.com/qubit-ltd/rs-dcl)

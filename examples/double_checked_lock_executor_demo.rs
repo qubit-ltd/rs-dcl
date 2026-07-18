@@ -5,101 +5,62 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! # Double-Checked Lock Executor Demo
-//!
-//! Demonstrates the usage of a reusable double-checked lock executor.
+//! Demonstrates basic and lifecycle-aware double-checked execution.
 
-use std::sync::{
-    Arc,
-    atomic::{
-        AtomicBool,
-        Ordering,
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{
+            AtomicBool,
+            Ordering,
+        },
     },
 };
 
 use qubit_dcl::{
-    ArcMutex,
     DoubleCheckedLockExecutor,
-    Lock,
+    ExecutionOutcome,
+    LifecycleDoubleCheckedLockExecutor,
+    PreparationOutcome,
 };
+use qubit_lock::ArcMutex;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create shared state
-    let running = Arc::new(AtomicBool::new(false));
-    let data = ArcMutex::new(42);
-
-    println!(
-        "Initial state: running = {}",
-        running.load(Ordering::Acquire)
-    );
-    println!("Initial data: {}", data.with_read(|d| *d));
-
-    let executor = DoubleCheckedLockExecutor::builder()
-        .on(data.clone())
+/// Runs basic and lifecycle DCL examples using atomic gates.
+fn main() {
+    let gate = Arc::new(AtomicBool::new(true));
+    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
         .when({
-            let running = running.clone();
-            move || running.load(Ordering::Acquire)
+            let gate = Arc::clone(&gate);
+            move || gate.load(Ordering::Acquire)
         })
         .build();
+    let outcome = executor.run({
+        let gate = Arc::clone(&gate);
+        move || {
+            gate.store(false, Ordering::Release);
+            Ok::<usize, io::Error>(42)
+        }
+    });
+    assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
-    // Try to execute when service is not running (should fail)
-    let result = executor
-        .call_with(|value: &mut i32| {
-            *value += 1;
-            Ok::<_, std::io::Error>(*value)
-        })
-        .get_result();
-
-    if result.is_success() {
-        println!("Unexpected success: {}", result.unwrap());
-    } else {
-        println!("Expected failure: Condition not met.");
-    }
-
-    // Start the service
-    running.store(true, Ordering::Release);
-    println!(
-        "Service started: running = {}",
-        running.load(Ordering::Acquire)
-    );
-
-    // Now execute should succeed
-    let result = executor
-        .call_with(|value: &mut i32| {
-            *value += 1;
-            Ok::<_, std::io::Error>(*value)
-        })
-        .get_result();
-
-    if result.is_success() {
-        println!("Success: new value = {}", result.unwrap());
-    } else {
-        println!("Unexpected failure: {:?}", result);
-    }
-
-    // Verify the data was updated
-    println!("Final data: {}", data.with_read(|d| *d));
-
-    // Stop the service
-    running.store(false, Ordering::Release);
-    println!(
-        "Service stopped: running = {}",
-        running.load(Ordering::Acquire)
-    );
-
-    // Try to execute when service is stopped (should fail)
-    let result = executor
-        .call_with(|value: &mut i32| {
-            *value += 1;
-            Ok::<_, std::io::Error>(*value)
-        })
-        .get_result();
-
-    if result.is_success() {
-        println!("Unexpected success: {}", result.unwrap());
-    } else {
-        println!("Expected failure: Condition not met.");
-    }
-
-    Ok(())
+    let lifecycle_executor =
+        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+            .when(|| true)
+            .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
+            .commit(|token| {
+                assert_eq!(token, ["prepare", "task"]);
+                Ok::<(), io::Error>(())
+            })
+            .rollback(|_, _| Ok::<(), io::Error>(()))
+            .build();
+    let report = lifecycle_executor.run_with_token(|token| {
+        token.push("task");
+        Ok::<usize, io::Error>(token.len())
+    });
+    assert!(matches!(report.execution(), ExecutionOutcome::Success(2)));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::Committed
+    ));
 }

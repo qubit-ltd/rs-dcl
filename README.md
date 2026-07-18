@@ -7,173 +7,245 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-A standalone crate for **double-checked locking** over generic lock handles. It packages the usual “test outside the lock, lock, test again, run the task” sequence into a reusable `DoubleCheckedLockExecutor`, with an optional **prepare / rollback / commit** pipeline and structured results.
+`qubit-dcl` packages the double-checked locking design pattern as reusable
+executors. A lock-free predicate first rejects unnecessary work without taking
+a lock. If it succeeds, the executor obtains a generic `qubit_lock::Lock<T>`,
+checks the same predicate again, and runs an arbitrary task inside that lock.
 
-The crate re-exports [`ArcMutex`](https://crates.io/crates/qubit-lock) and the [`Lock`](https://crates.io/crates/qubit-lock) trait from `qubit-lock` so a typical app can depend on `qubit-dcl` alone.
+Version 0.10 is a deliberately breaking redesign. The protected `T` is an
+implementation detail of the lock and is never passed to the predicate or task.
 
-## Features
+## Concurrency contract
 
-- **`DoubleCheckedLockExecutor`**: one builder-built executor, many invocations; integrates with the [`qubit-function`](https://crates.io/crates/qubit-function) `Tester` and runnable traits.
-- **`DoubleCheckedLock`**: one-shot convenience entry for `on(...).when(...).call*` style execution without keeping an executor variable.
-- **Double-checked flow**: first condition check without the lock, optional pre-lock prepare, write lock, second check, then task; after the lock is released, optional prepare commit or rollback.
-- **Execution API**: `call` / `execute` (no direct `&mut T` in the closure) and `call_with` / `execute_with` (mutable access to protected data).
-- **Typed outcomes**: `ExecutionContext` and `ExecutionResult` distinguish success, “condition not met,” task failure, and prepare finalization failures (`ExecutorError`).
-- **Logging hooks** via `log` and configurable `ExecutionLogger` on the builder for unmet conditions and prepare-step failures; each event can also be disabled from the builder chain.
+Correct DCL use requires all three rules below:
 
-## How it works
+1. The predicate reads an atomic or equivalently synchronized gate. The usual
+   protocol is an Acquire load paired with Release stores.
+2. The predicate must not acquire the executor's lock and should not block.
+3. A task may update the gate directly inside the executor lock. If the task
+   leaves the gate unchanged and it is updated later or by another system path,
+   that update must acquire the same underlying lock as the executor.
 
-1. The condition **tester runs twice** (outside the lock, then again under the write lock). Anything the first read relies on must remain safe without this executor’s lock (for example atomics with appropriate orderings).
-2. If the first test passes, an optional **prepare** runnable may run; then the lock is taken, the second test runs, and the user task runs with `&mut T` if applicable.
-3. If prepare ran successfully, after releasing the lock the executor may run **commit** on full success, or **rollback** when the inner check or task did not succeed.
+An atomic gate provides visibility; the shared lock provides mutual exclusion
+between a successful second check, the task, and gate transitions outside the
+task. `ptr::read_volatile` is intended for volatile memory such as MMIO and is
+not a replacement for atomic synchronization.
 
-Panics from the tester, prepare callbacks, or task are not caught by default. Enable capture with `.catch_panics()`, or use `.with_panic_capture(flag)` when the setting comes from a boolean. Built executors also support `.with_panic_capture(flag)` and return a reconfigured executor. Tester and task panics become `ExecutorError::Panic`; prepare lifecycle panics become `PrepareFailed`, `PrepareCommitFailed`, or `PrepareRollbackFailed`. When prepare already succeeded, rollback can still run for captured task or second-check panics. When cloned executors run concurrently, several calls may complete prepare before one call wins the second condition check; losing calls run prepare rollback if it is configured.
+## Basic executor
+
+Import lock types directly from their owning crate:
+
+```rust
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_lock::ArcMutex;
+
+let lock = ArcMutex::new(());
+let gate = Arc::new(AtomicBool::new(true));
+let executor = DoubleCheckedLockExecutor::builder(lock)
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+let outcome = executor.run({
+    let gate = Arc::clone(&gate);
+    move || {
+        // The second check has succeeded and this task already holds the
+        // executor lock, so it can close the gate without reacquiring it.
+        gate.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(42)
+    }
+});
+
+assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+```
+
+The first `false` result returns `ExecutionOutcome::ConditionNotMet` without
+calling any lock method. A task error is returned unchanged as
+`ExecutionOutcome::TaskFailed(E)`.
+
+When another path updates the gate, it must use the same lock object:
+
+```rust
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+use qubit_dcl::DoubleCheckedLockExecutor;
+use qubit_lock::{ArcMutex, Lock};
+
+let lock = ArcMutex::new(());
+let transition_lock = lock.clone();
+let gate = Arc::new(AtomicBool::new(true));
+let executor = DoubleCheckedLockExecutor::builder(lock)
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+transition_lock.with_write({
+    let gate = Arc::clone(&gate);
+    move |_| gate.store(false, Ordering::Release)
+});
+
+let outcome = executor.run(|| Ok::<(), std::io::Error>(()));
+assert!(matches!(
+    outcome,
+    qubit_dcl::ExecutionOutcome::ConditionNotMet
+));
+```
+
+## Lifecycle executor
+
+`LifecycleDoubleCheckedLockExecutor` runs prepare after the first check and
+before locking. Each invocation receives its own token `P`. After the task and
+lock release, that token is consumed by commit or rollback.
+
+```rust
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use qubit_dcl::{
+    ExecutionOutcome,
+    LifecycleDoubleCheckedLockExecutor,
+    PreparationOutcome,
+    RollbackCause,
+};
+use qubit_lock::ArcMutex;
+
+let gate = Arc::new(AtomicBool::new(true));
+let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .catch_panics(true)
+    .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepared"]))
+    .commit(|token| {
+        assert_eq!(token, ["prepared", "task"]);
+        Ok::<(), io::Error>(())
+    })
+    .rollback(|token, cause| {
+        assert!(!token.is_empty());
+        match cause {
+            RollbackCause::ConditionNotMet => {}
+            RollbackCause::TaskFailed(error) => eprintln!("task failed: {error}"),
+            RollbackCause::Panicked(panic) => {
+                eprintln!("panic in {:?}", panic.phase());
+            }
+        }
+        Ok::<(), io::Error>(())
+    })
+    .build();
+
+let report = executor.run_with_token(|token| {
+    token.push("task");
+    Ok::<usize, io::Error>(token.len())
+});
+
+assert!(matches!(
+    report.execution(),
+    ExecutionOutcome::Success(2)
+));
+assert!(matches!(
+    report.preparation(),
+    PreparationOutcome::Committed
+));
+```
+
+The typestate builder permits exactly three lifecycle combinations:
+
+- `prepare -> commit -> rollback -> build`
+- `prepare -> commit -> no_rollback -> build`
+- `prepare -> no_commit -> rollback -> build`
+
+There is intentionally no `no_commit + no_rollback` combination. When no token
+data is needed, prepare can return `()` and the caller can use `run` rather than
+`run_with_token`.
+
+## Outcome and panic semantics
+
+`ExecutionReport<R, E, C>` retains two independent axes:
+
+- `ExecutionOutcome<R, E>` reports condition checks, task success/error, or a
+  captured panic.
+- `PreparationOutcome<C>` reports prepare, commit, rollback, or an explicitly
+  unnecessary finalizer.
+
+A commit failure never erases task success, and a rollback failure never erases
+the task error or panic that triggered it. `RollbackCause::TaskFailed` borrows
+the original error during rollback while the report retains its owned value.
+
+Panic capture is disabled by default. With `.catch_panics(true)`, panic metadata
+includes the precise `PanicPhase` and original payload. The capture boundary is
+outside `Lock::with_write`, so a standard-library lock observes unwinding and is
+poisoned normally; parking-lot locks retain their normal non-poisoning behavior.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-dcl = "0.9"
+qubit-dcl = "0.10"
+qubit-lock = "0.10"
 ```
 
-`qubit-dcl` already depends on `qubit-lock` and re-exports `ArcMutex` and `Lock`; add a direct `qubit-lock` dependency only if you use types beyond those re-exports.
+`qubit-dcl` does not re-export `Lock`, `ArcMutex`, or other externally owned
+types. Declare `qubit-lock` directly when using its API.
 
-### Public API paths
+## Migration from 0.9
 
-Import the lock trait from the crate root:
+Version 0.10 removes every compatibility wrapper, one-shot API, built-in logger,
+and task closure that receives protected `T`. See the
+[0.10 migration guide](doc/user_guide_migration_0_10.md) for the complete
+mapping.
 
-```rust
-use qubit_dcl::Lock;
-```
-
-The old compatibility path `qubit_dcl::lock::Lock` is no longer provided. Use the root re-export above, or import `qubit_lock::Lock` directly when your code intentionally depends on `qubit-lock`.
-
-## Quick start
-
-```rust
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex, Lock, ExecutionResult};
-
-fn main() {
-    let data = ArcMutex::new(10);
-    let skip = Arc::new(AtomicBool::new(false));
-
-    let executor = DoubleCheckedLockExecutor::builder()
-        .on(data.clone())
-        .when({
-            let skip = skip.clone();
-            move || !skip.load(Ordering::Acquire)
-        })
-        .build();
-
-    let updated = executor
-        .call_with(|value: &mut i32| {
-            *value += 5;
-            Ok::<i32, std::io::Error>(*value)
-        })
-        .get_result();
-
-    assert!(matches!(updated, ExecutionResult::Success(15)));
-    assert_eq!(data.with_read(|value| *value), 15);
-}
-```
-
-### Side-effect–only run (`finish`)
-
-For `execute` or `call` with no meaningful return value, you can use [`ExecutionContext::finish`](https://docs.rs/qubit-dcl) on `ExecutionContext<(), E>` to get a `bool` success:
-
-```rust
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
-
-let data = ArcMutex::new(());
-let ok = DoubleCheckedLockExecutor::builder()
-    .on(data)
-    .when(|| true)
-    .build()
-    .execute(|| Ok::<(), std::io::Error>(()))
-    .finish();
-assert!(ok);
-```
-
-`finish()` is intentionally lossy: both condition-not-met and execution failure
-return `false`. Use `try_finish()` when you need to preserve task or prepare
-errors:
-
-```rust
-use qubit_dcl::{DoubleCheckedLockExecutor, ArcMutex};
-
-let data = ArcMutex::new(());
-let ok = DoubleCheckedLockExecutor::builder()
-    .on(data)
-    .when(|| true)
-    .build()
-    .execute(|| Ok::<(), std::io::Error>(()))
-    .try_finish()
-    .expect("execution should not fail");
-assert!(ok);
-```
-
-### One-shot convenience (`DoubleCheckedLock`)
-
-When you do not need to keep a reusable executor, use `DoubleCheckedLock` for a shorter chain:
-
-```rust
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use qubit_dcl::{DoubleCheckedLock, ArcMutex, ExecutionResult, Lock};
-
-let data = ArcMutex::new(10);
-let skip = Arc::new(AtomicBool::new(false));
-
-let updated = DoubleCheckedLock::on(data.clone())
-    .when({
-        let skip = skip.clone();
-        move || !skip.load(Ordering::Acquire)
-    })
-    .call_with(|value: &mut i32| {
-        *value += 5;
-        Ok::<i32, std::io::Error>(*value)
-    })
-    .get_result();
-
-assert!(matches!(updated, ExecutionResult::Success(15)));
-assert_eq!(data.with_read(|value| *value), 15);
-```
-
-### Example program
-
-A runnable sample is under `examples/double_checked_lock_executor_demo.rs`:
+## Testing
 
 ```bash
-cargo run --example double_checked_lock_executor_demo
-```
-
-## Builder API (summary)
-
-- Start with `DoubleCheckedLockExecutor::builder()`.
-- Attach a lock: `.on(lock)` where `L: Lock<T>`.
-- Set the double-checked condition: `.when(tester)`.
-- Configure panic capture with `.catch_panics()`, `.with_panic_capture(flag)`, or `.disable_catch_panics()`.
-- Optionally: `.prepare`, `.rollback_prepare`, `.commit_prepare` for the prepare pipeline.
-- Configure diagnostics with `.log_unmet_condition`, `.log_prepare_failure`, `.log_prepare_commit_failure`, `.log_prepare_rollback_failure`; disable them with the matching `.disable_*_logging` methods.
-- Finish with `.build()`.
-
-## Project layout
-
-- `src/double_checked`: executor, builders, `ExecutionContext`, `ExecutionResult`, errors, and logging.
-- `tests/double_checked` and `tests/docs`: unit and README consistency tests.
-
-## Quality checks
-
-```bash
-cargo +nightly fmt -- --check --config-path .rs-ci/rustfmt.toml
-cargo clippy --all-targets --all-features -- -D warnings
+# Run tests with the default feature set
 cargo test
-RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-./align-ci.sh
+
+# Run tests with all declared features
+cargo test --all-features
+
+# Project CI checks
 ./ci-check.sh
-./coverage.sh json
+
+# Check code coverage
+./coverage.sh
 ```
 
 ## License
 
-Apache-2.0
+Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the
+full license text.
+
+## Contributing
+
+Contributions are welcome. Please follow the Rust API guidelines, keep public
+API documentation and tests current, and run `./align-ci.sh` to format code and
+`./ci-check.sh` to satisfy CI requirements before submitting a pull request.
+
+## Author
+
+**Haixing Hu** - *Qubit Co. Ltd.*
+
+Repository: [https://github.com/qubit-ltd/rs-dcl](https://github.com/qubit-ltd/rs-dcl)
