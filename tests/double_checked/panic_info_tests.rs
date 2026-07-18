@@ -17,17 +17,16 @@ use qubit_dcl::{
     ExecutionOutcome,
     PanicPhase,
 };
-use qubit_lock::ArcMutex;
 
 /// Verifies a string payload remains inspectable and recoverable by value.
 #[test]
 fn test_panic_info_preserves_string_payload() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(|| panic_any(String::from("owned panic")));
+        executor.run(&parking_lot::Mutex::new(()), || panic_any(String::from("owned panic")));
 
     let ExecutionOutcome::Panicked(panic) = outcome else {
         panic!("expected captured task panic");
@@ -49,12 +48,12 @@ fn test_panic_info_preserves_string_payload() {
 /// Verifies unknown payloads are retained without fabricating a message.
 #[test]
 fn test_panic_info_preserves_non_string_payload_without_message() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(|| panic_any(123_u32));
+        executor.run(&parking_lot::Mutex::new(()), || panic_any(123_u32));
 
     let ExecutionOutcome::Panicked(panic) = outcome else {
         panic!("expected captured task panic");

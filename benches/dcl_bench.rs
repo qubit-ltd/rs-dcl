@@ -5,88 +5,154 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Criterion benchmarks for DCL fast and locked paths.
+//! Benchmarks the downstream-style submission and shutdown state machine.
 
 use std::{
     convert::Infallible,
     hint::black_box,
     sync::{
         Arc,
+        Mutex,
         atomic::{
-            AtomicBool,
+            AtomicU8,
+            AtomicUsize,
             Ordering,
         },
     },
 };
 
 use criterion::{
+    BenchmarkGroup,
     Criterion,
     criterion_group,
     criterion_main,
+    measurement::WallTime,
 };
-use qubit_dcl::DoubleCheckedLockExecutor;
-use qubit_lock::{
-    ArcMutex,
-    Lock,
+use parking_lot::Mutex as ParkingLotMutex;
+use qubit_dcl::{
+    DoubleCheckedLockExecutor,
+    ExecutionOutcome,
 };
+use qubit_lock::Lock;
 
-/// Benchmarks raw predicates, executor paths, and equivalent handwritten DCL.
-///
-/// # Parameters
-///
-/// * `criterion` - Criterion benchmark registry.
-fn benchmark_dcl(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("double_checked_lock");
+/// Executor accepts new work in this state.
+const RUNNING: u8 = 0;
+/// Executor rejects new work after shutdown begins.
+const SHUT_DOWN: u8 = 1;
 
-    let raw_gate = AtomicBool::new(false);
-    group.bench_function("raw_atomic_predicate", |bencher| {
-        bencher.iter(|| black_box(raw_gate.load(Ordering::Acquire)));
-    });
+/// Runs a submission after acquiring the lock before checking state.
+#[inline]
+fn submit_lock_first<L>(
+    state: &AtomicU8,
+    lock: &L,
+    submitted: &AtomicUsize,
+) -> bool
+where
+    L: Lock + ?Sized,
+{
+    let _guard = lock.lock();
+    if state.load(Ordering::Acquire) != RUNNING {
+        return false;
+    }
+    submitted.fetch_add(1, Ordering::Relaxed);
+    true
+}
 
-    let false_gate = Arc::new(AtomicBool::new(false));
-    let false_executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
-        .when({
-            let false_gate = Arc::clone(&false_gate);
-            move || false_gate.load(Ordering::Acquire)
-        })
+/// Runs the handwritten double-checked submission path.
+#[inline]
+fn submit_handwritten_dcl<L>(
+    state: &AtomicU8,
+    lock: &L,
+    submitted: &AtomicUsize,
+) -> bool
+where
+    L: Lock + ?Sized,
+{
+    if state.load(Ordering::Acquire) != RUNNING {
+        return false;
+    }
+    let _guard = lock.lock();
+    if state.load(Ordering::Acquire) != RUNNING {
+        return false;
+    }
+    submitted.fetch_add(1, Ordering::Relaxed);
+    true
+}
+
+/// Registers running and shut-down submission paths for one lock backend.
+fn benchmark_submission_backend<L>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    backend: &str,
+    lock: &L,
+)
+where
+    L: Lock + ?Sized,
+{
+    let state = Arc::new(AtomicU8::new(RUNNING));
+    let submitted = AtomicUsize::new(0);
+    let predicate_state = Arc::clone(&state);
+    let executor = DoubleCheckedLockExecutor::builder()
+        .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
         .build();
-    group.bench_function("executor_fast_false", |bencher| {
+
+    group.bench_function(format!("{backend}/running/lock_first"), |bencher| {
         bencher.iter(|| {
-            black_box(false_executor.run(|| Ok::<usize, Infallible>(1)))
+            black_box(submit_lock_first(&state, lock, &submitted))
+        });
+    });
+    group.bench_function(
+        format!("{backend}/running/handwritten_dcl"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_handwritten_dcl(&state, lock, &submitted))
+            });
+        },
+    );
+    group.bench_function(format!("{backend}/running/qubit_dcl"), |bencher| {
+        bencher.iter(|| {
+            black_box(executor.run(lock, || {
+                submitted.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), Infallible>(())
+            }))
         });
     });
 
-    let success_executor =
-        DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
-            .when(|| true)
-            .build();
-    group.bench_function("executor_uncontended_success", |bencher| {
+    state.store(SHUT_DOWN, Ordering::Release);
+    group.bench_function(format!("{backend}/shut_down/lock_first"), |bencher| {
         bencher.iter(|| {
-            black_box(
-                success_executor.run(|| Ok::<usize, Infallible>(black_box(1))),
-            )
+            black_box(submit_lock_first(&state, lock, &submitted))
         });
     });
-
-    let handwritten_gate = AtomicBool::new(true);
-    let handwritten_lock = ArcMutex::new(());
-    group.bench_function("handwritten_uncontended_dcl", |bencher| {
+    group.bench_function(
+        format!("{backend}/shut_down/handwritten_dcl"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_handwritten_dcl(&state, lock, &submitted))
+            });
+        },
+    );
+    group.bench_function(format!("{backend}/shut_down/qubit_dcl"), |bencher| {
         bencher.iter(|| {
-            let result = if handwritten_gate.load(Ordering::Acquire) {
-                handwritten_lock.with_write(|_| {
-                    if handwritten_gate.load(Ordering::Acquire) {
-                        black_box(1)
-                    } else {
-                        0
-                    }
-                })
-            } else {
-                0
-            };
-            black_box(result)
+            let outcome = executor.run(lock, || {
+                submitted.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), Infallible>(())
+            });
+            black_box(matches!(outcome, ExecutionOutcome::Success(())))
         });
     });
+}
 
+/// Benchmarks submission gates matching executor shutdown coordination.
+fn benchmark_dcl(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("executor_submission_gate");
+    let std_lock = Mutex::new(());
+    benchmark_submission_backend(&mut group, "std_mutex", &std_lock);
+    let parking_lot_lock = ParkingLotMutex::new(());
+    benchmark_submission_backend(
+        &mut group,
+        "parking_lot_mutex",
+        &parking_lot_lock,
+    );
     group.finish();
 }
 

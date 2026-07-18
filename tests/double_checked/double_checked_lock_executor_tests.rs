@@ -27,24 +27,18 @@ use qubit_dcl::{
     ExecutionOutcome,
     PanicPhase,
 };
-use qubit_lock::{
-    ArcMutex,
-    ArcStdMutex,
-    Lock,
-};
-
 use crate::support::CountingLock;
 
 /// Verifies the fast failure path performs no lock operation.
 #[test]
 fn test_run_initial_false_skips_lock_and_task() {
-    let lock = CountingLock::new(());
+    let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| false)
         .build();
 
-    let outcome = executor.run(|| {
+    let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<(), io::Error>(())
     });
@@ -58,17 +52,17 @@ fn test_run_initial_false_skips_lock_and_task() {
 /// call.
 #[test]
 fn test_run_second_false_skips_task_after_locking() {
-    let lock = CountingLock::new(());
+    let lock = CountingLock::new();
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+    let executor = DoubleCheckedLockExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
         })
         .build();
 
-    let outcome = executor.run(|| {
+    let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<(), io::Error>(())
     });
@@ -79,14 +73,14 @@ fn test_run_second_false_skips_task_after_locking() {
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
 }
 
-/// Verifies a successful task runs once under the write lock and preserves its
+/// Verifies a successful task runs once under the lock and preserves its
 /// return value.
 #[test]
 fn test_run_two_true_checks_preserves_success() {
-    let lock = CountingLock::new(());
+    let lock = CountingLock::new();
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+    let executor = DoubleCheckedLockExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {
@@ -96,7 +90,7 @@ fn test_run_two_true_checks_preserves_success() {
         })
         .build();
 
-    let outcome = executor.run(|| {
+    let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<u32, io::Error>(42)
     });
@@ -110,12 +104,12 @@ fn test_run_two_true_checks_preserves_success() {
 /// Verifies a task error remains owned and unchanged.
 #[test]
 fn test_run_preserves_task_error() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .build();
 
     let outcome =
-        executor.run(|| Err::<(), _>(io::Error::other("task failed")));
+        executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
 
     match outcome {
         ExecutionOutcome::TaskFailed(error) => {
@@ -128,12 +122,12 @@ fn test_run_preserves_task_error() {
 /// Verifies panic capture classifies the initial condition check.
 #[test]
 fn test_run_captures_initial_condition_panic() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| panic!("initial check"))
         .catch_panics(true)
         .build();
 
-    let outcome = executor.run(|| Ok::<(), io::Error>(()));
+    let outcome = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -148,7 +142,7 @@ fn test_run_captures_initial_condition_panic() {
 #[test]
 fn test_run_captures_second_condition_panic() {
     let checks = Arc::new(AtomicUsize::new(0));
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {
@@ -162,7 +156,7 @@ fn test_run_captures_second_condition_panic() {
         .catch_panics(true)
         .build();
 
-    let outcome = executor.run(|| Ok::<(), io::Error>(()));
+    let outcome = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -176,13 +170,13 @@ fn test_run_captures_second_condition_panic() {
 /// Verifies panic capture classifies a task panic after the second check.
 #[test]
 fn test_run_captures_task_panic() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
 
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(|| panic!("task panic"));
+        executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -197,19 +191,20 @@ fn test_run_captures_task_panic() {
 /// mutex before it is converted into an outcome.
 #[test]
 fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcStdMutex::new(()))
+    let lock = std::sync::Mutex::new(());
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
 
     let first: ExecutionOutcome<(), io::Error> =
-        executor.run(|| panic!("poison standard mutex"));
+        executor.run(&lock, || panic!("poison standard mutex"));
     assert!(matches!(
         first,
         ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
     ));
 
-    let second = executor.run(|| Ok::<u32, io::Error>(7));
+    let second = executor.run(&lock, || Ok::<u32, io::Error>(7));
     assert!(matches!(
         second,
         ExecutionOutcome::Panicked(panic)
@@ -221,19 +216,20 @@ fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
 /// mutex.
 #[test]
 fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let lock = parking_lot::Mutex::new(());
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
 
     let first: ExecutionOutcome<(), io::Error> =
-        executor.run(|| panic!("parking-lot task panic"));
+        executor.run(&lock, || panic!("parking-lot task panic"));
     assert!(matches!(
         first,
         ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
     ));
 
-    let second = executor.run(|| Ok::<u32, io::Error>(7));
+    let second = executor.run(&lock, || Ok::<u32, io::Error>(7));
     assert!(matches!(second, ExecutionOutcome::Success(7)));
 }
 
@@ -241,18 +237,18 @@ fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
 /// panic.
 #[test]
 fn test_run_captures_lock_acquisition_panic() {
-    let lock = ArcStdMutex::new(());
-    let poison_lock = lock.clone();
+    let lock = std::sync::Mutex::new(());
     let poison_result = catch_unwind(AssertUnwindSafe(|| {
-        poison_lock.with_write(|_| panic!("poison lock"));
+        let _guard = std::sync::Mutex::lock(&lock).unwrap();
+        panic!("poison lock");
     }));
     assert!(poison_result.is_err());
-    let executor = DoubleCheckedLockExecutor::builder(lock)
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
 
-    let outcome = executor.run(|| Ok::<(), io::Error>(()));
+    let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -265,28 +261,28 @@ fn test_run_captures_lock_acquisition_panic() {
 /// Verifies disabling panic capture resumes unwinding through the caller.
 #[test]
 fn test_run_propagates_task_panic_when_capture_is_disabled() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
         let _: ExecutionOutcome<(), io::Error> =
-            executor.run(|| panic!("uncaught task panic"));
+            executor.run(&parking_lot::Mutex::new(()), || panic!("uncaught task panic"));
     }));
 
     assert!(panic_result.is_err());
 }
 
-/// Verifies a built executor can be cloned when its lock handle is cloneable.
+/// Verifies a built executor can be cloned independently of lock ownership.
 #[test]
-fn test_clone_shares_configuration_and_lock() {
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+fn test_clone_shares_configuration_without_owning_lock() {
+    let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .build();
     let cloned = executor.clone();
 
-    let outcome = cloned.run(|| Ok::<u32, io::Error>(7));
+    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }

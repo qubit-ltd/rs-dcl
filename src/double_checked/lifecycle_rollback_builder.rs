@@ -19,19 +19,19 @@ use crate::double_checked::{
 /// Builder stage representing `no_commit` and requiring rollback.
 #[doc(hidden)]
 #[must_use = "the no-commit stage requires rollback"]
-pub struct LifecycleRollbackBuilder<L, T: ?Sized, P, C> {
-    /// DCL lock and predicate configuration.
-    core: DclCore<L, T>,
+pub struct LifecycleRollbackBuilder<P, C> {
+    /// DCL predicate and panic configuration.
+    core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
 }
 
-impl<L, T: ?Sized, P, C> LifecycleRollbackBuilder<L, T, P, C> {
+impl<P, C> LifecycleRollbackBuilder<P, C> {
     /// Creates the no-commit builder stage.
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL lock and predicate configuration.
+    /// * `core` - DCL predicate and panic configuration.
     /// * `prepare` - Erased prepare callback.
     ///
     /// # Returns
@@ -39,7 +39,7 @@ impl<L, T: ?Sized, P, C> LifecycleRollbackBuilder<L, T, P, C> {
     /// A builder requiring rollback.
     #[inline]
     pub(crate) fn new(
-        core: DclCore<L, T>,
+        core: DclCore,
         prepare: PrepareCallback<P, C>,
     ) -> Self {
         Self { core, prepare }
@@ -78,7 +78,7 @@ impl<L, T: ?Sized, P, C> LifecycleRollbackBuilder<L, T, P, C> {
     /// `rollback` runs after the executor lock is released and does not
     /// automatically reacquire it.
     #[inline]
-    pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<L, T, P, C>
+    pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<P, C>
     where
         F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C>
             + Send

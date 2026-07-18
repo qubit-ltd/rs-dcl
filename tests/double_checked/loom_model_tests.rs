@@ -76,50 +76,26 @@ impl<T> LoomLock<T> {
     }
 }
 
-impl<T> Lock<T> for LoomLock<T> {
-    /// Records and executes a modeled read operation.
-    fn with_read<R, F>(&self, operation: F) -> R
+impl<T> Lock for LoomLock<T>
+where
+    T: Send,
+{
+    type Guard<'a>
+        = loom::sync::MutexGuard<'a, T>
     where
-        F: FnOnce(&T) -> R,
-    {
+        Self: 'a;
+
+    /// Records and acquires the modeled mutex.
+    fn lock(&self) -> Self::Guard<'_> {
         self.record_call();
-        let guard =
-            self.inner.lock().expect("loom lock should not be poisoned");
-        operation(&guard)
+        self.inner.lock().expect("loom lock should not be poisoned")
     }
 
-    /// Records and executes a modeled write operation.
-    fn with_write<R, F>(&self, operation: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.record_call();
-        let mut guard =
-            self.inner.lock().expect("loom lock should not be poisoned");
-        operation(&mut guard)
-    }
-
-    /// Records and attempts a modeled read operation without blocking.
-    fn try_with_read<R, F>(&self, operation: F) -> Result<R, TryLockError>
-    where
-        F: FnOnce(&T) -> R,
-    {
+    /// Records and attempts immediate modeled acquisition.
+    fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         self.record_call();
         match self.inner.try_lock() {
-            Ok(guard) => Ok(operation(&guard)),
-            Err(StdTryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(StdTryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
-        }
-    }
-
-    /// Records and attempts a modeled write operation without blocking.
-    fn try_with_write<R, F>(&self, operation: F) -> Result<R, TryLockError>
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.record_call();
-        match self.inner.try_lock() {
-            Ok(mut guard) => Ok(operation(&mut guard)),
+            Ok(guard) => Ok(guard),
             Err(StdTryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
             Err(StdTryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
@@ -131,11 +107,11 @@ impl<T> Lock<T> for LoomLock<T> {
 fn test_loom_initial_false_has_zero_lock_calls() {
     model(|| {
         let lock = LoomLock::new(());
-        let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+        let executor = DoubleCheckedLockExecutor::builder()
             .when(|| false)
             .build();
 
-        let outcome = executor.run(|| Ok::<(), io::Error>(()));
+        let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
 
         assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
         assert_eq!(lock.calls(), 0);
@@ -149,8 +125,9 @@ fn test_loom_task_gate_change_allows_one_success() {
     model(|| {
         let gate = Arc::new(AtomicBool::new(true));
         let task_calls = Arc::new(AtomicUsize::new(0));
+        let lock = LoomLock::new(());
         let executor = Arc::new(
-            DoubleCheckedLockExecutor::builder(LoomLock::new(()))
+            DoubleCheckedLockExecutor::builder()
                 .when({
                     let gate = Arc::clone(&gate);
                     move || gate.load(Ordering::Acquire)
@@ -163,9 +140,10 @@ fn test_loom_task_gate_change_allows_one_success() {
                 let executor = Arc::clone(&executor);
                 let gate = Arc::clone(&gate);
                 let task_calls = Arc::clone(&task_calls);
+                let lock = lock.clone();
                 thread::spawn(move || {
                     matches!(
-                        executor.run(|| {
+                        executor.run(&lock, || {
                             task_calls.fetch_add(1, Ordering::Relaxed);
                             gate.store(false, Ordering::Release);
                             Ok::<(), io::Error>(())
@@ -195,7 +173,7 @@ fn test_loom_external_same_lock_transition_blocks_stale_task() {
         let gate = Arc::new(AtomicBool::new(true));
         let checks = Arc::new(AtomicUsize::new(0));
         let task_calls = Arc::new(AtomicUsize::new(0));
-        let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+        let executor = DoubleCheckedLockExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 let checks = Arc::clone(&checks);
@@ -206,20 +184,20 @@ fn test_loom_external_same_lock_transition_blocks_stale_task() {
             })
             .build();
 
-        let handle = lock.with_write(|_| {
-            let task_calls = Arc::clone(&task_calls);
-            let handle = thread::spawn(move || {
-                executor.run(|| {
-                    task_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                })
-            });
-            while checks.load(Ordering::Acquire) == 0 {
-                thread::yield_now();
-            }
-            gate.store(false, Ordering::Release);
-            handle
+        let guard = Lock::lock(&lock);
+        let worker_task_calls = Arc::clone(&task_calls);
+        let task_lock = lock.clone();
+        let handle = thread::spawn(move || {
+            executor.run(&task_lock, || {
+                worker_task_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            })
         });
+        while checks.load(Ordering::Acquire) == 0 {
+            thread::yield_now();
+        }
+        gate.store(false, Ordering::Release);
+        drop(guard);
 
         let outcome = handle.join().expect("loom worker should not panic");
         assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
@@ -233,8 +211,9 @@ fn test_loom_external_same_lock_transition_blocks_stale_task() {
 fn test_loom_prepare_tokens_do_not_cross_invocations() {
     model(|| {
         let committed_mask = Arc::new(AtomicUsize::new(0));
+        let lock = LoomLock::new(());
         let executor = Arc::new(
-            LifecycleDoubleCheckedLockExecutor::builder(LoomLock::new(()))
+            LifecycleDoubleCheckedLockExecutor::builder()
                 .when(|| true)
                 .prepare(|| Ok::<usize, io::Error>(usize::MAX))
                 .commit({
@@ -249,15 +228,17 @@ fn test_loom_prepare_tokens_do_not_cross_invocations() {
         );
 
         let first_executor = Arc::clone(&executor);
+        let first_lock = lock.clone();
         let first = thread::spawn(move || {
-            first_executor.run_with_token(|token| {
+            first_executor.run_with_token(&first_lock, |token| {
                 *token = 0;
                 Ok::<(), io::Error>(())
             })
         });
         let second_executor = Arc::clone(&executor);
+        let second_lock = lock.clone();
         let second = thread::spawn(move || {
-            second_executor.run_with_token(|token| {
+            second_executor.run_with_token(&second_lock, |token| {
                 *token = 1;
                 Ok::<(), io::Error>(())
             })

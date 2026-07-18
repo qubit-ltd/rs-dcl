@@ -55,9 +55,9 @@ pub(crate) type RollbackCallback<P, C> = Arc<
 /// Prepare runs after the lock-free check and before lock acquisition. Commit
 /// or rollback consumes the token after the executor lock has been released.
 #[must_use = "an executor does nothing until run or run_with_token is called"]
-pub struct LifecycleDoubleCheckedLockExecutor<L, T: ?Sized, P, C> {
-    /// Shared DCL lock, predicate, and panic configuration.
-    core: DclCore<L, T>,
+pub struct LifecycleDoubleCheckedLockExecutor<P, C> {
+    /// Shared DCL predicate and panic configuration.
+    core: DclCore,
     /// Callback that creates one token for each prepared invocation.
     prepare: PrepareCallback<P, C>,
     /// Optional successful-path finalizer.
@@ -66,33 +66,24 @@ pub struct LifecycleDoubleCheckedLockExecutor<L, T: ?Sized, P, C> {
     rollback: Option<RollbackCallback<P, C>>,
 }
 
-impl LifecycleDoubleCheckedLockExecutor<(), (), (), ()> {
-    /// Starts building a lifecycle executor around `lock`.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Generic synchronous lock used for the protected phase.
+impl LifecycleDoubleCheckedLockExecutor<(), ()> {
+    /// Starts building a lifecycle executor.
     ///
     /// # Returns
     ///
     /// A typestate builder requiring a predicate and lifecycle callbacks.
     #[inline]
-    pub fn builder<L, T: ?Sized>(
-        lock: L,
-    ) -> LifecycleDoubleCheckedLockExecutorBuilder<L, T>
-    where
-        L: Lock<T>,
-    {
-        LifecycleDoubleCheckedLockExecutorBuilder::new(lock)
+    pub fn builder() -> LifecycleDoubleCheckedLockExecutorBuilder {
+        LifecycleDoubleCheckedLockExecutorBuilder::new()
     }
 }
 
-impl<L, T: ?Sized, P, C> LifecycleDoubleCheckedLockExecutor<L, T, P, C> {
+impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// Creates a built lifecycle executor from typestate-validated parts.
     ///
     /// # Parameters
     ///
-    /// * `core` - Complete lock and predicate configuration.
+    /// * `core` - Complete predicate and panic configuration.
     /// * `prepare` - Per-invocation token producer.
     /// * `commit` - Optional successful-path finalizer.
     /// * `rollback` - Optional unsuccessful-path finalizer.
@@ -102,7 +93,7 @@ impl<L, T: ?Sized, P, C> LifecycleDoubleCheckedLockExecutor<L, T, P, C> {
     /// A reusable lifecycle executor.
     #[inline]
     pub(crate) fn from_parts(
-        core: DclCore<L, T>,
+        core: DclCore,
         prepare: PrepareCallback<P, C>,
         commit: Option<CommitCallback<P, C>>,
         rollback: Option<RollbackCallback<P, C>>,
@@ -114,16 +105,11 @@ impl<L, T: ?Sized, P, C> LifecycleDoubleCheckedLockExecutor<L, T, P, C> {
             rollback,
         }
     }
-}
-
-impl<L, T: ?Sized, P, C> LifecycleDoubleCheckedLockExecutor<L, T, P, C>
-where
-    L: Lock<T>,
-{
     /// Runs a task that does not need direct access to the prepare token.
     ///
     /// # Parameters
     ///
+    /// * `lock` - Generic synchronous lock used for this invocation.
     /// * `task` - One-shot task executed inside the lock after the second
     ///   condition check.
     ///
@@ -155,12 +141,17 @@ where
     /// executor lock. The second check and task share one write-lock critical
     /// section. Lifecycle callbacks do not automatically reacquire that lock.
     #[inline(always)]
-    pub fn run<R, E, F>(&self, task: F) -> ExecutionReport<R, E, C>
+    pub fn run<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> ExecutionReport<R, E, C>
     where
+        L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
         F: FnOnce() -> Result<R, E>,
     {
-        self.run_with_token(move |_| task())
+        self.run_with_token(lock, move |_| task())
     }
 
     /// Runs a task with mutable access to its invocation's prepare token.
@@ -171,6 +162,7 @@ where
     ///
     /// # Parameters
     ///
+    /// * `lock` - Generic synchronous lock used for this invocation.
     /// * `task` - One-shot task receiving the invocation token by mutable
     ///   reference.
     ///
@@ -198,15 +190,20 @@ where
     /// Token mutation by `task` occurs inside the executor lock. Commit and
     /// rollback consume the token only after that lock has been released.
     #[inline]
-    pub fn run_with_token<R, E, F>(&self, task: F) -> ExecutionReport<R, E, C>
+    pub fn run_with_token<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> ExecutionReport<R, E, C>
     where
+        L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
         F: FnOnce(&mut P) -> Result<R, E>,
     {
         if self.core.catch_panics() {
-            self.run_catching(task)
+            self.run_catching(lock, task)
         } else {
-            self.run_propagating(task)
+            self.run_propagating(lock, task)
         }
     }
 
@@ -214,13 +211,19 @@ where
     ///
     /// # Parameters
     ///
+    /// * `lock` - Lock used for this invocation.
     /// * `task` - Token-aware task to run in the locked phase.
     ///
     /// # Returns
     ///
     /// A complete report, including any captured panic metadata.
-    fn run_catching<R, E, F>(&self, task: F) -> ExecutionReport<R, E, C>
+    fn run_catching<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> ExecutionReport<R, E, C>
     where
+        L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
         F: FnOnce(&mut P) -> Result<R, E>,
     {
@@ -257,7 +260,10 @@ where
                 }
             };
 
-        match self.core.execute_locked_catching(|| task(&mut token)) {
+        match self
+            .core
+            .execute_locked_catching(lock, || task(&mut token))
+        {
             Ok(LockedExecution::ConditionNotMet) => {
                 self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
             }
@@ -278,6 +284,7 @@ where
     ///
     /// # Parameters
     ///
+    /// * `lock` - Lock used for this invocation.
     /// * `task` - Token-aware task to run in the locked phase.
     ///
     /// # Returns
@@ -288,8 +295,13 @@ where
     ///
     /// Propagates initial-check, prepare, commit, and ordinary rollback panics.
     /// A locked-phase panic is resumed after rollback is attempted.
-    fn run_propagating<R, E, F>(&self, task: F) -> ExecutionReport<R, E, C>
+    fn run_propagating<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> ExecutionReport<R, E, C>
     where
+        L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
         F: FnOnce(&mut P) -> Result<R, E>,
     {
@@ -309,7 +321,10 @@ where
             }
         };
 
-        match self.core.execute_locked_catching(|| task(&mut token)) {
+        match self
+            .core
+            .execute_locked_catching(lock, || task(&mut token))
+        {
             Ok(LockedExecution::ConditionNotMet) => {
                 self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
             }
@@ -475,12 +490,8 @@ where
     }
 }
 
-impl<L, T: ?Sized, P, C> Clone
-    for LifecycleDoubleCheckedLockExecutor<L, T, P, C>
-where
-    L: Clone,
-{
-    /// Clones the lock handle and shares all erased callbacks.
+impl<P, C> Clone for LifecycleDoubleCheckedLockExecutor<P, C> {
+    /// Shares all erased callbacks.
     #[inline]
     fn clone(&self) -> Self {
         Self {

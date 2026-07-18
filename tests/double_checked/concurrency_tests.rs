@@ -25,11 +25,6 @@ use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
 };
-use qubit_lock::{
-    ArcMutex,
-    Lock,
-};
-
 /// Verifies a task may change the gate while already holding the executor lock,
 /// allowing only one competing task to succeed.
 #[test]
@@ -39,8 +34,9 @@ fn test_task_changes_gate_inside_executor_lock() {
     let gate = Arc::new(AtomicBool::new(true));
     let task_calls = Arc::new(AtomicUsize::new(0));
     let start = Arc::new(Barrier::new(THREAD_COUNT));
+    let lock = Arc::new(parking_lot::Mutex::new(()));
     let executor = Arc::new(
-        DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+        DoubleCheckedLockExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 move || gate.load(Ordering::Acquire)
@@ -54,9 +50,10 @@ fn test_task_changes_gate_inside_executor_lock() {
             let gate = Arc::clone(&gate);
             let task_calls = Arc::clone(&task_calls);
             let start = Arc::clone(&start);
+            let lock = Arc::clone(&lock);
             thread::spawn(move || {
                 start.wait();
-                executor.run(|| {
+                executor.run(&lock, || {
                     task_calls.fetch_add(1, Ordering::Relaxed);
                     gate.store(false, Ordering::Release);
                     Ok::<(), io::Error>(())
@@ -80,11 +77,11 @@ fn test_task_changes_gate_inside_executor_lock() {
 /// by the waiting invocation's second check.
 #[test]
 fn test_external_gate_change_uses_same_underlying_lock() {
-    let lock = ArcMutex::new(());
+    let lock = Arc::new(parking_lot::Mutex::new(()));
     let gate = Arc::new(AtomicBool::new(true));
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = Arc::new(AtomicUsize::new(0));
-    let executor = DoubleCheckedLockExecutor::builder(lock.clone())
+    let executor = DoubleCheckedLockExecutor::builder()
         .when({
             let gate = Arc::clone(&gate);
             let checks = Arc::clone(&checks);
@@ -95,20 +92,20 @@ fn test_external_gate_change_uses_same_underlying_lock() {
         })
         .build();
 
-    let handle = lock.with_write(|_| {
-        let task_calls = Arc::clone(&task_calls);
-        let handle = thread::spawn(move || {
-            executor.run(|| {
-                task_calls.fetch_add(1, Ordering::Relaxed);
-                Ok::<(), io::Error>(())
-            })
-        });
-        while checks.load(Ordering::Acquire) == 0 {
-            thread::yield_now();
-        }
-        gate.store(false, Ordering::Release);
-        handle
+    let guard = lock.lock();
+    let worker_task_calls = Arc::clone(&task_calls);
+    let task_lock = Arc::clone(&lock);
+    let handle = thread::spawn(move || {
+        executor.run(&task_lock, || {
+            worker_task_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<(), io::Error>(())
+        })
     });
+    while checks.load(Ordering::Acquire) == 0 {
+        thread::yield_now();
+    }
+    gate.store(false, Ordering::Release);
+    drop(guard);
 
     let outcome = handle.join().expect("worker should not panic");
     assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));

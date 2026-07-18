@@ -20,21 +20,21 @@ use crate::double_checked::{
 /// Builder stage requiring a rollback/no-rollback choice.
 #[doc(hidden)]
 #[must_use = "the commit stage requires rollback or no_rollback"]
-pub struct LifecycleCommitBuilder<L, T: ?Sized, P, C> {
-    /// DCL lock and predicate configuration.
-    core: DclCore<L, T>,
+pub struct LifecycleCommitBuilder<P, C> {
+    /// DCL predicate and panic configuration.
+    core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
     /// Successful-path token consumer.
     commit: CommitCallback<P, C>,
 }
 
-impl<L, T: ?Sized, P, C> LifecycleCommitBuilder<L, T, P, C> {
+impl<P, C> LifecycleCommitBuilder<P, C> {
     /// Creates the commit-configured builder stage.
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL lock and predicate configuration.
+    /// * `core` - DCL predicate and panic configuration.
     /// * `prepare` - Erased prepare callback.
     /// * `commit` - Erased commit callback.
     ///
@@ -43,7 +43,7 @@ impl<L, T: ?Sized, P, C> LifecycleCommitBuilder<L, T, P, C> {
     /// A builder requiring a rollback choice.
     #[inline]
     pub(crate) fn new(
-        core: DclCore<L, T>,
+        core: DclCore,
         prepare: PrepareCallback<P, C>,
         commit: CommitCallback<P, C>,
     ) -> Self {
@@ -87,7 +87,7 @@ impl<L, T: ?Sized, P, C> LifecycleCommitBuilder<L, T, P, C> {
     /// `rollback` runs after the executor lock is released and does not
     /// automatically reacquire it.
     #[inline]
-    pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<L, T, P, C>
+    pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<P, C>
     where
         F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C>
             + Send
@@ -109,7 +109,7 @@ impl<L, T: ?Sized, P, C> LifecycleCommitBuilder<L, T, P, C> {
     ///
     /// A complete builder ready to build.
     #[inline]
-    pub fn no_rollback(self) -> LifecycleReadyBuilder<L, T, P, C> {
+    pub fn no_rollback(self) -> LifecycleReadyBuilder<P, C> {
         LifecycleReadyBuilder::new(
             self.core,
             self.prepare,

@@ -15,12 +15,12 @@ use crate::double_checked::{
 /// Builder stage containing every required basic-executor component.
 #[doc(hidden)]
 #[must_use = "the ready builder must be consumed by build"]
-pub struct DoubleCheckedLockExecutorReadyBuilder<L, T: ?Sized> {
+pub struct DoubleCheckedLockExecutorReadyBuilder {
     /// Shared DCL configuration being built.
-    core: DclCore<L, T>,
+    core: DclCore,
 }
 
-impl<L, T: ?Sized> DoubleCheckedLockExecutorReadyBuilder<L, T> {
+impl DoubleCheckedLockExecutorReadyBuilder {
     /// Creates a ready builder from a configured DCL core.
     ///
     /// # Parameters
@@ -31,7 +31,7 @@ impl<L, T: ?Sized> DoubleCheckedLockExecutorReadyBuilder<L, T> {
     ///
     /// A builder that can be configured further or built.
     #[inline]
-    pub(crate) fn new(core: DclCore<L, T>) -> Self {
+    pub(crate) fn new(core: DclCore) -> Self {
         Self { core }
     }
 
@@ -57,7 +57,7 @@ impl<L, T: ?Sized> DoubleCheckedLockExecutorReadyBuilder<L, T> {
     ///
     /// An executor sharing the configured predicate across cloned handles.
     #[inline]
-    pub fn build(self) -> DoubleCheckedLockExecutor<L, T> {
+    pub fn build(self) -> DoubleCheckedLockExecutor {
         DoubleCheckedLockExecutor::from_core(self.core)
     }
 }

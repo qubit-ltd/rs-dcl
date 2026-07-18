@@ -7,8 +7,10 @@
 // =============================================================================
 //! Shared integration-test support.
 
+mod counting_guard;
 mod counting_lock;
 mod panic_on_drop;
 
+pub use counting_guard::CountingGuard;
 pub use counting_lock::CountingLock;
 pub use panic_on_drop::PanicOnDrop;

@@ -18,9 +18,9 @@ use crate::double_checked::{
 /// Typestate-validated lifecycle builder ready to build.
 #[doc(hidden)]
 #[must_use = "the ready builder must be consumed by build"]
-pub struct LifecycleReadyBuilder<L, T: ?Sized, P, C> {
-    /// DCL lock and predicate configuration.
-    core: DclCore<L, T>,
+pub struct LifecycleReadyBuilder<P, C> {
+    /// DCL predicate and panic configuration.
+    core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
     /// Optional successful-path token consumer.
@@ -29,12 +29,12 @@ pub struct LifecycleReadyBuilder<L, T: ?Sized, P, C> {
     rollback: Option<RollbackCallback<P, C>>,
 }
 
-impl<L, T: ?Sized, P, C> LifecycleReadyBuilder<L, T, P, C> {
+impl<P, C> LifecycleReadyBuilder<P, C> {
     /// Creates a complete typestate-validated builder.
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL lock and predicate configuration.
+    /// * `core` - DCL predicate and panic configuration.
     /// * `prepare` - Erased prepare callback.
     /// * `commit` - Selected commit callback, if required.
     /// * `rollback` - Selected rollback callback, if required.
@@ -44,7 +44,7 @@ impl<L, T: ?Sized, P, C> LifecycleReadyBuilder<L, T, P, C> {
     /// A builder exposing only [`Self::build`].
     #[inline]
     pub(crate) fn new(
-        core: DclCore<L, T>,
+        core: DclCore,
         prepare: PrepareCallback<P, C>,
         commit: Option<CommitCallback<P, C>>,
         rollback: Option<RollbackCallback<P, C>>,
@@ -64,7 +64,7 @@ impl<L, T: ?Sized, P, C> LifecycleReadyBuilder<L, T, P, C> {
     /// An executor sharing callbacks while producing an independent token for
     /// each invocation.
     #[inline]
-    pub fn build(self) -> LifecycleDoubleCheckedLockExecutor<L, T, P, C> {
+    pub fn build(self) -> LifecycleDoubleCheckedLockExecutor<P, C> {
         LifecycleDoubleCheckedLockExecutor::from_parts(
             self.core,
             self.prepare,

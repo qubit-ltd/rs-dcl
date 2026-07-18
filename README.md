@@ -9,11 +9,13 @@
 
 `qubit-dcl` packages the double-checked locking design pattern as reusable
 executors. A lock-free predicate first rejects unnecessary work without taking
-a lock. If it succeeds, the executor obtains a generic `qubit_lock::Lock<T>`,
-checks the same predicate again, and runs an arbitrary task inside that lock.
+a lock. If it succeeds, the executor obtains the generic `qubit_lock::Lock`
+passed to that call, checks the same predicate again, and runs an arbitrary
+task inside that lock.
 
-Version 0.10 is a deliberately breaking redesign. The protected `T` is an
-implementation detail of the lock and is never passed to the predicate or task.
+Version 0.11 is a deliberately breaking redesign. Executors retain the
+predicate and callbacks, while every `run` call supplies its lock. One executor
+can therefore coordinate through different lock implementations or instances.
 
 ## Concurrency contract
 
@@ -45,18 +47,18 @@ use std::{
 };
 
 use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
-use qubit_lock::ArcMutex;
+use parking_lot::Mutex;
 
-let lock = ArcMutex::new(());
+let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder(lock)
+let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
     })
     .build();
 
-let outcome = executor.run({
+let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
     move || {
         // The second check has succeeded and this task already holds the
@@ -82,24 +84,22 @@ use std::sync::{
 };
 
 use qubit_dcl::DoubleCheckedLockExecutor;
-use qubit_lock::{ArcMutex, Lock};
+use qubit_lock::Lock;
 
-let lock = ArcMutex::new(());
-let transition_lock = lock.clone();
+let lock = Arc::new(parking_lot::Mutex::new(()));
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder(lock)
+let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
     })
     .build();
 
-transition_lock.with_write({
-    let gate = Arc::clone(&gate);
-    move |_| gate.store(false, Ordering::Release)
-});
+let guard = Lock::lock(&lock);
+gate.store(false, Ordering::Release);
+drop(guard);
 
-let outcome = executor.run(|| Ok::<(), std::io::Error>(()));
+let outcome = executor.run(&lock, || Ok::<(), std::io::Error>(()));
 assert!(matches!(
     outcome,
     qubit_dcl::ExecutionOutcome::ConditionNotMet
@@ -127,10 +127,10 @@ use qubit_dcl::{
     PreparationOutcome,
     RollbackCause,
 };
-use qubit_lock::ArcMutex;
 
+let lock = std::sync::Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+let executor = LifecycleDoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -154,7 +154,7 @@ let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
     })
     .build();
 
-let report = executor.run_with_token(|token| {
+let report = executor.run_with_token(&lock, |token| {
     token.push("task");
     Ok::<usize, io::Error>(token.len())
 });
@@ -194,25 +194,26 @@ the original error during rollback while the report retains its owned value.
 
 Panic capture is disabled by default. With `.catch_panics(true)`, panic metadata
 includes the precise `PanicPhase` and original payload. The capture boundary is
-outside `Lock::with_write`, so a standard-library lock observes unwinding and is
-poisoned normally; parking-lot locks retain their normal non-poisoning behavior.
+outside the RAII guard's scope, so a standard-library lock observes unwinding
+and is poisoned normally; parking-lot locks retain their normal non-poisoning
+behavior.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-dcl = "0.10"
-qubit-lock = "0.10"
+qubit-dcl = "0.11"
+qubit-lock = "0.11"
 ```
 
-`qubit-dcl` does not re-export `Lock`, `ArcMutex`, or other externally owned
-types. Declare `qubit-lock` directly when using its API.
+`qubit-dcl` does not re-export `Lock` or lock primitives owned by other crates.
+Declare `qubit-lock` and the selected lock backend directly.
 
-## Migration from 0.9
+## Migration from 0.10
 
-Version 0.10 removes every compatibility wrapper, one-shot API, built-in logger,
-and task closure that receives protected `T`. See the
-[0.10 migration guide](doc/user_guide_migration_0_10.md) for the complete
+Version 0.11 moves locks from builder state to each executor call and adopts the
+data-independent `qubit_lock::Lock` trait. See the
+[0.11 migration guide](doc/user_guide_migration_0_11.md) for the complete
 mapping.
 
 ## Testing

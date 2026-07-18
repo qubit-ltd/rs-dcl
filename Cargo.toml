@@ -1,6 +1,6 @@
 [package]
 name = "qubit-dcl"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -32,11 +32,13 @@ name = "qubit_dcl"
 doctest = true
 
 [dependencies]
-qubit-lock = { version = "0.10.0", path = "../rs-lock" }
+qubit-function = { version = "0.16.0", path = "../rs-function" }
+qubit-lock = { version = "0.11.0", path = "../rs-lock" }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 loom = "0.7"
+parking_lot = "0.12"
 
 [[bench]]
 name = "dcl_bench"

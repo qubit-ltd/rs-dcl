@@ -9,11 +9,11 @@
 
 `qubit-dcl` 将双重检查锁（Double-Checked Locking）设计模式封装为可复用
 executor。无锁 predicate 首先排除不需要执行的任务；条件满足后，executor
-获取一个通用的 `qubit_lock::Lock<T>`，再次检查同一个 predicate，并在锁内
+获取本次调用传入的通用 `qubit_lock::Lock`，再次检查同一个 predicate，并在锁内
 执行任意 task。
 
-0.10 是一次有意进行的破坏性重设计。锁所保护的 `T` 只是实现细节，不会传给
-predicate 或 task。
+0.11 是一次有意进行的破坏性重设计。executor 只持有 predicate 和 callback，
+每次 `run` 单独传入锁，因此同一个 executor 可使用不同锁实现或锁实例。
 
 ## 并发契约
 
@@ -43,18 +43,18 @@ use std::{
 };
 
 use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
-use qubit_lock::ArcMutex;
+use parking_lot::Mutex;
 
-let lock = ArcMutex::new(());
+let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder(lock)
+let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
     })
     .build();
 
-let outcome = executor.run({
+let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
     move || {
         // 第二次检查已经成功，task 此时位于 executor 锁内，可以直接关闭
@@ -80,24 +80,22 @@ use std::sync::{
 };
 
 use qubit_dcl::DoubleCheckedLockExecutor;
-use qubit_lock::{ArcMutex, Lock};
+use qubit_lock::Lock;
 
-let lock = ArcMutex::new(());
-let transition_lock = lock.clone();
+let lock = Arc::new(parking_lot::Mutex::new(()));
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder(lock)
+let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
     })
     .build();
 
-transition_lock.with_write({
-    let gate = Arc::clone(&gate);
-    move |_| gate.store(false, Ordering::Release)
-});
+let guard = Lock::lock(&lock);
+gate.store(false, Ordering::Release);
+drop(guard);
 
-let outcome = executor.run(|| Ok::<(), std::io::Error>(()));
+let outcome = executor.run(&lock, || Ok::<(), std::io::Error>(()));
 assert!(matches!(
     outcome,
     qubit_dcl::ExecutionOutcome::ConditionNotMet
@@ -125,10 +123,10 @@ use qubit_dcl::{
     PreparationOutcome,
     RollbackCause,
 };
-use qubit_lock::ArcMutex;
 
+let lock = std::sync::Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+let executor = LifecycleDoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -152,7 +150,7 @@ let executor = LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
     })
     .build();
 
-let report = executor.run_with_token(|token| {
+let report = executor.run_with_token(&lock, |token| {
     token.push("task");
     Ok::<usize, io::Error>(token.len())
 });
@@ -188,25 +186,26 @@ panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error�
 仍然保留其所有权。
 
 默认不捕获 panic。启用 `.catch_panics(true)` 后，panic 信息包含准确的
-`PanicPhase` 和原始 payload。捕获边界位于 `Lock::with_write` 外，因此标准库锁会
-正常观察 unwind 并进入 poisoned 状态；parking-lot 锁则保持其不 poisoning 的
+`PanicPhase` 和原始 payload。捕获边界位于 RAII guard 的作用域外，因此标准库锁
+会正常观察 unwind 并进入 poisoned 状态；parking-lot 锁则保持其不 poisoning 的
 正常语义。
 
 ## 安装
 
 ```toml
 [dependencies]
-qubit-dcl = "0.10"
-qubit-lock = "0.10"
+qubit-dcl = "0.11"
+qubit-lock = "0.11"
 ```
 
-`qubit-dcl` 不再重导出 `Lock`、`ArcMutex` 或其他外部 crate 拥有的类型。使用
-`qubit-lock` API 时必须直接声明该依赖。
+`qubit-dcl` 不重导出 `Lock` 或其他 crate 拥有的锁原语。调用方必须直接声明
+`qubit-lock` 和所选锁后端依赖。
 
-## 从 0.9 迁移
+## 从 0.10 迁移
 
-0.10 删除全部兼容包装、one-shot API、内置 logger，以及接收受保护 `T` 的 task
-closure。完整映射参见 [0.10 迁移指南](doc/user_guide_migration_0_10.zh_CN.md)。
+0.11 将锁从 builder 状态移到每次 executor 调用，并采用与数据无关的
+`qubit_lock::Lock` trait。完整映射参见
+[0.11 迁移指南](doc/user_guide_migration_0_11.zh_CN.md)。
 
 ## 测试
 
