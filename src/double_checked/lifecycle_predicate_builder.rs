@@ -18,23 +18,23 @@ use crate::double_checked::{
 /// Builder stage that requires prepare before finalizer selection.
 #[doc(hidden)]
 #[must_use = "the predicate stage must be completed with prepare"]
-pub struct LifecyclePredicateBuilder<L, T: ?Sized> {
-    /// DCL configuration containing the lock and predicate.
-    core: DclCore<L, T>,
+pub struct LifecyclePredicateBuilder {
+    /// DCL predicate and panic configuration.
+    core: DclCore,
 }
 
-impl<L, T: ?Sized> LifecyclePredicateBuilder<L, T> {
+impl LifecyclePredicateBuilder {
     /// Creates the predicate-configured lifecycle stage.
     ///
     /// # Parameters
     ///
-    /// * `core` - Lock and predicate configuration.
+    /// * `core` - Predicate and panic configuration.
     ///
     /// # Returns
     ///
     /// A builder awaiting prepare.
     #[inline]
-    pub(crate) fn new(core: DclCore<L, T>) -> Self {
+    pub(crate) fn new(core: DclCore) -> Self {
         Self { core }
     }
 
@@ -89,7 +89,7 @@ impl<L, T: ?Sized> LifecyclePredicateBuilder<L, T> {
     pub fn prepare<P, C, F>(
         self,
         prepare: F,
-    ) -> LifecyclePrepareBuilder<L, T, P, C>
+    ) -> LifecyclePrepareBuilder<P, C>
     where
         F: Fn() -> Result<P, C> + Send + Sync + 'static,
     {

@@ -17,10 +17,8 @@
 //!
 //! ```compile_fail
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()));
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder();
 //! let _executor = builder.build();
 //! ```
 //!
@@ -28,10 +26,8 @@
 //!
 //! ```compile_fail
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
 //!         .when(|| true);
 //! let _executor = builder.build();
 //! ```
@@ -42,10 +38,8 @@
 //! use std::io;
 //!
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()));
 //! let _executor = builder.build();
@@ -57,10 +51,8 @@
 //! use std::io;
 //!
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()))
 //!         .commit(|_| Ok::<(), io::Error>(()));
@@ -73,10 +65,8 @@
 //! use std::io;
 //!
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()))
 //!         .no_commit();
@@ -89,10 +79,8 @@
 //! use std::io;
 //!
 //! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
-//! use qubit_lock::ArcMutex;
 //!
-//! let builder =
-//!     LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
 //!         .when(|| true);
 //! let _builder = builder.commit(|_| Ok::<(), io::Error>(()));
 //! ```

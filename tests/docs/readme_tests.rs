@@ -16,7 +16,8 @@ const README_ZH: &str = include_str!("../../README.zh_CN.md");
 #[test]
 fn test_readmes_document_final_public_api() {
     for readme in [README_EN, README_ZH] {
-        assert!(readme.contains("DoubleCheckedLockExecutor::builder(lock)"));
+        assert!(readme.contains("DoubleCheckedLockExecutor::builder()"));
+        assert!(readme.contains("executor.run(&lock"));
         assert!(readme.contains("LifecycleDoubleCheckedLockExecutor"));
         assert!(readme.contains("run_with_token"));
         assert!(readme.contains("no_commit"));
@@ -60,11 +61,11 @@ fn test_readme_dependency_versions_match_package_version() {
     }
 }
 
-/// Verifies each README links to its language-specific 0.10 migration guide.
+/// Verifies each README links to its language-specific 0.11 migration guide.
 #[test]
 fn test_readmes_link_migration_guides() {
-    assert!(README_EN.contains("doc/user_guide_migration_0_10.md"));
-    assert!(README_ZH.contains("doc/user_guide_migration_0_10.zh_CN.md"));
+    assert!(README_EN.contains("doc/user_guide_migration_0_11.md"));
+    assert!(README_ZH.contains("doc/user_guide_migration_0_11.zh_CN.md"));
 }
 
 /// Verifies the required final four H2 sections are the last H2 headings in

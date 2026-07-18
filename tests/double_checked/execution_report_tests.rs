@@ -14,20 +14,19 @@ use qubit_dcl::{
     LifecycleDoubleCheckedLockExecutor,
     PreparationOutcome,
 };
-use qubit_lock::ArcMutex;
 
 /// Verifies borrowed accessors expose both report axes without consuming them.
 #[test]
 fn test_execution_report_accessors_preserve_both_axes() {
     let executor =
-        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+        LifecycleDoubleCheckedLockExecutor::builder()
             .when(|| true)
             .prepare(|| Ok::<(), io::Error>(()))
             .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
             .no_rollback()
             .build();
 
-    let report = executor.run(|| Ok::<u32, io::Error>(42));
+    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(report.execution(), ExecutionOutcome::Success(42)));
     assert!(matches!(
@@ -40,14 +39,14 @@ fn test_execution_report_accessors_preserve_both_axes() {
 #[test]
 fn test_execution_report_into_parts_preserves_owned_errors() {
     let executor =
-        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+        LifecycleDoubleCheckedLockExecutor::builder()
             .when(|| true)
             .prepare(|| Ok::<(), io::Error>(()))
             .no_commit()
             .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
             .build();
 
-    let report = executor.run(|| Err::<(), _>(io::Error::other("task failed")));
+    let report = executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
     let (execution, preparation) = report.into_parts();
 
     match execution {

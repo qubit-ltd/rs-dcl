@@ -24,18 +24,18 @@ use qubit_dcl::{
     LifecycleDoubleCheckedLockExecutor,
     PreparationOutcome,
 };
-use qubit_lock::ArcMutex;
 
 /// Runs basic and lifecycle DCL examples using atomic gates.
 fn main() {
     let gate = Arc::new(AtomicBool::new(true));
-    let executor = DoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+    let lock = std::sync::Mutex::new(());
+    let executor = DoubleCheckedLockExecutor::builder()
         .when({
             let gate = Arc::clone(&gate);
             move || gate.load(Ordering::Acquire)
         })
         .build();
-    let outcome = executor.run({
+    let outcome = executor.run(&lock, {
         let gate = Arc::clone(&gate);
         move || {
             gate.store(false, Ordering::Release);
@@ -44,8 +44,9 @@ fn main() {
     });
     assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
+    let lifecycle_lock = parking_lot::Mutex::new(());
     let lifecycle_executor =
-        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+        LifecycleDoubleCheckedLockExecutor::builder()
             .when(|| true)
             .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
             .commit(|token| {
@@ -54,7 +55,7 @@ fn main() {
             })
             .rollback(|_, _| Ok::<(), io::Error>(()))
             .build();
-    let report = lifecycle_executor.run_with_token(|token| {
+    let report = lifecycle_executor.run_with_token(&lifecycle_lock, |token| {
         token.push("task");
         Ok::<usize, io::Error>(token.len())
     });

@@ -7,42 +7,27 @@
 // =============================================================================
 //! Initial builder stage for the lifecycle DCL executor.
 
-use std::{
-    marker::PhantomData,
-    sync::Arc,
-};
+use qubit_function::ArcTester;
 
 use crate::double_checked::{
     LifecyclePredicateBuilder,
     internal::DclCore,
 };
 
-/// Builder stage that owns a lock but cannot proceed without a predicate.
+/// Builder stage that cannot proceed without a predicate.
 #[doc(hidden)]
 #[must_use = "the builder must be completed with when and lifecycle stages"]
-pub struct LifecycleDoubleCheckedLockExecutorBuilder<L, T: ?Sized> {
-    /// Lock supplied by the caller.
-    lock: L,
-    /// Associates the builder with the lock's protected type.
-    marker: PhantomData<fn(&T)>,
-}
+pub struct LifecycleDoubleCheckedLockExecutorBuilder;
 
-impl<L, T: ?Sized> LifecycleDoubleCheckedLockExecutorBuilder<L, T> {
+impl LifecycleDoubleCheckedLockExecutorBuilder {
     /// Creates the initial lifecycle builder stage.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Lock used by the built executor.
     ///
     /// # Returns
     ///
     /// A builder requiring [`Self::when`].
     #[inline]
-    pub(crate) fn new(lock: L) -> Self {
-        Self {
-            lock,
-            marker: PhantomData,
-        }
+    pub(crate) fn new() -> Self {
+        Self
     }
 
     /// Sets the lock-free condition evaluated before and after locking.
@@ -75,13 +60,10 @@ impl<L, T: ?Sized> LifecycleDoubleCheckedLockExecutorBuilder<L, T> {
     /// `predicate` runs once without the executor lock and again while holding
     /// it. It must not acquire the same underlying lock itself.
     #[inline]
-    pub fn when<F>(self, predicate: F) -> LifecyclePredicateBuilder<L, T>
+    pub fn when<F>(self, predicate: F) -> LifecyclePredicateBuilder
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
-        LifecyclePredicateBuilder::new(DclCore::new(
-            self.lock,
-            Arc::new(predicate),
-        ))
+        LifecyclePredicateBuilder::new(DclCore::new(ArcTester::new(predicate)))
     }
 }

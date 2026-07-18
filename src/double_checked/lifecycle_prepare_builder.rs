@@ -20,19 +20,19 @@ use crate::double_checked::{
 /// Builder stage requiring a successful-path finalizer choice.
 #[doc(hidden)]
 #[must_use = "the prepare stage requires commit or no_commit"]
-pub struct LifecyclePrepareBuilder<L, T: ?Sized, P, C> {
-    /// DCL lock and predicate configuration.
-    core: DclCore<L, T>,
+pub struct LifecyclePrepareBuilder<P, C> {
+    /// DCL predicate and panic configuration.
+    core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
 }
 
-impl<L, T: ?Sized, P, C> LifecyclePrepareBuilder<L, T, P, C> {
+impl<P, C> LifecyclePrepareBuilder<P, C> {
     /// Creates the prepare-configured builder stage.
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL lock and predicate configuration.
+    /// * `core` - DCL predicate and panic configuration.
     /// * `prepare` - Erased prepare callback.
     ///
     /// # Returns
@@ -40,7 +40,7 @@ impl<L, T: ?Sized, P, C> LifecyclePrepareBuilder<L, T, P, C> {
     /// A builder requiring `commit` or `no_commit`.
     #[inline]
     pub(crate) fn new(
-        core: DclCore<L, T>,
+        core: DclCore,
         prepare: PrepareCallback<P, C>,
     ) -> Self {
         Self { core, prepare }
@@ -76,7 +76,7 @@ impl<L, T: ?Sized, P, C> LifecyclePrepareBuilder<L, T, P, C> {
     /// `commit` runs after the task and after the executor lock is released.
     /// It does not automatically reacquire that lock.
     #[inline]
-    pub fn commit<F>(self, commit: F) -> LifecycleCommitBuilder<L, T, P, C>
+    pub fn commit<F>(self, commit: F) -> LifecycleCommitBuilder<P, C>
     where
         F: Fn(P) -> Result<(), C> + Send + Sync + 'static,
     {
@@ -91,7 +91,7 @@ impl<L, T: ?Sized, P, C> LifecyclePrepareBuilder<L, T, P, C> {
     /// A builder that still requires rollback; the invalid no-commit plus
     /// no-rollback combination is not representable.
     #[inline]
-    pub fn no_commit(self) -> LifecycleRollbackBuilder<L, T, P, C> {
+    pub fn no_commit(self) -> LifecycleRollbackBuilder<P, C> {
         LifecycleRollbackBuilder::new(self.core, self.prepare)
     }
 }

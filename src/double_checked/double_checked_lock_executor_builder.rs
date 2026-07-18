@@ -7,42 +7,27 @@
 // =============================================================================
 //! Initial builder stage for the basic DCL executor.
 
-use std::{
-    marker::PhantomData,
-    sync::Arc,
-};
+use qubit_function::ArcTester;
 
 use crate::double_checked::{
     DoubleCheckedLockExecutorReadyBuilder,
     internal::DclCore,
 };
 
-/// Builder stage that owns a lock but cannot build until a predicate is set.
+/// Builder stage that cannot build until a predicate is set.
 #[doc(hidden)]
 #[must_use = "the builder must be completed with when and build"]
-pub struct DoubleCheckedLockExecutorBuilder<L, T: ?Sized> {
-    /// Lock supplied by the caller.
-    lock: L,
-    /// Associates the builder with the lock's protected type.
-    marker: PhantomData<fn(&T)>,
-}
+pub struct DoubleCheckedLockExecutorBuilder;
 
-impl<L, T: ?Sized> DoubleCheckedLockExecutorBuilder<L, T> {
+impl DoubleCheckedLockExecutorBuilder {
     /// Creates the initial builder stage.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Lock used by the built executor.
     ///
     /// # Returns
     ///
     /// A builder that requires [`Self::when`].
     #[inline]
-    pub(crate) fn new(lock: L) -> Self {
-        Self {
-            lock,
-            marker: PhantomData,
-        }
+    pub(crate) fn new() -> Self {
+        Self
     }
 
     /// Sets the lock-free condition evaluated before and after locking.
@@ -81,13 +66,12 @@ impl<L, T: ?Sized> DoubleCheckedLockExecutorBuilder<L, T> {
     pub fn when<F>(
         self,
         predicate: F,
-    ) -> DoubleCheckedLockExecutorReadyBuilder<L, T>
+    ) -> DoubleCheckedLockExecutorReadyBuilder
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
         DoubleCheckedLockExecutorReadyBuilder::new(DclCore::new(
-            self.lock,
-            Arc::new(predicate),
+            ArcTester::new(predicate),
         ))
     }
 }

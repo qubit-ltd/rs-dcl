@@ -15,35 +15,30 @@ use std::sync::{
     },
 };
 
-use qubit_lock::{
-    ArcMutex,
-    Lock,
-    TryLockError,
-};
+use parking_lot::Mutex;
+use qubit_lock::{Lock, TryLockError};
+
+use super::CountingGuard;
 
 /// Wraps a real parking-lot mutex and counts calls to the `Lock` API.
 #[derive(Clone)]
-pub struct CountingLock<T> {
+pub struct CountingLock {
     /// Real lock used to preserve production locking behavior.
-    inner: ArcMutex<T>,
+    inner: Arc<Mutex<()>>,
     /// Shared acquisition-method invocation counter.
     calls: Arc<AtomicUsize>,
 }
 
-impl<T> CountingLock<T> {
-    /// Creates a counting lock protecting `value`.
-    ///
-    /// # Parameters
-    ///
-    /// * `value` - Initial protected value.
+impl CountingLock {
+    /// Creates a counting lock.
     ///
     /// # Returns
     ///
     /// A lock with a zeroed call counter.
     #[inline]
-    pub fn new(value: T) -> Self {
+    pub fn new() -> Self {
         Self {
-            inner: ArcMutex::new(value),
+            inner: Arc::new(Mutex::new(())),
             calls: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -65,44 +60,22 @@ impl<T> CountingLock<T> {
     }
 }
 
-impl<T> Lock<T> for CountingLock<T> {
-    /// Records and delegates a read operation.
+impl Lock for CountingLock {
+    type Guard<'a> = CountingGuard<'a>;
+
+    /// Records and delegates blocking acquisition.
     #[inline(always)]
-    fn with_read<R, F>(&self, operation: F) -> R
-    where
-        F: FnOnce(&T) -> R,
-    {
+    fn lock(&self) -> Self::Guard<'_> {
         self.record_call();
-        self.inner.with_read(operation)
+        CountingGuard::new(self.inner.lock())
     }
 
-    /// Records and delegates a write operation.
+    /// Records and delegates immediate acquisition.
     #[inline(always)]
-    fn with_write<R, F>(&self, operation: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
+    fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         self.record_call();
-        self.inner.with_write(operation)
-    }
-
-    /// Records and delegates a non-blocking read operation.
-    #[inline(always)]
-    fn try_with_read<R, F>(&self, operation: F) -> Result<R, TryLockError>
-    where
-        F: FnOnce(&T) -> R,
-    {
-        self.record_call();
-        self.inner.try_with_read(operation)
-    }
-
-    /// Records and delegates a non-blocking write operation.
-    #[inline(always)]
-    fn try_with_write<R, F>(&self, operation: F) -> Result<R, TryLockError>
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.record_call();
-        self.inner.try_with_write(operation)
+        Mutex::try_lock(self.inner.as_ref())
+            .map(CountingGuard::new)
+            .ok_or(TryLockError::WouldBlock)
     }
 }

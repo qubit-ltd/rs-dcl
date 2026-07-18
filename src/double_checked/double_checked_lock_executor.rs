@@ -18,66 +18,50 @@ use crate::double_checked::{
 /// Executes arbitrary tasks using the double-checked locking pattern.
 ///
 /// The first predicate call is lock-free. If it succeeds, the executor obtains
-/// a write lock, evaluates the same predicate again, and runs the task while
-/// still holding that lock. The protected `T` is deliberately not exposed to
-/// either the predicate or task.
+/// the supplied lock, evaluates the same predicate again, and runs the task
+/// while still holding that lock. The lock's protected data is deliberately
+/// not exposed to either the predicate or task.
 #[must_use = "an executor does nothing until run is called"]
-pub struct DoubleCheckedLockExecutor<L, T: ?Sized> {
-    /// Shared lock, predicate, and panic configuration.
-    core: DclCore<L, T>,
+pub struct DoubleCheckedLockExecutor {
+    /// Shared predicate and panic configuration.
+    core: DclCore,
 }
 
-impl DoubleCheckedLockExecutor<(), ()> {
-    /// Starts building an executor around `lock`.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Generic synchronous lock used for the protected phase.
+impl DoubleCheckedLockExecutor {
+    /// Starts building an executor.
     ///
     /// # Returns
     ///
     /// A typestate builder that requires a predicate before it can build.
     #[inline]
-    pub fn builder<L, T: ?Sized>(
-        lock: L,
-    ) -> DoubleCheckedLockExecutorBuilder<L, T>
-    where
-        L: Lock<T>,
-    {
-        DoubleCheckedLockExecutorBuilder::new(lock)
+    pub fn builder() -> DoubleCheckedLockExecutorBuilder {
+        DoubleCheckedLockExecutorBuilder::new()
     }
-}
 
-impl<L, T: ?Sized> DoubleCheckedLockExecutor<L, T> {
     /// Creates a built executor from its configured core.
     ///
     /// # Parameters
     ///
-    /// * `core` - Complete lock and predicate configuration.
+    /// * `core` - Complete predicate and panic configuration.
     ///
     /// # Returns
     ///
     /// A reusable executor.
     #[inline]
-    pub(crate) fn from_core(core: DclCore<L, T>) -> Self {
+    pub(crate) fn from_core(core: DclCore) -> Self {
         Self { core }
     }
-}
-
-impl<L, T: ?Sized> DoubleCheckedLockExecutor<L, T>
-where
-    L: Lock<T>,
-{
     /// Runs `task` only when both condition checks succeed.
     ///
     /// The first condition check performs no lock operation. The second check
-    /// and task run inside one `with_write` call. A task that needs to change
+    /// and task run under one RAII guard. A task that needs to change
     /// the gate may safely do so through captured atomic state because it is
     /// already inside the executor's critical section. Gate changes made after
     /// the task or on other system paths must acquire the same underlying lock.
     ///
     /// # Parameters
     ///
+    /// * `lock` - Generic synchronous lock used for this invocation.
     /// * `task` - One-shot task executed inside the lock after the second
     ///   check.
     ///
@@ -109,8 +93,9 @@ where
     /// acquire the same underlying lock. A task may update its captured gate
     /// directly; later or external gate updates that must exclude the task must
     /// acquire that same underlying lock.
-    pub fn run<R, E, F>(&self, task: F) -> ExecutionOutcome<R, E>
+    pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionOutcome<R, E>
     where
+        L: Lock + ?Sized,
         F: FnOnce() -> Result<R, E>,
     {
         if self.core.catch_panics() {
@@ -119,7 +104,7 @@ where
                 Ok(false) => return ExecutionOutcome::ConditionNotMet,
                 Err(panic) => return ExecutionOutcome::Panicked(panic),
             }
-            match self.core.execute_locked_catching(task) {
+            match self.core.execute_locked_catching(lock, task) {
                 Ok(locked) => locked.into_outcome(),
                 Err(panic) => ExecutionOutcome::Panicked(panic),
             }
@@ -127,16 +112,13 @@ where
             if !self.core.check_initial() {
                 return ExecutionOutcome::ConditionNotMet;
             }
-            self.core.execute_locked(task).into_outcome()
+            self.core.execute_locked(lock, task).into_outcome()
         }
     }
 }
 
-impl<L, T: ?Sized> Clone for DoubleCheckedLockExecutor<L, T>
-where
-    L: Clone,
-{
-    /// Clones the lock handle and shares the predicate configuration.
+impl Clone for DoubleCheckedLockExecutor {
+    /// Shares the predicate configuration.
     #[inline]
     fn clone(&self) -> Self {
         Self {
