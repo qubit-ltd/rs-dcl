@@ -106,7 +106,7 @@ impl DclCore {
     pub(crate) fn check_initial_catching(&self) -> Result<bool, PanicInfo> {
         catch_phase(PanicPhase::InitialConditionCheck, || self.check_initial())
     }
-    
+
     /// Acquires the lock, checks the condition again, and optionally runs
     /// the task without catching panics.
     ///

@@ -86,10 +86,7 @@ impl LifecyclePredicateBuilder {
     /// must manage any separate locks it needs and must not assume the executor
     /// lock is held.
     #[inline]
-    pub fn prepare<P, C, F>(
-        self,
-        prepare: F,
-    ) -> LifecyclePrepareBuilder<P, C>
+    pub fn prepare<P, C, F>(self, prepare: F) -> LifecyclePrepareBuilder<P, C>
     where
         F: Fn() -> Result<P, C> + Send + Sync + 'static,
     {

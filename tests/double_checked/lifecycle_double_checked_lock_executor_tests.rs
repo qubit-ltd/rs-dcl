@@ -26,6 +26,7 @@ use std::{
     thread,
 };
 
+use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::{
     ExecutionOutcome,
     LifecycleDoubleCheckedLockExecutor,
@@ -33,7 +34,6 @@ use qubit_dcl::{
     PreparationOutcome,
     RollbackCause,
 };
-use parking_lot::Mutex as ParkingLotMutex;
 
 use crate::support::PanicOnDrop;
 
@@ -43,33 +43,33 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
     let commit_calls = Arc::new(AtomicUsize::new(0));
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| false)
-            .prepare({
-                let prepare_calls = Arc::clone(&prepare_calls);
-                move || {
-                    prepare_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .commit({
-                let commit_calls = Arc::clone(&commit_calls);
-                move |_| {
-                    commit_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .rollback({
-                let rollback_calls = Arc::clone(&rollback_calls);
-                move |_, _| {
-                    rollback_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .prepare({
+            let prepare_calls = Arc::clone(&prepare_calls);
+            move || {
+                prepare_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .commit({
+            let commit_calls = Arc::clone(&commit_calls);
+            move |_| {
+                commit_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .rollback({
+            let rollback_calls = Arc::clone(&rollback_calls);
+            move |_, _| {
+                rollback_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         report.execution(),
@@ -88,21 +88,21 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
 #[test]
 fn test_run_prepare_error_does_not_rollback_without_token() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Err::<u32, _>(io::Error::other("prepare failed")))
-            .no_commit()
-            .rollback({
-                let rollback_calls = Arc::clone(&rollback_calls);
-                move |_, _| {
-                    rollback_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Err::<u32, _>(io::Error::other("prepare failed")))
+        .no_commit()
+        .rollback({
+            let rollback_calls = Arc::clone(&rollback_calls);
+            move |_, _| {
+                rollback_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(report.execution(), ExecutionOutcome::NotExecuted));
     match report.preparation() {
@@ -118,22 +118,22 @@ fn test_run_prepare_error_does_not_rollback_without_token() {
 #[test]
 fn test_run_captures_initial_predicate_panic_before_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| panic!("initial predicate panic"))
-            .catch_panics(true)
-            .prepare({
-                let prepare_calls = Arc::clone(&prepare_calls);
-                move || {
-                    prepare_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .no_commit()
-            .rollback(|_, _| Ok::<(), io::Error>(()))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| panic!("initial predicate panic"))
+        .catch_panics(true)
+        .prepare({
+            let prepare_calls = Arc::clone(&prepare_calls);
+            move || {
+                prepare_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         report.execution(),
@@ -152,22 +152,22 @@ fn test_run_captures_initial_predicate_panic_before_prepare() {
 #[test]
 fn test_run_captures_prepare_panic_without_rollback() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
-            .no_commit()
-            .rollback({
-                let rollback_calls = Arc::clone(&rollback_calls);
-                move |_, _| {
-                    rollback_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
+        .no_commit()
+        .rollback({
+            let rollback_calls = Arc::clone(&rollback_calls);
+            move |_, _| {
+                rollback_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(report.execution(), ExecutionOutcome::NotExecuted));
     assert!(matches!(
@@ -182,22 +182,22 @@ fn test_run_captures_prepare_panic_without_rollback() {
 #[test]
 fn test_run_catching_initial_false_does_not_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| false)
-            .catch_panics(true)
-            .prepare({
-                let prepare_calls = Arc::clone(&prepare_calls);
-                move || {
-                    prepare_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .no_commit()
-            .rollback(|_, _| Ok::<(), io::Error>(()))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .catch_panics(true)
+        .prepare({
+            let prepare_calls = Arc::clone(&prepare_calls);
+            move || {
+                prepare_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         report.execution(),
@@ -213,16 +213,16 @@ fn test_run_catching_initial_false_does_not_prepare() {
 /// Verifies the capturing state machine retains a returned prepare error.
 #[test]
 fn test_run_catching_prepare_error_preserves_lifecycle_error() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Err::<(), _>(io::Error::other("prepare failed")))
-            .no_commit()
-            .rollback(|_, _| Ok::<(), io::Error>(()))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Err::<(), _>(io::Error::other("prepare failed")))
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(report.execution(), ExecutionOutcome::NotExecuted));
     assert!(matches!(
@@ -259,10 +259,8 @@ fn test_run_second_false_rolls_back_after_unlock() {
                     matches!(cause, RollbackCause::ConditionNotMet),
                     Ordering::Relaxed,
                 );
-                rollback_obtained_lock.store(
-                    lock.try_lock().is_some(),
-                    Ordering::Relaxed,
-                );
+                rollback_obtained_lock
+                    .store(lock.try_lock().is_some(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
@@ -289,36 +287,37 @@ fn test_run_second_false_rolls_back_after_unlock() {
 fn test_run_captures_second_predicate_panic_then_rolls_back() {
     let checks = Arc::new(AtomicUsize::new(0));
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when({
-                let checks = Arc::clone(&checks);
-                move || {
-                    if checks.fetch_add(1, Ordering::Relaxed) == 0 {
-                        true
-                    } else {
-                        panic!("second predicate panic")
-                    }
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when({
+            let checks = Arc::clone(&checks);
+            move || {
+                if checks.fetch_add(1, Ordering::Relaxed) == 0 {
+                    true
+                } else {
+                    panic!("second predicate panic")
                 }
-            })
-            .catch_panics(true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback({
-                let rollback_phase = Arc::clone(&rollback_phase);
-                move |_, cause| {
-                    let RollbackCause::Panicked(panic) = cause else {
-                        panic!("expected panic rollback cause");
-                    };
-                    *rollback_phase.lock().expect(
-                        "rollback phase mutex should not be poisoned",
-                    ) = Some(panic.phase());
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+            }
+        })
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback({
+            let rollback_phase = Arc::clone(&rollback_phase);
+            move |_, cause| {
+                let RollbackCause::Panicked(panic) = cause else {
+                    panic!("expected panic rollback cause");
+                };
+                *rollback_phase
+                    .lock()
+                    .expect("rollback phase mutex should not be poisoned") =
+                    Some(panic.phase());
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         report.execution(),
@@ -405,10 +404,8 @@ fn test_run_success_commits_after_unlock() {
             let commit_obtained_lock = Arc::clone(&commit_obtained_lock);
             move |token| {
                 committed_token.store(token, Ordering::Relaxed);
-                commit_obtained_lock.store(
-                    lock.try_lock().is_some(),
-                    Ordering::Relaxed,
-                );
+                commit_obtained_lock
+                    .store(lock.try_lock().is_some(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
@@ -431,29 +428,31 @@ fn test_run_success_commits_after_unlock() {
 #[test]
 fn test_run_task_error_rolls_back_with_original_error_view() {
     let rollback_message = Arc::new(Mutex::new(None));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback({
-                let rollback_message = Arc::clone(&rollback_message);
-                move |_, cause| {
-                    let RollbackCause::TaskFailed(error) = cause else {
-                        panic!("expected task failure cause");
-                    };
-                    let error = error
-                        .downcast_ref::<io::Error>()
-                        .expect("rollback should see the original io::Error");
-                    *rollback_message.lock().expect(
-                        "rollback message mutex should not be poisoned",
-                    ) = Some(error.to_string());
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback({
+            let rollback_message = Arc::clone(&rollback_message);
+            move |_, cause| {
+                let RollbackCause::TaskFailed(error) = cause else {
+                    panic!("expected task failure cause");
+                };
+                let error = error
+                    .downcast_ref::<io::Error>()
+                    .expect("rollback should see the original io::Error");
+                *rollback_message
+                    .lock()
+                    .expect("rollback message mutex should not be poisoned") =
+                    Some(error.to_string());
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+    let report = executor.run(&parking_lot::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
 
     match report.execution() {
         ExecutionOutcome::TaskFailed(error) => {
@@ -478,26 +477,27 @@ fn test_run_task_error_rolls_back_with_original_error_view() {
 #[test]
 fn test_run_with_token_commits_task_updates() {
     let committed_token = Arc::new(Mutex::new(None));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
-            .commit({
-                let committed_token = Arc::clone(&committed_token);
-                move |token| {
-                    *committed_token.lock().expect(
-                        "committed token mutex should not be poisoned",
-                    ) = Some(token);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
+        .commit({
+            let committed_token = Arc::clone(&committed_token);
+            move |token| {
+                *committed_token
+                    .lock()
+                    .expect("committed token mutex should not be poisoned") =
+                    Some(token);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .no_rollback()
+        .build();
 
-    let report = executor.run_with_token(&parking_lot::Mutex::new(()), |token| {
-        token.push("task");
-        Ok::<usize, io::Error>(token.len())
-    });
+    let report =
+        executor.run_with_token(&parking_lot::Mutex::new(()), |token| {
+            token.push("task");
+            Ok::<usize, io::Error>(token.len())
+        });
 
     assert!(matches!(report.execution(), ExecutionOutcome::Success(2)));
     assert_eq!(
@@ -512,15 +512,15 @@ fn test_run_with_token_commits_task_updates() {
 /// Verifies commit failure does not overwrite task success.
 #[test]
 fn test_run_commit_failure_preserves_success() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
+        .no_rollback()
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(report.execution(), ExecutionOutcome::Success(42)));
     match report.preparation() {
@@ -535,16 +535,16 @@ fn test_run_commit_failure_preserves_success() {
 /// task success remains intact.
 #[test]
 fn test_run_captures_commit_panic_without_overwriting_success() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
+        .no_rollback()
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(report.execution(), ExecutionOutcome::Success(42)));
     assert!(matches!(
@@ -558,16 +558,17 @@ fn test_run_captures_commit_panic_without_overwriting_success() {
 /// rollback errors.
 #[test]
 fn test_run_catching_task_and_rollback_errors_preserves_both() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+    let report = executor.run(&parking_lot::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
 
     assert!(matches!(
         report.execution(),
@@ -586,24 +587,24 @@ fn test_run_catching_task_and_rollback_errors_preserves_both() {
 #[test]
 fn test_clone_shares_lifecycle_callbacks() {
     let commit_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Ok::<u32, io::Error>(17))
-            .commit({
-                let commit_calls = Arc::clone(&commit_calls);
-                move |token| {
-                    assert_eq!(token, 17);
-                    commit_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<u32, io::Error>(17))
+        .commit({
+            let commit_calls = Arc::clone(&commit_calls);
+            move |token| {
+                assert_eq!(token, 17);
+                commit_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .no_rollback()
+        .build();
     let cloned = executor.clone();
 
-    let report = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let report =
+        cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(report.execution(), ExecutionOutcome::Success(42)));
     assert!(matches!(
@@ -616,15 +617,16 @@ fn test_clone_shares_lifecycle_callbacks() {
 /// Verifies rollback failure does not overwrite the original task error.
 #[test]
 fn test_run_rollback_failure_preserves_task_error() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
+        .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+    let report = executor.run(&parking_lot::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
 
     assert!(matches!(
         report.execution(),
@@ -640,25 +642,25 @@ fn test_run_rollback_failure_preserves_task_error() {
 #[test]
 fn test_run_captured_task_panic_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback({
-                let rollback_phase = Arc::clone(&rollback_phase);
-                move |_, cause| {
-                    let RollbackCause::Panicked(panic) = cause else {
-                        panic!("expected panic rollback cause");
-                    };
-                    *rollback_phase.lock().expect(
-                        "rollback phase mutex should not be poisoned",
-                    ) = Some(panic.phase());
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback({
+            let rollback_phase = Arc::clone(&rollback_phase);
+            move |_, cause| {
+                let RollbackCause::Panicked(panic) = cause else {
+                    panic!("expected panic rollback cause");
+                };
+                *rollback_phase
+                    .lock()
+                    .expect("rollback phase mutex should not be poisoned") =
+                    Some(panic.phase());
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
     let report: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
         executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
@@ -682,14 +684,13 @@ fn test_run_captured_task_panic_rolls_back() {
 /// Verifies a rollback panic is retained independently from the task panic.
 #[test]
 fn test_run_captured_task_and_rollback_panics_preserves_both() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| panic!("rollback panic"))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| panic!("rollback panic"))
+        .build();
 
     let report: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
         executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
@@ -710,24 +711,25 @@ fn test_run_captured_task_and_rollback_panics_preserves_both() {
 #[test]
 fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(false)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback({
-                let rollback_calls = Arc::clone(&rollback_calls);
-                move |_, _| {
-                    rollback_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback({
+            let rollback_calls = Arc::clone(&rollback_calls);
+            move |_, _| {
+                rollback_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -739,20 +741,21 @@ fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
 /// when panic capture is disabled.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_error() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(false)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| {
-                Err::<(), _>(io::Error::other("secondary rollback error"))
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| {
+            Err::<(), _>(io::Error::other("secondary rollback error"))
+        })
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -763,20 +766,21 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
 /// phase panic when panic capture is disabled.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(false)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| -> Result<(), io::Error> {
-                panic!("secondary rollback panic")
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| -> Result<(), io::Error> {
+            panic!("secondary rollback panic")
+        })
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -787,22 +791,22 @@ fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
 #[test]
 fn test_run_uncaptured_initial_predicate_panic_propagates() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| panic!("initial predicate panic"))
-            .prepare({
-                let prepare_calls = Arc::clone(&prepare_calls);
-                move || {
-                    prepare_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .no_commit()
-            .rollback(|_, _| Ok::<(), io::Error>(()))
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| panic!("initial predicate panic"))
+        .prepare({
+            let prepare_calls = Arc::clone(&prepare_calls);
+            move || {
+                prepare_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor
+            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
     let payload =
@@ -819,22 +823,22 @@ fn test_run_uncaptured_initial_predicate_panic_propagates() {
 #[test]
 fn test_run_uncaptured_prepare_panic_propagates_without_rollback() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
-            .no_commit()
-            .rollback({
-                let rollback_calls = Arc::clone(&rollback_calls);
-                move |_, _| {
-                    rollback_calls.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), io::Error>(())
-                }
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
+        .no_commit()
+        .rollback({
+            let rollback_calls = Arc::clone(&rollback_calls);
+            move |_, _| {
+                rollback_calls.fetch_add(1, Ordering::Relaxed);
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor
+            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
     let payload = panic_result.expect_err("prepare panic should propagate");
@@ -846,16 +850,16 @@ fn test_run_uncaptured_prepare_panic_propagates_without_rollback() {
 /// lock release.
 #[test]
 fn test_run_uncaptured_commit_panic_propagates() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
+        .no_rollback()
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor
+            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
     let payload = panic_result.expect_err("commit panic should propagate");
@@ -866,19 +870,17 @@ fn test_run_uncaptured_commit_panic_propagates() {
 /// locked-phase panic exists.
 #[test]
 fn test_run_uncaptured_ordinary_rollback_panic_propagates() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .no_commit()
-            .rollback(|_, _| -> Result<(), io::Error> {
-                panic!("rollback panic")
-            })
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| -> Result<(), io::Error> { panic!("rollback panic") })
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report =
-            executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+        let _report = executor.run(&parking_lot::Mutex::new(()), || {
+            Err::<(), _>(io::Error::other("task failed"))
+        });
     }));
 
     let payload = panic_result.expect_err("rollback panic should propagate");
@@ -889,17 +891,18 @@ fn test_run_uncaptured_ordinary_rollback_panic_propagates() {
 /// panic after consuming its token.
 #[test]
 fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<(), io::Error>(()))
-            .commit(|_| Ok::<(), io::Error>(()))
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -910,18 +913,19 @@ fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
 /// panic when no rollback callback is configured.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
-    let executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .catch_panics(false)
-            .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
-            .commit(|_| Ok::<(), io::Error>(()))
-            .no_rollback()
-            .build();
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");

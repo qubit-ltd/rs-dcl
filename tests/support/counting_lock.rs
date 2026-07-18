@@ -16,7 +16,10 @@ use std::sync::{
 };
 
 use parking_lot::Mutex;
-use qubit_lock::{Lock, TryLockError};
+use qubit_lock::{
+    Lock,
+    TryLockError,
+};
 
 use super::CountingGuard;
 

@@ -45,16 +45,15 @@ fn main() {
     assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
     let lifecycle_lock = parking_lot::Mutex::new(());
-    let lifecycle_executor =
-        LifecycleDoubleCheckedLockExecutor::builder()
-            .when(|| true)
-            .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
-            .commit(|token| {
-                assert_eq!(token, ["prepare", "task"]);
-                Ok::<(), io::Error>(())
-            })
-            .rollback(|_, _| Ok::<(), io::Error>(()))
-            .build();
+    let lifecycle_executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
+        .commit(|token| {
+            assert_eq!(token, ["prepare", "task"]);
+            Ok::<(), io::Error>(())
+        })
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
     let report = lifecycle_executor.run_with_token(&lifecycle_lock, |token| {
         token.push("task");
         Ok::<usize, io::Error>(token.len())

@@ -107,9 +107,8 @@ where
 fn test_loom_initial_false_has_zero_lock_calls() {
     model(|| {
         let lock = LoomLock::new(());
-        let executor = DoubleCheckedLockExecutor::builder()
-            .when(|| false)
-            .build();
+        let executor =
+            DoubleCheckedLockExecutor::builder().when(|| false).build();
 
         let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
 
