@@ -8,5 +8,7 @@
 //! Shared integration-test support.
 
 mod counting_lock;
+mod panic_on_drop;
 
 pub use counting_lock::CountingLock;
+pub use panic_on_drop::PanicOnDrop;

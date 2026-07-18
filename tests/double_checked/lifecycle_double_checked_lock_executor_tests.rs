@@ -39,6 +39,8 @@ use qubit_lock::{
     Lock,
 };
 
+use crate::support::PanicOnDrop;
+
 /// Verifies a failed initial check bypasses every lifecycle callback and lock.
 #[test]
 fn test_run_initial_false_does_not_prepare_or_finalize() {
@@ -892,6 +894,28 @@ fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
         LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
             .when(|| true)
             .prepare(|| Ok::<(), io::Error>(()))
+            .commit(|_| Ok::<(), io::Error>(()))
+            .no_rollback()
+            .build();
+
+    let panic_result = catch_unwind(AssertUnwindSafe(|| {
+        let _: qubit_dcl::ExecutionReport<(), io::Error, io::Error> =
+            executor.run(|| panic!("original task panic"));
+    }));
+
+    let payload = panic_result.expect_err("task panic should resume unwinding");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"original task panic"));
+}
+
+/// Verifies a token destructor panic cannot replace the original locked-phase
+/// panic when no rollback callback is configured.
+#[test]
+fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
+    let executor =
+        LifecycleDoubleCheckedLockExecutor::builder(ArcMutex::new(()))
+            .when(|| true)
+            .catch_panics(false)
+            .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
             .commit(|_| Ok::<(), io::Error>(()))
             .no_rollback()
             .build();
