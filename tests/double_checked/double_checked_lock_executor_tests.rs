@@ -22,21 +22,19 @@ use std::{
     },
 };
 
+use crate::support::CountingLock;
 use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
     PanicPhase,
 };
-use crate::support::CountingLock;
 
 /// Verifies the fast failure path performs no lock operation.
 #[test]
 fn test_run_initial_false_skips_lock_and_task() {
     let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder()
-        .when(|| false)
-        .build();
+    let executor = DoubleCheckedLockExecutor::builder().when(|| false).build();
 
     let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
@@ -104,12 +102,11 @@ fn test_run_two_true_checks_preserves_success() {
 /// Verifies a task error remains owned and unchanged.
 #[test]
 fn test_run_preserves_task_error() {
-    let executor = DoubleCheckedLockExecutor::builder()
-        .when(|| true)
-        .build();
+    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
 
-    let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
 
     match outcome {
         ExecutionOutcome::TaskFailed(error) => {
@@ -127,7 +124,8 @@ fn test_run_captures_initial_condition_panic() {
         .catch_panics(true)
         .build();
 
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -156,7 +154,8 @@ fn test_run_captures_second_condition_panic() {
         .catch_panics(true)
         .build();
 
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
         ExecutionOutcome::Panicked(panic) => {
@@ -267,8 +266,10 @@ fn test_run_propagates_task_panic_when_capture_is_disabled() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: ExecutionOutcome<(), io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("uncaught task panic"));
+        let _: ExecutionOutcome<(), io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("uncaught task panic")
+            });
     }));
 
     assert!(panic_result.is_err());
@@ -277,12 +278,11 @@ fn test_run_propagates_task_panic_when_capture_is_disabled() {
 /// Verifies a built executor can be cloned independently of lock ownership.
 #[test]
 fn test_clone_shares_configuration_without_owning_lock() {
-    let executor = DoubleCheckedLockExecutor::builder()
-        .when(|| true)
-        .build();
+    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
     let cloned = executor.clone();
 
-    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome =
+        cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }

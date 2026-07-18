@@ -141,11 +141,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// executor lock. The second check and task share one write-lock critical
     /// section. Lifecycle callbacks do not automatically reacquire that lock.
     #[inline(always)]
-    pub fn run<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> ExecutionReport<R, E, C>
+    pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionReport<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -260,10 +256,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
                 }
             };
 
-        match self
-            .core
-            .execute_locked_catching(lock, || task(&mut token))
-        {
+        match self.core.execute_locked_catching(lock, || task(&mut token)) {
             Ok(LockedExecution::ConditionNotMet) => {
                 self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
             }
@@ -321,10 +314,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
             }
         };
 
-        match self
-            .core
-            .execute_locked_catching(lock, || task(&mut token))
-        {
+        match self.core.execute_locked_catching(lock, || task(&mut token)) {
             Ok(LockedExecution::ConditionNotMet) => {
                 self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
             }

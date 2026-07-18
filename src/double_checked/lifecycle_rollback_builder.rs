@@ -38,10 +38,7 @@ impl<P, C> LifecycleRollbackBuilder<P, C> {
     ///
     /// A builder requiring rollback.
     #[inline]
-    pub(crate) fn new(
-        core: DclCore,
-        prepare: PrepareCallback<P, C>,
-    ) -> Self {
+    pub(crate) fn new(core: DclCore, prepare: PrepareCallback<P, C>) -> Self {
         Self { core, prepare }
     }
 

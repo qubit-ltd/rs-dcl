@@ -1,0 +1,34 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Tests for the lifecycle predicate builder stage.
+
+use std::io;
+
+use qubit_dcl::{
+    LifecycleDoubleCheckedLockExecutor,
+    PreparationOutcome,
+};
+
+/// Verifies the predicate stage accepts panic configuration and preparation.
+#[test]
+fn test_predicate_builder_configures_prepare() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Err::<(), _>(io::Error::other("prepare")))
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::PrepareFailed(_)
+    ));
+}

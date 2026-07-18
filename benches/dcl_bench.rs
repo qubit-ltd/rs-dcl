@@ -84,8 +84,7 @@ fn benchmark_submission_backend<L>(
     group: &mut BenchmarkGroup<'_, WallTime>,
     backend: &str,
     lock: &L,
-)
-where
+) where
     L: Lock + ?Sized,
 {
     let state = Arc::new(AtomicU8::new(RUNNING));
@@ -96,9 +95,7 @@ where
         .build();
 
     group.bench_function(format!("{backend}/running/lock_first"), |bencher| {
-        bencher.iter(|| {
-            black_box(submit_lock_first(&state, lock, &submitted))
-        });
+        bencher.iter(|| black_box(submit_lock_first(&state, lock, &submitted)));
     });
     group.bench_function(
         format!("{backend}/running/handwritten_dcl"),
@@ -118,11 +115,14 @@ where
     });
 
     state.store(SHUT_DOWN, Ordering::Release);
-    group.bench_function(format!("{backend}/shut_down/lock_first"), |bencher| {
-        bencher.iter(|| {
-            black_box(submit_lock_first(&state, lock, &submitted))
-        });
-    });
+    group.bench_function(
+        format!("{backend}/shut_down/lock_first"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_lock_first(&state, lock, &submitted))
+            });
+        },
+    );
     group.bench_function(
         format!("{backend}/shut_down/handwritten_dcl"),
         |bencher| {

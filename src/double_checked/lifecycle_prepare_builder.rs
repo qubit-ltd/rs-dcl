@@ -39,10 +39,7 @@ impl<P, C> LifecyclePrepareBuilder<P, C> {
     ///
     /// A builder requiring `commit` or `no_commit`.
     #[inline]
-    pub(crate) fn new(
-        core: DclCore,
-        prepare: PrepareCallback<P, C>,
-    ) -> Self {
+    pub(crate) fn new(core: DclCore, prepare: PrepareCallback<P, C>) -> Self {
         Self { core, prepare }
     }
 

@@ -63,10 +63,7 @@ impl DoubleCheckedLockExecutorBuilder {
     /// `predicate` runs once without the executor lock and again while holding
     /// it. It must not acquire the same underlying lock itself.
     #[inline]
-    pub fn when<F>(
-        self,
-        predicate: F,
-    ) -> DoubleCheckedLockExecutorReadyBuilder
+    pub fn when<F>(self, predicate: F) -> DoubleCheckedLockExecutorReadyBuilder
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
