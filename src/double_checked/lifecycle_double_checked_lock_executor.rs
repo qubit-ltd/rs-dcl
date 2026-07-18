@@ -451,8 +451,9 @@ where
     /// Attempts rollback after a locked-phase panic and then resumes the
     /// original unwind payload.
     ///
-    /// Secondary rollback errors or panics are intentionally discarded so
-    /// they cannot replace the original panic when capture is disabled.
+    /// Secondary rollback errors, rollback panics, or token destructor panics
+    /// are intentionally discarded so they cannot replace the original panic
+    /// when capture is disabled.
     ///
     /// # Parameters
     ///
@@ -468,7 +469,7 @@ where
                 rollback(token, RollbackCause::Panicked(&panic))
             }));
         } else {
-            drop(token);
+            let _secondary = catch_unwind(AssertUnwindSafe(|| drop(token)));
         }
         resume_unwind(panic.into_payload())
     }
