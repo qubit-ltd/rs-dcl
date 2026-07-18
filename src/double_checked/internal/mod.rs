@@ -5,13 +5,12 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-mod builder_typestate_tests;
-mod concurrency_tests;
-mod double_checked_lock_executor_tests;
-mod execution_outcome_tests;
-mod execution_report_tests;
-mod lifecycle_double_checked_lock_executor_tests;
-mod loom_model_tests;
-mod panic_info_tests;
-mod preparation_outcome_tests;
-mod rollback_cause_tests;
+//! Private execution machinery shared by public DCL executors.
+
+mod dcl_core;
+mod locked_execution;
+mod panic_capture;
+
+pub(crate) use dcl_core::DclCore;
+pub(crate) use locked_execution::LockedExecution;
+pub(crate) use panic_capture::catch_phase;

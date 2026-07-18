@@ -5,13 +5,8 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-mod builder_typestate_tests;
-mod concurrency_tests;
-mod double_checked_lock_executor_tests;
-mod execution_outcome_tests;
-mod execution_report_tests;
-mod lifecycle_double_checked_lock_executor_tests;
-mod loom_model_tests;
-mod panic_info_tests;
-mod preparation_outcome_tests;
-mod rollback_cause_tests;
+//! Shared integration-test support.
+
+mod counting_lock;
+
+pub use counting_lock::CountingLock;
