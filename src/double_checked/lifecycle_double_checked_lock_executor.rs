@@ -138,8 +138,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// # Locking
     ///
     /// The initial check, prepare, commit, and rollback run outside the
-    /// executor lock. The second check and task share one write-lock critical
-    /// section. Lifecycle callbacks do not automatically reacquire that lock.
+    /// executor lock. The second check and task share one guard from the
+    /// supplied acquisition mode. A shared/read mode permits concurrent tasks
+    /// and is valid only for read-only protected protocols without at-most-once
+    /// requirements. Gate mutation, protected writes, or serialized execution
+    /// require an [`qubit_lock::ExclusiveLock`] mode. Lifecycle callbacks do
+    /// not automatically reacquire that lock.
     #[inline(always)]
     pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionReport<R, E, C>
     where
@@ -153,8 +157,8 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// Runs a task with mutable access to its invocation's prepare token.
     ///
     /// The token exists on the invocation stack rather than in shared executor
-    /// state. The task runs inside the executor lock; commit or rollback later
-    /// consumes the same token outside that lock.
+    /// state. The task runs while the executor guard is held; commit or
+    /// rollback later consumes the same token outside that guard.
     ///
     /// # Parameters
     ///
@@ -183,8 +187,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Locking
     ///
-    /// Token mutation by `task` occurs inside the executor lock. Commit and
-    /// rollback consume the token only after that lock has been released.
+    /// Token mutation by `task` occurs while the executor guard is held.
+    /// Because each token belongs to one invocation, mutating the token alone
+    /// does not require exclusive lock acquisition. Mutating captured gate or
+    /// protected shared state does require an [`qubit_lock::ExclusiveLock`]
+    /// mode or a separate uniqueness mechanism. Commit and rollback consume the
+    /// token only after the guard has been released.
     #[inline]
     pub fn run_with_token<L, R, E, F>(
         &self,

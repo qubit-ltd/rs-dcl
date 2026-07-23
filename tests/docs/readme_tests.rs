@@ -34,15 +34,27 @@ fn test_readmes_document_final_public_api() {
 /// Verifies both README files state the three non-negotiable gate contracts.
 #[test]
 fn test_readmes_document_gate_and_lock_contracts() {
-    assert!(README_EN.contains("Acquire load"));
-    assert!(README_EN.contains("must not acquire the executor's lock"));
-    assert!(README_EN.contains("inside the executor lock"));
-    assert!(README_EN.contains("same underlying lock"));
+    let readme_en = README_EN.split_whitespace().collect::<Vec<_>>().join(" ");
+    let readme_zh = README_ZH.split_whitespace().collect::<Vec<_>>().join(" ");
 
-    assert!(README_ZH.contains("Acquire load"));
-    assert!(README_ZH.contains("不得获取 executor 的同一底层锁"));
-    assert!(README_ZH.contains("executor 锁内"));
-    assert!(README_ZH.contains("同一底层锁"));
+    assert!(readme_en.contains("Acquire load"));
+    assert!(readme_en.contains("must not acquire the executor's lock"));
+    assert!(
+        readme_en
+            .contains("`Lock` represents an acquisition mode, not necessarily an exclusive one")
+    );
+    assert!(readme_en.contains("shared read mode"));
+    assert!(readme_en.contains("paired write mode"));
+    assert!(readme_en.contains("must use an `ExclusiveLock` mode"));
+    assert!(readme_en.contains("same underlying lock"));
+
+    assert!(readme_zh.contains("Acquire load"));
+    assert!(readme_zh.contains("不得获取 executor 的同一底层锁"));
+    assert!(readme_zh.contains("`Lock` 表示获取模式，并不必然表示排他锁"));
+    assert!(readme_zh.contains("共享 read mode"));
+    assert!(readme_zh.contains("配套的 write mode"));
+    assert!(readme_zh.contains("必须使用 `ExclusiveLock` mode"));
+    assert!(readme_zh.contains("同一底层锁"));
 }
 
 /// Verifies installation snippets use the package's current major/minor

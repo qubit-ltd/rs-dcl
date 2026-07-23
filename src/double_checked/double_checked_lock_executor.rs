@@ -21,6 +21,10 @@ use crate::double_checked::{
 /// the supplied lock, evaluates the same predicate again, and runs the task
 /// while still holding that lock. The lock's protected data is deliberately
 /// not exposed to either the predicate or task.
+///
+/// The supplied [`Lock`] selects an acquisition mode, not necessarily an
+/// exclusive one. Shared modes allow multiple tasks to overlap; exclusive
+/// modes serialize the second check and task.
 #[must_use = "an executor does nothing until run is called"]
 pub struct DoubleCheckedLockExecutor {
     /// Shared predicate and panic configuration.
@@ -54,10 +58,19 @@ impl DoubleCheckedLockExecutor {
     /// Runs `task` only when both condition checks succeed.
     ///
     /// The first condition check performs no lock operation. The second check
-    /// and task run under one RAII guard. A task that needs to change
-    /// the gate may safely do so through captured atomic state because it is
-    /// already inside the executor's critical section. Gate changes made after
-    /// the task or on other system paths must acquire the same underlying lock.
+    /// and task run under one RAII guard. That guard may represent shared or
+    /// exclusive acquisition.
+    ///
+    /// A shared mode is valid when the task is read-only with respect to the
+    /// protected protocol, every conflicting writer uses the paired exclusive
+    /// mode of the same underlying lock, and the caller does not require
+    /// at-most-once task execution. Multiple shared-mode invocations may pass
+    /// the second check and run their tasks concurrently.
+    ///
+    /// A task that changes the gate or protected state, or otherwise requires
+    /// serialized or at-most-once execution, must receive a lock mode
+    /// implementing [`qubit_lock::ExclusiveLock`] or use a separate uniqueness
+    /// mechanism such as compare-and-exchange.
     ///
     /// # Parameters
     ///
@@ -89,10 +102,14 @@ impl DoubleCheckedLockExecutor {
     /// # Locking
     ///
     /// The first predicate call does not acquire `lock`. The second call and
-    /// `task` share one write-lock critical section. The predicate must not
-    /// acquire the same underlying lock. A task may update its captured gate
-    /// directly; later or external gate updates that must exclude the task must
-    /// acquire that same underlying lock.
+    /// `task` share one guard from the supplied acquisition mode. The predicate
+    /// must not acquire the same underlying lock.
+    ///
+    /// With a shared/read mode, the task must remain read-only relative to the
+    /// protected protocol and all conflicting updates must acquire the paired
+    /// write mode. With an exclusive mode, the task may update its captured
+    /// gate directly; later or external conflicting updates must acquire the
+    /// same underlying lock.
     pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionOutcome<R, E>
     where
         L: Lock + ?Sized,
