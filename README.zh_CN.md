@@ -22,16 +22,24 @@ executor。无锁 predicate 首先排除不需要执行的任务；条件满足�
 1. predicate 读取 atomic 或具有等价同步语义的 gate。常用协议是 Acquire load
    配对 Release store。
 2. predicate 不得获取 executor 的同一底层锁，也不应执行阻塞操作。
-3. task 可以在 executor 锁内直接修改 gate。如果 task 不修改 gate，而是在
-   task 返回后或由系统其他路径修改，则修改方必须获取 executor 的同一底层锁。
+3. 锁模式必须匹配 task 的实际语义。`Lock` 表示获取模式，并不必然表示排他锁。
+   executor 会让第二次检查和 task 共用该模式产生的同一个 guard。
 
-atomic gate 提供可见性；同一把锁负责在第二次检查成功、task 和 task 外 gate
-转换之间提供互斥。`ptr::read_volatile` 面向 MMIO 等 volatile memory，不能替代
-atomic 同步。
+当 task 只读取协议保护的状态、所有冲突写入都使用同一底层锁配套的 write mode，
+并且调用方不要求 task 至多执行一次时，共享 read mode 是正确选择。此时多个调用
+可以同时通过第二次检查并并发执行。
+
+如果 task 会修改 gate 或受保护状态、消费任务、执行一次性初始化，或者要求串行化，
+则必须使用 `ExclusiveLock` mode，例如 mutex 或 write-mode adapter。也可以使用独立
+的 compare-and-exchange 协议来选出唯一执行者。
+
+atomic gate 提供可见性；所选锁模式提供对应的共享或排他协调。
+`ptr::read_volatile` 面向 MMIO 等 volatile memory，不能替代 atomic 同步。
 
 ## 基础 executor
 
-锁类型应直接从其所属 crate 导入：
+锁类型应直接从其所属 crate 导入。下面的例子有意使用 mutex，因此 task 运行在
+排他获取模式中，可以在该 guard 内直接关闭 gate：
 
 ```rust
 use std::{
@@ -70,6 +78,40 @@ assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 第一次检查返回 `false` 时，executor 不调用任何锁方法，直接返回
 `ExecutionOutcome::ConditionNotMet`。task 返回的错误会原样保存在
 `ExecutionOutcome::TaskFailed(E)` 中。
+
+只读 task 可以使用 read-mode adapter。多个执行可以重叠，使用配套的 write mode
+的 writer 则会被排除：
+
+```rust
+use std::sync::{
+    Arc,
+    RwLock,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+};
+
+use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_lock::ReadWriteLock;
+
+let lock = RwLock::new(());
+let gate = Arc::new(AtomicBool::new(true));
+let value = Arc::new(AtomicUsize::new(42));
+let executor = DoubleCheckedLockExecutor::builder()
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+let read_mode = lock.read_lock();
+let outcome = executor.run(&read_mode, {
+    let value = Arc::clone(&value);
+    move || Ok::<usize, std::io::Error>(value.load(Ordering::Acquire))
+});
+assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+
+let _writer = lock.write();
+value.store(43, Ordering::Release);
+```
 
 如果由 task 外的路径修改 gate，该路径必须使用同一个锁对象：
 

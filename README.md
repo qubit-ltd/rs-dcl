@@ -24,18 +24,31 @@ Correct DCL use requires all three rules below:
 1. The predicate reads an atomic or equivalently synchronized gate. The usual
    protocol is an Acquire load paired with Release stores.
 2. The predicate must not acquire the executor's lock and should not block.
-3. A task may update the gate directly inside the executor lock. If the task
-   leaves the gate unchanged and it is updated later or by another system path,
-   that update must acquire the same underlying lock as the executor.
+3. The selected lock mode must match the task's semantics. `Lock` represents an
+   acquisition mode, not necessarily an exclusive one. The executor holds one
+   guard from that mode across the second check and task.
 
-An atomic gate provides visibility; the shared lock provides mutual exclusion
-between a successful second check, the task, and gate transitions outside the
-task. `ptr::read_volatile` is intended for volatile memory such as MMIO and is
-not a replacement for atomic synchronization.
+A shared read mode is valid when the task only reads state covered by the
+protocol, every conflicting writer uses the paired write mode of the same
+underlying lock, and callers do not require at-most-once task execution.
+Multiple invocations may then pass the second check and run concurrently.
+
+A task that changes the gate or protected state, consumes work, performs
+one-time initialization, or otherwise requires serialization must use an
+`ExclusiveLock` mode such as a mutex or write-mode adapter. An independent
+compare-and-exchange protocol is also valid when it establishes the required
+unique winner.
+
+An atomic gate provides visibility; the selected lock mode supplies the
+corresponding shared/exclusive coordination. `ptr::read_volatile` is intended
+for volatile memory such as MMIO and is not a replacement for atomic
+synchronization.
 
 ## Basic executor
 
-Import lock types directly from their owning crate:
+Import lock types directly from their owning crate. The following example
+deliberately uses a mutex, so its task runs through an exclusive acquisition
+mode and may close the gate inside that guard:
 
 ```rust
 use std::{
@@ -74,6 +87,40 @@ assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 The first `false` result returns `ExecutionOutcome::ConditionNotMet` without
 calling any lock method. A task error is returned unchanged as
 `ExecutionOutcome::TaskFailed(E)`.
+
+Read-only tasks may use a read-mode adapter. Multiple executions can overlap,
+while writers using the paired write mode remain excluded:
+
+```rust
+use std::sync::{
+    Arc,
+    RwLock,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+};
+
+use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_lock::ReadWriteLock;
+
+let lock = RwLock::new(());
+let gate = Arc::new(AtomicBool::new(true));
+let value = Arc::new(AtomicUsize::new(42));
+let executor = DoubleCheckedLockExecutor::builder()
+    .when({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    })
+    .build();
+
+let read_mode = lock.read_lock();
+let outcome = executor.run(&read_mode, {
+    let value = Arc::clone(&value);
+    move || Ok::<usize, std::io::Error>(value.load(Ordering::Acquire))
+});
+assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+
+let _writer = lock.write();
+value.store(43, Ordering::Release);
+```
 
 When another path updates the gate, it must use the same lock object:
 

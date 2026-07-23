@@ -46,8 +46,7 @@ fn test_run_initial_false_skips_lock_and_task() {
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
 }
 
-/// Verifies a failed second check prevents task execution after one write-lock
-/// call.
+/// Verifies a failed second check prevents task execution after one lock call.
 #[test]
 fn test_run_second_false_skips_task_after_locking() {
     let lock = CountingLock::new();
