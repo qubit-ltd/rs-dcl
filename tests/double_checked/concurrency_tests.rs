@@ -17,14 +17,93 @@ use std::{
             AtomicUsize,
             Ordering,
         },
+        mpsc,
     },
     thread,
+    time::Duration,
 };
 
 use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
 };
+use qubit_lock::{
+    ReadWriteLock,
+    TryLockError,
+};
+
+/// Verifies a read-mode lock allows read-only tasks to overlap while excluding
+/// the paired writer.
+#[test]
+fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
+    const READER_COUNT: usize = 2;
+
+    let gate = Arc::new(AtomicBool::new(true));
+    let (entered_sender, entered_receiver) = mpsc::channel();
+    let release =
+        Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
+    let lock = Arc::new(parking_lot::RwLock::new(()));
+    let executor = Arc::new(
+        DoubleCheckedLockExecutor::builder()
+            .when({
+                let gate = Arc::clone(&gate);
+                move || gate.load(Ordering::Acquire)
+            })
+            .build(),
+    );
+
+    let handles = (0..READER_COUNT)
+        .map(|_| {
+            let entered_sender = entered_sender.clone();
+            let executor = Arc::clone(&executor);
+            let lock = Arc::clone(&lock);
+            let release = Arc::clone(&release);
+            thread::spawn(move || {
+                let read_lock = ReadWriteLock::read_lock(lock.as_ref());
+                executor.run(&read_lock, || {
+                    entered_sender
+                        .send(())
+                        .expect("reader entry receiver should remain alive");
+                    let (released, release_changed) = &*release;
+                    let mut released = released.lock();
+                    release_changed
+                        .wait_while(&mut released, |released| !*released);
+                    Ok::<(), io::Error>(())
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    drop(entered_sender);
+
+    let readers_overlapped = (0..READER_COUNT).all(|_| {
+        entered_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .is_ok()
+    });
+    let writer_was_excluded = matches!(
+        ReadWriteLock::try_write(lock.as_ref()),
+        Err(TryLockError::WouldBlock),
+    );
+    {
+        let (released, release_changed) = &*release;
+        *released.lock() = true;
+        release_changed.notify_all();
+    }
+
+    for handle in handles {
+        assert!(matches!(
+            handle.join().expect("reader should not panic"),
+            ExecutionOutcome::Success(()),
+        ));
+    }
+    assert!(
+        readers_overlapped,
+        "both read-mode tasks should enter before either is released"
+    );
+    assert!(writer_was_excluded);
+    assert!(ReadWriteLock::try_write(lock.as_ref()).is_ok());
+}
+
 /// Verifies a task may change the gate while already holding the executor lock,
 /// allowing only one competing task to succeed.
 #[test]
