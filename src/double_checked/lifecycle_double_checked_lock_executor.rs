@@ -367,6 +367,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
                 Ok(()) => PreparationOutcome::Committed,
                 Err(error) => PreparationOutcome::CommitFailed(error),
             },
+            None if self.core.catch_panics() => {
+                match catch_phase(PanicPhase::Commit, || drop(token)) {
+                    Ok(()) => PreparationOutcome::CommitNotRequired,
+                    Err(panic) => PreparationOutcome::CommitPanicked(panic),
+                }
+            }
             None => {
                 drop(token);
                 PreparationOutcome::CommitNotRequired
@@ -418,6 +424,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
                         Ok(()) => PreparationOutcome::RolledBack,
                         Err(error) => PreparationOutcome::RollbackFailed(error),
                     }
+                }
+            }
+            None if self.core.catch_panics() => {
+                match catch_phase(PanicPhase::Rollback, || drop(token)) {
+                    Ok(()) => PreparationOutcome::RollbackNotRequired,
+                    Err(panic) => PreparationOutcome::RollbackPanicked(panic),
                 }
             }
             None => {
