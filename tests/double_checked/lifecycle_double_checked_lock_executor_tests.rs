@@ -554,6 +554,30 @@ fn test_run_captures_commit_panic_without_overwriting_success() {
     ));
 }
 
+/// Verifies token destruction without a commit callback is captured as a
+/// commit-phase panic while preserving task success.
+#[test]
+fn test_run_captures_token_drop_panic_without_commit() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+
+    let report =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+
+    assert!(matches!(report.execution(), ExecutionOutcome::Success(42)));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::CommitPanicked(panic)
+            if panic.phase() == PanicPhase::Commit
+                && panic.message() == Some("secondary token drop panic")
+    ));
+}
+
 /// Verifies captured callback execution preserves simultaneous task and
 /// rollback errors.
 #[test]
@@ -703,6 +727,35 @@ fn test_run_captured_task_and_rollback_panics_preserves_both() {
         report.preparation(),
         PreparationOutcome::RollbackPanicked(panic)
             if panic.phase() == PanicPhase::Rollback
+    ));
+}
+
+/// Verifies token destruction without a rollback callback is captured as a
+/// rollback-phase panic without replacing the task error.
+#[test]
+fn test_run_captures_token_drop_panic_without_rollback() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+
+    let report = executor.run(&parking_lot::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
+
+    assert!(matches!(
+        report.execution(),
+        ExecutionOutcome::TaskFailed(error)
+            if error.to_string() == "task failed"
+    ));
+    assert!(matches!(
+        report.preparation(),
+        PreparationOutcome::RollbackPanicked(panic)
+            if panic.phase() == PanicPhase::Rollback
+                && panic.message() == Some("secondary token drop panic")
     ));
 }
 

@@ -25,7 +25,7 @@ pub enum PreparationOutcome<C> {
     Committed,
     /// Commit consumed the token and returned the original lifecycle error.
     CommitFailed(C),
-    /// Commit panicked while consuming the token.
+    /// Commit finalization panicked while consuming the token.
     CommitPanicked(PanicInfo),
     /// The unsuccessful path explicitly declared that no rollback was
     /// required.
@@ -34,6 +34,6 @@ pub enum PreparationOutcome<C> {
     RolledBack,
     /// Rollback consumed the token and returned the original lifecycle error.
     RollbackFailed(C),
-    /// Rollback panicked while consuming the token.
+    /// Rollback finalization panicked while consuming the token.
     RollbackPanicked(PanicInfo),
 }
