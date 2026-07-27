@@ -13,7 +13,8 @@ executor。无锁 predicate 首先排除不需要执行的任务；条件满足�
 执行任意 task。
 
 0.11 是一次有意进行的破坏性重设计。executor 只持有 predicate 和 callback，
-每次 `run` 单独传入锁，因此同一个 executor 可使用不同锁实现或锁实例。
+每次 `run` 单独传入锁获取模式。锁在这里是协调机制，而不是数据所有权，因此
+executor 不会永久绑定某个锁，也不会绑定 task 使用的数据。
 
 ## 并发契约
 
@@ -28,6 +29,11 @@ executor。无锁 predicate 首先排除不需要执行的任务；条件满足�
 当 task 只读取协议保护的状态、所有冲突写入都使用同一底层锁配套的 write mode，
 并且调用方不要求 task 至多执行一次时，共享 read mode 是正确选择。此时多个调用
 可以同时通过第二次检查并并发执行。
+
+一个常见设计是由读线程和写线程调用同一个 executor：读线程传入某个 RWLock 的
+read mode 并执行只读 action；写线程传入同一底层锁配套的 write mode 并执行写
+action。两个 action 可以操作不同的捕获数据，只需读取同一个 atomic 状态变量。
+这正是每次调用才传入锁，而不是把锁或受保护数据固定在 executor 内的原因。
 
 如果 task 会修改 gate 或受保护状态、消费任务、执行一次性初始化，或者要求串行化，
 则必须使用 `ExclusiveLock` mode，例如 mutex 或 write-mode adapter。也可以使用独立
@@ -79,8 +85,8 @@ assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 `ExecutionOutcome::ConditionNotMet`。task 返回的错误会原样保存在
 `ExecutionOutcome::TaskFailed(E)` 中。
 
-只读 task 可以使用 read-mode adapter。多个执行可以重叠，使用配套的 write mode
-的 writer 则会被排除：
+同一个 executor 可以使用同一 RWLock 配套的 read mode 和 write mode。下面两个
+action 有意操作不同的捕获数据，只共享协调协议：
 
 ```rust
 use std::sync::{
@@ -94,7 +100,8 @@ use qubit_lock::ReadWriteLock;
 
 let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let value = Arc::new(AtomicUsize::new(42));
+let read_value = Arc::new(AtomicUsize::new(42));
+let write_value = Arc::new(AtomicUsize::new(0));
 let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
@@ -103,14 +110,24 @@ let executor = DoubleCheckedLockExecutor::builder()
     .build();
 
 let read_mode = lock.read_lock();
-let outcome = executor.run(&read_mode, {
-    let value = Arc::clone(&value);
-    move || Ok::<usize, std::io::Error>(value.load(Ordering::Acquire))
+let read_outcome = executor.run(&read_mode, {
+    let read_value = Arc::clone(&read_value);
+    move || Ok::<usize, std::io::Error>(read_value.load(Ordering::Acquire))
 });
-assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+assert!(matches!(read_outcome, ExecutionOutcome::Success(42)));
 
-let _writer = lock.write();
-value.store(43, Ordering::Release);
+let write_mode = lock.write_lock();
+let write_outcome = executor.run(&write_mode, {
+    let gate = Arc::clone(&gate);
+    let write_value = Arc::clone(&write_value);
+    move || {
+        write_value.store(43, Ordering::Release);
+        gate.store(false, Ordering::Release);
+        Ok::<(), std::io::Error>(())
+    }
+});
+assert!(matches!(write_outcome, ExecutionOutcome::Success(())));
+assert_eq!(write_value.load(Ordering::Acquire), 43);
 ```
 
 如果由 task 外的路径修改 gate，该路径必须使用同一个锁对象：
@@ -160,9 +177,9 @@ use std::{
 };
 
 use qubit_dcl::{
-    ExecutionOutcome,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
     RollbackCause,
 };
 
@@ -192,18 +209,17 @@ let executor = LifecycleDoubleCheckedLockExecutor::builder()
     })
     .build();
 
-let report = executor.run_with_token(&lock, |token| {
+let outcome = executor.run_with_token(&lock, |token| {
     token.push("task");
     Ok::<usize, io::Error>(token.len())
 });
 
 assert!(matches!(
-    report.execution(),
-    ExecutionOutcome::Success(2)
-));
-assert!(matches!(
-    report.preparation(),
-    PreparationOutcome::Committed
+    outcome,
+    LifecycleOutcome::TaskSucceeded {
+        value: 2,
+        commit: FinalizationOutcome::Succeeded,
+    }
 ));
 ```
 
@@ -218,19 +234,20 @@ typestate builder 只允许三种生命周期组合：
 
 ## 结果与 panic 语义
 
-`ExecutionReport<R, E, C>` 保留两个相互独立的结果轴：
-
-- `ExecutionOutcome<R, E>` 表示条件检查、task 成功/失败或捕获的 panic。
-- `PreparationOutcome<C>` 表示 prepare、commit、rollback 或明确不需要 finalizer。
+基础 executor 返回 `ExecutionOutcome<R, E>`。生命周期 executor 返回一个穷尽的
+`LifecycleOutcome<R, E, C>`，由 variant 直接表示最终控制流状态。执行 commit 或
+rollback 的 variant 包含 `FinalizationOutcome<C>`，其状态为 `NotRequired`、
+`Succeeded`、`Failed(C)` 或 `Panicked(PanicInfo)`。
 
 commit 失败不会覆盖 task 成功；rollback 失败不会覆盖触发它的 task error 或
-panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error，而 report
-仍然保留其所有权。
+panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error，而
+`LifecycleOutcome` 仍然保留其所有权。
 
 默认不捕获 panic。启用 `.catch_panics(true)` 后，panic 信息包含准确的
 `PanicPhase` 和原始 payload。捕获边界位于 RAII guard 的作用域外，因此标准库锁
 会正常观察 unwind 并进入 poisoned 状态；parking-lot 锁则保持其不 poisoning 的
-正常语义。
+正常语义。正常完成锁内工作后，显式释放 guard 时发生的 panic 会分类为
+`PanicPhase::LockRelease`。
 
 ## 安装
 

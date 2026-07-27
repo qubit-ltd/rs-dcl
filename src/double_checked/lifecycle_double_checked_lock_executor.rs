@@ -82,6 +82,13 @@ where
 ///
 /// Prepare runs after the lock-free check and before lock acquisition. Commit
 /// or rollback consumes the token after the executor lock has been released.
+///
+/// The executor intentionally owns neither a lock nor protected data. The same
+/// executor may be invoked with the read and write modes obtained from one
+/// RWLock. A read-only task and a write task can operate on different captured
+/// data while consulting the same atomic gate; their paired modes on the same
+/// underlying lock provide the required coordination. This is why each
+/// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
 #[must_use = "an executor does nothing until run or run_with_token is called"]
 pub struct LifecycleDoubleCheckedLockExecutor<P, C> {
     /// Shared DCL predicate and panic configuration.
@@ -155,7 +162,9 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// When panic capture is disabled, propagates callback, lock, predicate,
     /// and task panics. A panic after prepare in the locked phase first
     /// releases the lock and attempts rollback before the original panic is
-    /// resumed.
+    /// resumed. With capture enabled, a guard-drop panic after locked work
+    /// completes is classified as [`PanicPhase::LockRelease`] and triggers
+    /// rollback.
     ///
     /// # Synchronization
     ///
@@ -172,6 +181,11 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// requirements. Gate mutation, protected writes, or serialized execution
     /// require an [`qubit_lock::ExclusiveLock`] mode. Lifecycle callbacks do
     /// not automatically reacquire that lock.
+    ///
+    /// The same executor may receive paired read and write modes from one
+    /// RWLock on different calls. Those calls may operate on different
+    /// captured data; the modes must refer to the same underlying lock whenever
+    /// their actions conflict through the shared gate protocol.
     #[inline(always)]
     pub fn run<L, R, E, F>(
         &self,
@@ -209,7 +223,8 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Panics
     ///
-    /// Uses the same panic behavior as [`Self::run`].
+    /// Uses the same panic behavior and lock-release classification as
+    /// [`Self::run`].
     ///
     /// # Synchronization
     ///
@@ -225,6 +240,10 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// protected shared state does require an [`qubit_lock::ExclusiveLock`]
     /// mode or a separate uniqueness mechanism. Commit and rollback consume the
     /// token only after the guard has been released.
+    ///
+    /// As with [`Self::run`], callers may supply read and write modes from one
+    /// RWLock to the same executor. Tasks may capture different data; the
+    /// shared underlying lock and atomic gate establish their coordination.
     #[inline]
     pub fn run_with_token<L, R, E, F>(
         &self,

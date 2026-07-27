@@ -28,6 +28,32 @@ Apply the same change to lifecycle execution:
 - `run(task)` becomes `run(&lock, task)`.
 - `run_with_token(task)` becomes `run_with_token(&lock, task)`.
 
+The lifecycle result model is also replaced rather than compatibility-aliased:
+
+- `ExecutionReport<R, E, C>` and `PreparationOutcome<C>` are removed.
+- `LifecycleDoubleCheckedLockExecutor::run` and `run_with_token` now return one
+  exhaustive `LifecycleOutcome<R, E, C>`.
+- Commit and rollback status is represented by
+  `FinalizationOutcome<C>`.
+- The basic executor continues to return `ExecutionOutcome<R, E>`, but its
+  lifecycle-only `NotExecuted` variant is removed.
+
+The principal state mapping is:
+
+| Previous report state | New lifecycle outcome |
+| --- | --- |
+| Initial condition not met | `InitialConditionNotMet` |
+| Initial condition check panicked | `InitialConditionCheckPanicked` |
+| `NotExecuted` + prepare failure/panic | `PrepareFailed` / `PreparePanicked` |
+| Task success + commit state | `TaskSucceeded { value, commit }` |
+| Second condition not met + rollback state | `SecondConditionNotMet { rollback }` |
+| Task failure + rollback state | `TaskFailed { error, rollback }` |
+| Locked execution panic + rollback state | `ExecutionPanicked { panic, rollback }` |
+
+Within the nested commit or rollback field, the old `*NotRequired`,
+`Committed`/`RolledBack`, `*Failed`, and `*Panicked` variants map to
+`FinalizationOutcome::{NotRequired, Succeeded, Failed, Panicked}`.
+
 The removed `ArcMutex`, `ArcRwLock`, and related wrappers are not replaced in
 `qubit-dcl`. Use native `std`, `parking_lot`, or Tokio lock types supported by
 `qubit-lock`. A read-write lock must select a mode explicitly through its
@@ -37,3 +63,11 @@ The predicate remains a zero-argument, thread-safe callback. It must read an
 atomic or equivalently synchronized gate. Every external transition that must
 exclude the task must acquire the exact same underlying lock passed to `run`.
 
+Passing a lock per invocation is intentional. The same executor can receive a
+read mode in one thread and the paired write mode in another thread, provided
+both modes come from the same RWLock. Their tasks may use different captured
+data while consulting the same atomic state variable; the lock supplies
+coordination rather than data ownership.
+
+With panic capture enabled, a panic raised while dropping the guard after
+normally completed locked work is reported as `PanicPhase::LockRelease`.

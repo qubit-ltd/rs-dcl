@@ -23,7 +23,11 @@ fn test_readmes_document_final_public_api() {
         assert!(readme.contains("no_commit"));
         assert!(readme.contains("no_rollback"));
         assert!(readme.contains("ExecutionOutcome"));
-        assert!(readme.contains("PreparationOutcome"));
+        assert!(readme.contains("LifecycleOutcome"));
+        assert!(readme.contains("FinalizationOutcome"));
+        assert!(readme.contains("LockRelease"));
+        assert!(!readme.contains("ExecutionReport"));
+        assert!(!readme.contains("PreparationOutcome"));
         assert!(!readme.contains("ExecutionContext"));
         assert!(!readme.contains("ExecutionLogger"));
         assert!(!readme.contains("call_with"));
@@ -45,6 +49,11 @@ fn test_readmes_document_gate_and_lock_contracts() {
     );
     assert!(readme_en.contains("shared read mode"));
     assert!(readme_en.contains("paired write mode"));
+    assert!(readme_en.contains("same executor"));
+    assert!(readme_en.contains("different captured data"));
+    assert!(
+        readme_en.contains("coordination mechanism rather than data ownership")
+    );
     assert!(readme_en.contains("must use an `ExclusiveLock` mode"));
     assert!(readme_en.contains("same underlying lock"));
 
@@ -53,6 +62,9 @@ fn test_readmes_document_gate_and_lock_contracts() {
     assert!(readme_zh.contains("`Lock` 表示获取模式，并不必然表示排他锁"));
     assert!(readme_zh.contains("共享 read mode"));
     assert!(readme_zh.contains("配套的 write mode"));
+    assert!(readme_zh.contains("同一个 executor"));
+    assert!(readme_zh.contains("不同的捕获数据"));
+    assert!(readme_zh.contains("协调机制，而不是数据所有权"));
     assert!(readme_zh.contains("必须使用 `ExclusiveLock` mode"));
     assert!(readme_zh.contains("同一底层锁"));
 }

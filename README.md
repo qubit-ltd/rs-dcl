@@ -14,8 +14,9 @@ passed to that call, checks the same predicate again, and runs an arbitrary
 task inside that lock.
 
 Version 0.11 is a deliberately breaking redesign. Executors retain the
-predicate and callbacks, while every `run` call supplies its lock. One executor
-can therefore coordinate through different lock implementations or instances.
+predicate and callbacks, while every `run` call supplies its lock acquisition
+mode. The lock is a coordination mechanism rather than data ownership, so an
+executor is not permanently bound to a lock or to the data used by its tasks.
 
 ## Concurrency contract
 
@@ -32,6 +33,14 @@ A shared read mode is valid when the task only reads state covered by the
 protocol, every conflicting writer uses the paired write mode of the same
 underlying lock, and callers do not require at-most-once task execution.
 Multiple invocations may then pass the second check and run concurrently.
+
+One common design deliberately invokes the same executor from reader and
+writer threads. A reader supplies the read mode of an RWLock and performs a
+read-only action; a writer supplies the paired write mode of that same
+underlying lock and performs a write action. Their actions may operate on
+different captured data while consulting the same atomic state variable. This
+is why the executor accepts a lock on each call instead of fixing one lock or
+binding protected data into the executor.
 
 A task that changes the gate or protected state, consumes work, performs
 one-time initialization, or otherwise requires serialization must use an
@@ -88,8 +97,9 @@ The first `false` result returns `ExecutionOutcome::ConditionNotMet` without
 calling any lock method. A task error is returned unchanged as
 `ExecutionOutcome::TaskFailed(E)`.
 
-Read-only tasks may use a read-mode adapter. Multiple executions can overlap,
-while writers using the paired write mode remain excluded:
+The same executor may use paired read and write modes from one RWLock. The two
+actions below deliberately use different captured data and share only the
+coordination protocol:
 
 ```rust
 use std::sync::{
@@ -103,7 +113,8 @@ use qubit_lock::ReadWriteLock;
 
 let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let value = Arc::new(AtomicUsize::new(42));
+let read_value = Arc::new(AtomicUsize::new(42));
+let write_value = Arc::new(AtomicUsize::new(0));
 let executor = DoubleCheckedLockExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
@@ -112,14 +123,24 @@ let executor = DoubleCheckedLockExecutor::builder()
     .build();
 
 let read_mode = lock.read_lock();
-let outcome = executor.run(&read_mode, {
-    let value = Arc::clone(&value);
-    move || Ok::<usize, std::io::Error>(value.load(Ordering::Acquire))
+let read_outcome = executor.run(&read_mode, {
+    let read_value = Arc::clone(&read_value);
+    move || Ok::<usize, std::io::Error>(read_value.load(Ordering::Acquire))
 });
-assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+assert!(matches!(read_outcome, ExecutionOutcome::Success(42)));
 
-let _writer = lock.write();
-value.store(43, Ordering::Release);
+let write_mode = lock.write_lock();
+let write_outcome = executor.run(&write_mode, {
+    let gate = Arc::clone(&gate);
+    let write_value = Arc::clone(&write_value);
+    move || {
+        write_value.store(43, Ordering::Release);
+        gate.store(false, Ordering::Release);
+        Ok::<(), std::io::Error>(())
+    }
+});
+assert!(matches!(write_outcome, ExecutionOutcome::Success(())));
+assert_eq!(write_value.load(Ordering::Acquire), 43);
 ```
 
 When another path updates the gate, it must use the same lock object:
@@ -169,9 +190,9 @@ use std::{
 };
 
 use qubit_dcl::{
-    ExecutionOutcome,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
     RollbackCause,
 };
 
@@ -201,18 +222,17 @@ let executor = LifecycleDoubleCheckedLockExecutor::builder()
     })
     .build();
 
-let report = executor.run_with_token(&lock, |token| {
+let outcome = executor.run_with_token(&lock, |token| {
     token.push("task");
     Ok::<usize, io::Error>(token.len())
 });
 
 assert!(matches!(
-    report.execution(),
-    ExecutionOutcome::Success(2)
-));
-assert!(matches!(
-    report.preparation(),
-    PreparationOutcome::Committed
+    outcome,
+    LifecycleOutcome::TaskSucceeded {
+        value: 2,
+        commit: FinalizationOutcome::Succeeded,
+    }
 ));
 ```
 
@@ -228,22 +248,23 @@ data is needed, prepare can return `()` and the caller can use `run` rather than
 
 ## Outcome and panic semantics
 
-`ExecutionReport<R, E, C>` retains two independent axes:
-
-- `ExecutionOutcome<R, E>` reports condition checks, task success/error, or a
-  captured panic.
-- `PreparationOutcome<C>` reports prepare, commit, rollback, or an explicitly
-  unnecessary finalizer.
+The basic executor returns `ExecutionOutcome<R, E>`. The lifecycle executor
+returns one exhaustive `LifecycleOutcome<R, E, C>` whose variant identifies
+the terminal control-flow state. Variants that perform commit or rollback
+contain `FinalizationOutcome<C>` with `NotRequired`, `Succeeded`, `Failed(C)`,
+or `Panicked(PanicInfo)`.
 
 A commit failure never erases task success, and a rollback failure never erases
 the task error or panic that triggered it. `RollbackCause::TaskFailed` borrows
-the original error during rollback while the report retains its owned value.
+the original error during rollback while `LifecycleOutcome` retains its owned
+value.
 
 Panic capture is disabled by default. With `.catch_panics(true)`, panic metadata
 includes the precise `PanicPhase` and original payload. The capture boundary is
 outside the RAII guard's scope, so a standard-library lock observes unwinding
 and is poisoned normally; parking-lot locks retain their normal non-poisoning
-behavior.
+behavior. A panic raised while explicitly dropping a normally completed guard
+is classified as `PanicPhase::LockRelease`.
 
 ## Installation
 
