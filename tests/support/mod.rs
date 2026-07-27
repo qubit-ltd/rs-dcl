@@ -10,7 +10,9 @@
 mod counting_guard;
 mod counting_lock;
 mod panic_on_drop;
+mod panicking_release_lock;
 
 pub use counting_guard::CountingGuard;
 pub use counting_lock::CountingLock;
 pub use panic_on_drop::PanicOnDrop;
+pub use panicking_release_lock::PanickingReleaseLock;

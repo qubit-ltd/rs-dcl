@@ -18,6 +18,7 @@ fn test_panic_phases_are_distinct() {
         PanicPhase::LockAcquisition,
         PanicPhase::SecondConditionCheck,
         PanicPhase::Task,
+        PanicPhase::LockRelease,
         PanicPhase::Commit,
         PanicPhase::Rollback,
     ];

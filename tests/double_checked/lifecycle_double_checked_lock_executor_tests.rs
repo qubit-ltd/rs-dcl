@@ -35,7 +35,10 @@ use qubit_dcl::{
     RollbackCause,
 };
 
-use crate::support::PanicOnDrop;
+use crate::support::{
+    PanicOnDrop,
+    PanickingReleaseLock,
+};
 
 /// Verifies a failed initial check bypasses every lifecycle callback and lock.
 #[test]
@@ -361,6 +364,50 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
             .lock()
             .expect("rollback phase mutex should not be poisoned"),
         Some(PanicPhase::LockAcquisition)
+    );
+}
+
+/// Verifies a captured guard-drop panic is supplied to rollback with its lock
+/// release phase.
+#[test]
+fn test_run_captures_lock_release_panic_then_rolls_back() {
+    let rollback_phase = Arc::new(Mutex::new(None));
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback({
+            let rollback_phase = Arc::clone(&rollback_phase);
+            move |_, cause| {
+                let RollbackCause::Panicked(panic) = cause else {
+                    panic!("expected panic rollback cause");
+                };
+                *rollback_phase
+                    .lock()
+                    .expect("rollback phase mutex should not be poisoned") =
+                    Some(panic.phase());
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
+
+    let outcome =
+        executor.run(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+
+    assert!(matches!(
+        outcome,
+        LifecycleOutcome::ExecutionPanicked {
+            panic,
+            rollback: FinalizationOutcome::Succeeded,
+        } if panic.phase() == PanicPhase::LockRelease
+    ));
+    assert_eq!(
+        rollback_phase
+            .lock()
+            .expect("rollback phase mutex should not be poisoned")
+            .as_ref(),
+        Some(&PanicPhase::LockRelease)
     );
 }
 

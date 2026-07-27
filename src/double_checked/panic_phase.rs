@@ -20,6 +20,8 @@ pub enum PanicPhase {
     SecondConditionCheck,
     /// The task panicked while holding the executor lock.
     Task,
+    /// Releasing the executor lock guard panicked after locked work completed.
+    LockRelease,
     /// Commit finalization panicked after the lock was released.
     Commit,
     /// Rollback finalization panicked after the lock was released.

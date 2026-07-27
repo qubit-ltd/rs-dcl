@@ -55,7 +55,7 @@ enum RollbackExecution<E> {
     ConditionNotMet,
     /// The task returned its original error.
     TaskFailed(E),
-    /// Lock acquisition, the second check, or the task panicked.
+    /// Lock acquisition, the second check, the task, or lock release panicked.
     Panicked(PanicInfo),
 }
 
