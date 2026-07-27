@@ -11,7 +11,7 @@ use std::io;
 
 use qubit_dcl::{
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
 };
 
 /// Verifies the predicate stage accepts panic configuration and preparation.
@@ -24,11 +24,8 @@ fn test_predicate_builder_configures_prepare() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let report =
+    let outcome =
         executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
-    assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::PrepareFailed(_)
-    ));
+    assert!(matches!(outcome, LifecycleOutcome::PrepareFailed(_)));
 }

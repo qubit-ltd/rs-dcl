@@ -20,12 +20,11 @@ use std::{
 use qubit_lock::Lock;
 
 use crate::double_checked::{
-    ExecutionOutcome,
-    ExecutionReport,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutorBuilder,
+    LifecycleOutcome,
     PanicInfo,
     PanicPhase,
-    PreparationOutcome,
     RollbackCause,
     internal::{
         DclCore,
@@ -49,6 +48,35 @@ pub(crate) type RollbackCallback<P, C> = Arc<
         + Sync
         + 'static,
 >;
+
+/// Locked execution state that requires lifecycle rollback.
+enum RollbackExecution<E> {
+    /// The second condition check returned `false`.
+    ConditionNotMet,
+    /// The task returned its original error.
+    TaskFailed(E),
+    /// Lock acquisition, the second check, or the task panicked.
+    Panicked(PanicInfo),
+}
+
+impl<E> RollbackExecution<E>
+where
+    E: Error + Send + Sync + 'static,
+{
+    /// Creates the borrowed cause passed to the rollback callback.
+    ///
+    /// # Returns
+    ///
+    /// A cause borrowing any task error or panic metadata from this state.
+    #[inline]
+    fn cause(&self) -> RollbackCause<'_> {
+        match self {
+            Self::ConditionNotMet => RollbackCause::ConditionNotMet,
+            Self::TaskFailed(error) => RollbackCause::TaskFailed(error),
+            Self::Panicked(panic) => RollbackCause::Panicked(panic),
+        }
+    }
+}
 
 /// Executes a DCL task with per-invocation prepare and finalization callbacks.
 ///
@@ -115,12 +143,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// A report retaining both the execution and lifecycle outcomes.
+    /// The single terminal lifecycle outcome.
     ///
     /// # Errors
     ///
-    /// Task and lifecycle errors are returned inside their respective report
-    /// axes and never overwrite one another.
+    /// Task and lifecycle errors are retained in the same structured outcome
+    /// and never overwrite one another.
     ///
     /// # Panics
     ///
@@ -145,7 +173,11 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// require an [`qubit_lock::ExclusiveLock`] mode. Lifecycle callbacks do
     /// not automatically reacquire that lock.
     #[inline(always)]
-    pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionReport<R, E, C>
+    pub fn run<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -168,12 +200,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// A report retaining both the execution and lifecycle outcomes.
+    /// The single terminal lifecycle outcome.
     ///
     /// # Errors
     ///
-    /// Task and lifecycle errors are returned inside their respective report
-    /// axes and never overwrite one another.
+    /// Task and lifecycle errors are retained in the same structured outcome
+    /// and never overwrite one another.
     ///
     /// # Panics
     ///
@@ -198,7 +230,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
         &self,
         lock: &L,
         task: F,
-    ) -> ExecutionReport<R, E, C>
+    ) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -220,12 +252,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// A complete report, including any captured panic metadata.
+    /// The complete lifecycle outcome, including captured panic metadata.
     fn run_catching<L, R, E, F>(
         &self,
         lock: &L,
         task: F,
-    ) -> ExecutionReport<R, E, C>
+    ) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -234,16 +266,10 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
         match self.core.check_initial_catching() {
             Ok(true) => {}
             Ok(false) => {
-                return ExecutionReport::new(
-                    ExecutionOutcome::ConditionNotMet,
-                    PreparationOutcome::NotStarted,
-                );
+                return LifecycleOutcome::InitialConditionNotMet;
             }
             Err(panic) => {
-                return ExecutionReport::new(
-                    ExecutionOutcome::Panicked(panic),
-                    PreparationOutcome::NotStarted,
-                );
+                return LifecycleOutcome::InitialConditionCheckPanicked(panic);
             }
         }
 
@@ -251,31 +277,24 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
             match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
                 Ok(Ok(token)) => token,
                 Ok(Err(error)) => {
-                    return ExecutionReport::new(
-                        ExecutionOutcome::NotExecuted,
-                        PreparationOutcome::PrepareFailed(error),
-                    );
+                    return LifecycleOutcome::PrepareFailed(error);
                 }
                 Err(panic) => {
-                    return ExecutionReport::new(
-                        ExecutionOutcome::NotExecuted,
-                        PreparationOutcome::PreparePanicked(panic),
-                    );
+                    return LifecycleOutcome::PreparePanicked(panic);
                 }
             };
 
         match self.core.execute_locked_catching(lock, || task(&mut token)) {
             Ok(LockedExecution::ConditionNotMet) => {
-                self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
+                self.finish_rollback(token, RollbackExecution::ConditionNotMet)
             }
             Ok(LockedExecution::Task(Ok(value))) => {
                 self.finish_commit(token, value)
             }
-            Ok(LockedExecution::Task(Err(error))) => {
-                self.finish_rollback(token, ExecutionOutcome::TaskFailed(error))
-            }
+            Ok(LockedExecution::Task(Err(error))) => self
+                .finish_rollback(token, RollbackExecution::TaskFailed(error)),
             Err(panic) => {
-                self.finish_rollback(token, ExecutionOutcome::Panicked(panic))
+                self.finish_rollback(token, RollbackExecution::Panicked(panic))
             }
         }
     }
@@ -290,7 +309,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// A complete report when no callback or locked phase panics.
+    /// The complete lifecycle outcome when no phase panics.
     ///
     /// # Panics
     ///
@@ -300,38 +319,31 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
         &self,
         lock: &L,
         task: F,
-    ) -> ExecutionReport<R, E, C>
+    ) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
         F: FnOnce(&mut P) -> Result<R, E>,
     {
         if !self.core.check_initial() {
-            return ExecutionReport::new(
-                ExecutionOutcome::ConditionNotMet,
-                PreparationOutcome::NotStarted,
-            );
+            return LifecycleOutcome::InitialConditionNotMet;
         }
         let mut token = match (self.prepare)() {
             Ok(token) => token,
             Err(error) => {
-                return ExecutionReport::new(
-                    ExecutionOutcome::NotExecuted,
-                    PreparationOutcome::PrepareFailed(error),
-                );
+                return LifecycleOutcome::PrepareFailed(error);
             }
         };
 
         match self.core.execute_locked_catching(lock, || task(&mut token)) {
             Ok(LockedExecution::ConditionNotMet) => {
-                self.finish_rollback(token, ExecutionOutcome::ConditionNotMet)
+                self.finish_rollback(token, RollbackExecution::ConditionNotMet)
             }
             Ok(LockedExecution::Task(Ok(value))) => {
                 self.finish_commit(token, value)
             }
-            Ok(LockedExecution::Task(Err(error))) => {
-                self.finish_rollback(token, ExecutionOutcome::TaskFailed(error))
-            }
+            Ok(LockedExecution::Task(Err(error))) => self
+                .finish_rollback(token, RollbackExecution::TaskFailed(error)),
             Err(panic) => self.rollback_then_resume(token, panic),
         }
     }
@@ -345,7 +357,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// A report combining success with commit or no-commit status.
+    /// A task-success outcome retaining the commit status.
     ///
     /// # Panics
     ///
@@ -354,31 +366,31 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
         &self,
         token: P,
         value: R,
-    ) -> ExecutionReport<R, E, C> {
-        let preparation = match &self.commit {
+    ) -> LifecycleOutcome<R, E, C> {
+        let commit = match &self.commit {
             Some(commit) if self.core.catch_panics() => {
                 match catch_phase(PanicPhase::Commit, || commit(token)) {
-                    Ok(Ok(())) => PreparationOutcome::Committed,
-                    Ok(Err(error)) => PreparationOutcome::CommitFailed(error),
-                    Err(panic) => PreparationOutcome::CommitPanicked(panic),
+                    Ok(Ok(())) => FinalizationOutcome::Succeeded,
+                    Ok(Err(error)) => FinalizationOutcome::Failed(error),
+                    Err(panic) => FinalizationOutcome::Panicked(panic),
                 }
             }
             Some(commit) => match commit(token) {
-                Ok(()) => PreparationOutcome::Committed,
-                Err(error) => PreparationOutcome::CommitFailed(error),
+                Ok(()) => FinalizationOutcome::Succeeded,
+                Err(error) => FinalizationOutcome::Failed(error),
             },
             None if self.core.catch_panics() => {
                 match catch_phase(PanicPhase::Commit, || drop(token)) {
-                    Ok(()) => PreparationOutcome::CommitNotRequired,
-                    Err(panic) => PreparationOutcome::CommitPanicked(panic),
+                    Ok(()) => FinalizationOutcome::NotRequired,
+                    Err(panic) => FinalizationOutcome::Panicked(panic),
                 }
             }
             None => {
                 drop(token);
-                PreparationOutcome::CommitNotRequired
+                FinalizationOutcome::NotRequired
             }
         };
-        ExecutionReport::new(ExecutionOutcome::Success(value), preparation)
+        LifecycleOutcome::TaskSucceeded { value, commit }
     }
 
     /// Finalizes an unsuccessful invocation without holding the executor lock.
@@ -386,12 +398,12 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// # Parameters
     ///
     /// * `token` - Token produced for this invocation.
-    /// * `execution` - Condition, task-error, or captured-panic outcome that
+    /// * `execution` - Condition, task-error, or captured-panic state that
     ///   requires rollback.
     ///
     /// # Returns
     ///
-    /// A report retaining `execution` independently from rollback status.
+    /// A lifecycle outcome retaining `execution` and rollback status.
     ///
     /// # Panics
     ///
@@ -399,76 +411,49 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     fn finish_rollback<R, E>(
         &self,
         token: P,
-        execution: ExecutionOutcome<R, E>,
-    ) -> ExecutionReport<R, E, C>
+        execution: RollbackExecution<E>,
+    ) -> LifecycleOutcome<R, E, C>
     where
         E: Error + Send + Sync + 'static,
     {
-        let preparation = match &self.rollback {
+        let rollback = match &self.rollback {
             Some(rollback) => {
-                let cause = Self::rollback_cause(&execution);
+                let cause = execution.cause();
                 if self.core.catch_panics() {
                     match catch_phase(PanicPhase::Rollback, || {
                         rollback(token, cause)
                     }) {
-                        Ok(Ok(())) => PreparationOutcome::RolledBack,
-                        Ok(Err(error)) => {
-                            PreparationOutcome::RollbackFailed(error)
-                        }
-                        Err(panic) => {
-                            PreparationOutcome::RollbackPanicked(panic)
-                        }
+                        Ok(Ok(())) => FinalizationOutcome::Succeeded,
+                        Ok(Err(error)) => FinalizationOutcome::Failed(error),
+                        Err(panic) => FinalizationOutcome::Panicked(panic),
                     }
                 } else {
                     match rollback(token, cause) {
-                        Ok(()) => PreparationOutcome::RolledBack,
-                        Err(error) => PreparationOutcome::RollbackFailed(error),
+                        Ok(()) => FinalizationOutcome::Succeeded,
+                        Err(error) => FinalizationOutcome::Failed(error),
                     }
                 }
             }
             None if self.core.catch_panics() => {
                 match catch_phase(PanicPhase::Rollback, || drop(token)) {
-                    Ok(()) => PreparationOutcome::RollbackNotRequired,
-                    Err(panic) => PreparationOutcome::RollbackPanicked(panic),
+                    Ok(()) => FinalizationOutcome::NotRequired,
+                    Err(panic) => FinalizationOutcome::Panicked(panic),
                 }
             }
             None => {
                 drop(token);
-                PreparationOutcome::RollbackNotRequired
+                FinalizationOutcome::NotRequired
             }
         };
-        ExecutionReport::new(execution, preparation)
-    }
-
-    /// Creates the borrowed rollback cause for a completed execution outcome.
-    ///
-    /// # Parameters
-    ///
-    /// * `execution` - Outcome requiring rollback.
-    ///
-    /// # Returns
-    ///
-    /// A cause borrowing any task error or panic metadata from `execution`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called with an outcome that does not require rollback. This is
-    /// an internal invariant enforced by the state-machine dispatch.
-    #[inline]
-    fn rollback_cause<R, E>(
-        execution: &ExecutionOutcome<R, E>,
-    ) -> RollbackCause<'_>
-    where
-        E: Error + Send + Sync + 'static,
-    {
         match execution {
-            ExecutionOutcome::ConditionNotMet => RollbackCause::ConditionNotMet,
-            ExecutionOutcome::TaskFailed(error) => {
-                RollbackCause::TaskFailed(error)
+            RollbackExecution::ConditionNotMet => {
+                LifecycleOutcome::SecondConditionNotMet { rollback }
             }
-            ExecutionOutcome::Panicked(panic) => RollbackCause::Panicked(panic),
-            ExecutionOutcome::Success(_) | ExecutionOutcome::NotExecuted => {
-                unreachable!("only failed locked outcomes require rollback")
+            RollbackExecution::TaskFailed(error) => {
+                LifecycleOutcome::TaskFailed { error, rollback }
+            }
+            RollbackExecution::Panicked(panic) => {
+                LifecycleOutcome::ExecutionPanicked { panic, rollback }
             }
         }
     }

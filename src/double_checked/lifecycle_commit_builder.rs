@@ -68,8 +68,7 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     /// # Errors
     ///
     /// This method only stores `rollback`; an error returned when rollback
-    /// later runs is preserved in
-    /// [`crate::PreparationOutcome::RollbackFailed`].
+    /// later runs is preserved in [`crate::FinalizationOutcome::Failed`].
     ///
     /// # Panics
     ///

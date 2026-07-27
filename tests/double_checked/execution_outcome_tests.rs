@@ -30,15 +30,6 @@ fn test_execution_outcome_condition_not_met_is_distinct() {
     assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
 }
 
-/// Verifies that a lifecycle prepare failure can report that no task ran.
-#[test]
-fn test_execution_outcome_not_executed_is_distinct() {
-    let outcome: ExecutionOutcome<(), io::Error> =
-        ExecutionOutcome::NotExecuted;
-
-    assert!(matches!(outcome, ExecutionOutcome::NotExecuted));
-}
-
 /// Verifies that a task error is returned without string conversion.
 #[test]
 fn test_execution_outcome_task_failed_preserves_error() {

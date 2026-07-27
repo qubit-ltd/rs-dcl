@@ -10,8 +10,9 @@
 use std::io;
 
 use qubit_dcl::{
-    ExecutionOutcome,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
+    LifecycleOutcome,
 };
 
 /// Verifies a ready lifecycle builder produces a reusable executor.
@@ -26,9 +27,13 @@ fn test_ready_builder_builds_reusable_executor() {
     let lock = parking_lot::Mutex::new(());
 
     for value in [1, 2] {
-        let report = executor.run(&lock, || Ok::<u32, io::Error>(value));
-        assert!(
-            matches!(report.execution(), ExecutionOutcome::Success(v) if *v == value)
-        );
+        let outcome = executor.run(&lock, || Ok::<u32, io::Error>(value));
+        assert!(matches!(
+            outcome,
+            LifecycleOutcome::TaskSucceeded {
+                value: actual,
+                commit: FinalizationOutcome::NotRequired,
+            } if actual == value
+        ));
     }
 }

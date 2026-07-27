@@ -10,8 +10,9 @@
 use std::io;
 
 use qubit_dcl::{
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
 };
 
 /// Verifies the commit stage supports the explicit no-rollback branch.
@@ -23,11 +24,14 @@ fn test_commit_builder_selects_no_rollback() {
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
-    let report =
+    let outcome =
         executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::Committed
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            commit: FinalizationOutcome::Succeeded,
+            ..
+        }
     ));
 }
