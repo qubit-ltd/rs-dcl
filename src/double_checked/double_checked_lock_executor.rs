@@ -25,6 +25,13 @@ use crate::double_checked::{
 /// The supplied [`Lock`] selects an acquisition mode, not necessarily an
 /// exclusive one. Shared modes allow multiple tasks to overlap; exclusive
 /// modes serialize the second check and task.
+///
+/// The executor intentionally does not own a lock or protected data. One
+/// common use invokes the same executor with the read and write modes obtained
+/// from one RWLock: a reader runs a read-only task under the read mode, while a
+/// writer runs a write task under the paired write mode. The two tasks may use
+/// different captured data while consulting the same atomic gate. Passing the
+/// mode to each [`Self::run`] call preserves this coordination-only role.
 #[must_use = "an executor does nothing until run is called"]
 pub struct DoubleCheckedLockExecutor {
     /// Shared predicate and panic configuration.
@@ -72,6 +79,12 @@ impl DoubleCheckedLockExecutor {
     /// implementing [`qubit_lock::ExclusiveLock`] or use a separate uniqueness
     /// mechanism such as compare-and-exchange.
     ///
+    /// The same executor may be called concurrently with read and write modes
+    /// from one RWLock. Correctness depends on those modes sharing the same
+    /// underlying lock, not on the tasks accessing the same data: a read-only
+    /// task and a write task may capture different objects while sharing the
+    /// predicate's state variable.
+    ///
     /// # Parameters
     ///
     /// * `lock` - Generic synchronous lock used for this invocation.
@@ -91,7 +104,8 @@ impl DoubleCheckedLockExecutor {
     ///
     /// When panic capture is disabled, propagates panics from the predicate,
     /// lock implementation, or task. When enabled, those panics are returned
-    /// as [`ExecutionOutcome::Panicked`].
+    /// as [`ExecutionOutcome::Panicked`]. A guard-drop panic after locked work
+    /// completes is classified as [`crate::PanicPhase::LockRelease`].
     ///
     /// # Synchronization
     ///

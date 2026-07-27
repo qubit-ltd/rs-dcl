@@ -32,13 +32,14 @@ use qubit_lock::{
     TryLockError,
 };
 
-/// Verifies a read-mode lock allows read-only tasks to overlap while excluding
-/// the paired writer.
+/// Verifies one executor can run read-only tasks under a shared mode and a
+/// write task over different data under the paired exclusive mode.
 #[test]
 fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
     const READER_COUNT: usize = 2;
 
     let gate = Arc::new(AtomicBool::new(true));
+    let written_value = Arc::new(AtomicUsize::new(0));
     let (entered_sender, entered_receiver) = mpsc::channel();
     let release =
         Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
@@ -101,7 +102,20 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
         "both read-mode tasks should enter before either is released"
     );
     assert!(writer_was_excluded);
-    assert!(ReadWriteLock::try_write(lock.as_ref()).is_ok());
+
+    let write_mode = ReadWriteLock::write_lock(lock.as_ref());
+    let write_outcome = executor.run(&write_mode, {
+        let gate = Arc::clone(&gate);
+        let written_value = Arc::clone(&written_value);
+        move || {
+            written_value.store(43, Ordering::Release);
+            gate.store(false, Ordering::Release);
+            Ok::<(), io::Error>(())
+        }
+    });
+    assert!(matches!(write_outcome, ExecutionOutcome::Success(())));
+    assert_eq!(written_value.load(Ordering::Acquire), 43);
+    assert!(!gate.load(Ordering::Acquire));
 }
 
 /// Verifies a task may change the gate while already holding the executor lock,
