@@ -165,14 +165,17 @@ impl DclCore {
     {
         let phase = Cell::new(PanicPhase::LockAcquisition);
         catch_unwind(AssertUnwindSafe(|| {
-            let _guard = lock.lock();
+            let guard = lock.lock();
             phase.set(PanicPhase::SecondConditionCheck);
-            if !self.predicate.test() {
+            let outcome = if !self.predicate.test() {
                 LockedExecution::ConditionNotMet
             } else {
                 phase.set(PanicPhase::Task);
                 LockedExecution::Task(task())
-            }
+            };
+            phase.set(PanicPhase::LockRelease);
+            drop(guard);
+            outcome
         }))
         .map_err(|payload| PanicInfo::from_payload(phase.get(), payload))
     }

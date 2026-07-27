@@ -24,7 +24,7 @@ pub enum RollbackCause<'a> {
         /// Borrowed view of the original task error.
         &'a (dyn Error + Send + Sync + 'static),
     ),
-    /// Lock acquisition, the second condition check, or the task panicked.
+    /// Lock acquisition, the second check, the task, or lock release panicked.
     Panicked(
         /// Borrowed metadata for the original captured panic.
         &'a PanicInfo,

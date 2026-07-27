@@ -22,7 +22,10 @@ use std::{
     },
 };
 
-use crate::support::CountingLock;
+use crate::support::{
+    CountingLock,
+    PanickingReleaseLock,
+};
 use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
@@ -253,6 +256,27 @@ fn test_run_captures_lock_acquisition_panic() {
             assert_eq!(panic.phase(), PanicPhase::LockAcquisition);
         }
         _ => panic!("expected captured lock-acquisition panic"),
+    }
+}
+
+/// Verifies a guard-drop panic is classified as lock release rather than task
+/// execution.
+#[test]
+fn test_run_captures_lock_release_panic() {
+    let executor = DoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .build();
+
+    let outcome =
+        executor.run(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+
+    match outcome {
+        ExecutionOutcome::Panicked(panic) => {
+            assert_eq!(panic.phase(), PanicPhase::LockRelease);
+            assert_eq!(panic.message(), Some("lock release panic"));
+        }
+        _ => panic!("expected captured lock-release panic"),
     }
 }
 
