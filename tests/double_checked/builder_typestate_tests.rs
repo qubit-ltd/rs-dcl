@@ -10,9 +10,9 @@
 use std::io;
 
 use qubit_dcl::{
-    ExecutionOutcome,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
 };
 
 /// Verifies the complete prepare/commit/rollback combination builds and runs.
@@ -25,13 +25,15 @@ fn test_builder_full_lifecycle_combination() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let report =
+    let outcome =
         executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
-    assert!(matches!(report.execution(), ExecutionOutcome::Success(7)));
     assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::Committed
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            value: 7,
+            commit: FinalizationOutcome::Succeeded,
+        }
     ));
 }
 
@@ -46,17 +48,16 @@ fn test_builder_commit_without_rollback_combination() {
         .no_rollback()
         .build();
 
-    let report = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task"))
     });
 
     assert!(matches!(
-        report.execution(),
-        ExecutionOutcome::TaskFailed(_)
-    ));
-    assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::RollbackNotRequired
+        outcome,
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::NotRequired,
+            ..
+        }
     ));
 }
 
@@ -71,12 +72,14 @@ fn test_builder_rollback_without_commit_combination() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let report =
+    let outcome =
         executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
-    assert!(matches!(report.execution(), ExecutionOutcome::Success(7)));
     assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::CommitNotRequired
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            value: 7,
+            commit: FinalizationOutcome::NotRequired,
+        }
     ));
 }

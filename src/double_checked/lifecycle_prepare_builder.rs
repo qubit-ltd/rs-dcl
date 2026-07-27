@@ -56,7 +56,7 @@ impl<P, C> LifecyclePrepareBuilder<P, C> {
     /// # Errors
     ///
     /// This method only stores `commit`; an error returned when commit later
-    /// runs is preserved in [`crate::PreparationOutcome::CommitFailed`].
+    /// runs is preserved in [`crate::FinalizationOutcome::Failed`].
     ///
     /// # Panics
     ///

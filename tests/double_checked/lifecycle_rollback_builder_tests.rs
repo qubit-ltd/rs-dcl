@@ -10,8 +10,9 @@
 use std::io;
 
 use qubit_dcl::{
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
 };
 
 /// Verifies rollback configuration receives a failed task outcome.
@@ -23,12 +24,15 @@ fn test_rollback_builder_configures_rollback() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let report = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task"))
     });
 
     assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::RolledBack
+        outcome,
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::Succeeded,
+            ..
+        }
     ));
 }

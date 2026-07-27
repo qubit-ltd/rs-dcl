@@ -21,8 +21,9 @@ use std::{
 use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
-    PreparationOutcome,
+    LifecycleOutcome,
 };
 
 /// Runs basic and lifecycle DCL examples using atomic gates.
@@ -54,13 +55,15 @@ fn main() {
         })
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let report = lifecycle_executor.run_with_token(&lifecycle_lock, |token| {
+    let outcome = lifecycle_executor.run_with_token(&lifecycle_lock, |token| {
         token.push("task");
         Ok::<usize, io::Error>(token.len())
     });
-    assert!(matches!(report.execution(), ExecutionOutcome::Success(2)));
     assert!(matches!(
-        report.preparation(),
-        PreparationOutcome::Committed
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            value: 2,
+            commit: FinalizationOutcome::Succeeded,
+        }
     ));
 }

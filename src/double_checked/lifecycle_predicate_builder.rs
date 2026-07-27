@@ -68,7 +68,7 @@ impl LifecyclePredicateBuilder {
     /// # Errors
     ///
     /// This method only stores `prepare`; an error returned when prepare later
-    /// runs is preserved in [`crate::PreparationOutcome::PrepareFailed`].
+    /// runs is preserved in [`crate::LifecycleOutcome::PrepareFailed`].
     ///
     /// # Panics
     ///

@@ -11,18 +11,18 @@ mod double_checked_lock_executor;
 mod double_checked_lock_executor_builder;
 mod double_checked_lock_executor_ready_builder;
 mod execution_outcome;
-mod execution_report;
+mod finalization_outcome;
 mod internal;
 mod lifecycle_commit_builder;
 mod lifecycle_double_checked_lock_executor;
 mod lifecycle_double_checked_lock_executor_builder;
+mod lifecycle_outcome;
 mod lifecycle_predicate_builder;
 mod lifecycle_prepare_builder;
 mod lifecycle_ready_builder;
 mod lifecycle_rollback_builder;
 mod panic_info;
 mod panic_phase;
-mod preparation_outcome;
 mod rollback_cause;
 
 pub use double_checked_lock_executor::DoubleCheckedLockExecutor;
@@ -31,7 +31,7 @@ pub use double_checked_lock_executor_builder::DoubleCheckedLockExecutorBuilder;
 #[doc(hidden)]
 pub use double_checked_lock_executor_ready_builder::DoubleCheckedLockExecutorReadyBuilder;
 pub use execution_outcome::ExecutionOutcome;
-pub use execution_report::ExecutionReport;
+pub use finalization_outcome::FinalizationOutcome;
 #[doc(hidden)]
 pub use lifecycle_commit_builder::LifecycleCommitBuilder;
 pub use lifecycle_double_checked_lock_executor::LifecycleDoubleCheckedLockExecutor;
@@ -42,6 +42,7 @@ pub(crate) use lifecycle_double_checked_lock_executor::{
 };
 #[doc(hidden)]
 pub use lifecycle_double_checked_lock_executor_builder::LifecycleDoubleCheckedLockExecutorBuilder;
+pub use lifecycle_outcome::LifecycleOutcome;
 #[doc(hidden)]
 pub use lifecycle_predicate_builder::LifecyclePredicateBuilder;
 #[doc(hidden)]
@@ -52,5 +53,4 @@ pub use lifecycle_ready_builder::LifecycleReadyBuilder;
 pub use lifecycle_rollback_builder::LifecycleRollbackBuilder;
 pub use panic_info::PanicInfo;
 pub use panic_phase::PanicPhase;
-pub use preparation_outcome::PreparationOutcome;
 pub use rollback_cause::RollbackCause;

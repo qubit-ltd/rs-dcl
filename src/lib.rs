@@ -90,10 +90,10 @@ pub mod double_checked;
 pub use double_checked::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
-    ExecutionReport,
+    FinalizationOutcome,
     LifecycleDoubleCheckedLockExecutor,
+    LifecycleOutcome,
     PanicInfo,
     PanicPhase,
-    PreparationOutcome,
     RollbackCause,
 };
