@@ -33,7 +33,7 @@ doctest = true
 
 [dependencies]
 qubit-function = "0.16"
-qubit-lock = { default-features = false, features = ["parking-lot"], version = "0.11.0", path = "../rs-lock" }
+qubit-lock = { default-features = false, features = ["parking-lot"], version = "0.12.0", path = "../rs-lock" }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
