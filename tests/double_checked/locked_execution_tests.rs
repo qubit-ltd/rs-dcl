@@ -34,7 +34,7 @@ fn test_locked_execution_rechecks_before_task() {
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
         })
         .build();
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run(&std::sync::Mutex::new(()), || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<(), io::Error>(())
     });

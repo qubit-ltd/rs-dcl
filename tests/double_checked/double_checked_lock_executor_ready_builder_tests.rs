@@ -22,7 +22,7 @@ fn test_ready_builder_enables_panic_capture() {
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic!("task"));
+        executor.run(&std::sync::Mutex::new(()), || panic!("task"));
 
     assert!(matches!(outcome, ExecutionOutcome::Panicked(_)));
 }

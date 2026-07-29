@@ -24,7 +24,7 @@ fn test_rollback_builder_configures_rollback() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run(&std::sync::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task"))
     });
 
