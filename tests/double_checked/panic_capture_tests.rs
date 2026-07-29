@@ -7,7 +7,10 @@
 // =============================================================================
 //! Public regression tests for internal panic capture.
 
-use std::io;
+use std::{
+    io,
+    sync::Mutex,
+};
 
 use qubit_dcl::{
     DoubleCheckedLockExecutor,
@@ -23,7 +26,7 @@ fn test_panic_capture_retains_task_context() {
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic!("captured"));
+        executor.run(&Mutex::new(()), || panic!("captured"));
 
     assert!(matches!(
         outcome,

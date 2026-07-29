@@ -101,11 +101,11 @@ fn test_readme_installation_snippets_declare_parking_lot() {
 fn test_manifest_exposes_parking_lot_as_a_default_feature() {
     assert!(CARGO_TOML.contains("[features]\ndefault = [\"parking-lot\"]"));
     assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
-    assert!(
-        CARGO_TOML.contains(
-            "qubit-lock = { default-features = false, version = \"0.12.0\", path = \"../rs-lock\" }"
-        )
-    );
+    let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock")
+        .expect("Cargo.toml should declare qubit-lock");
+    assert!(dependency.contains("default-features = false"));
+    assert!(dependency.contains("version = \"0.12\""));
+    assert!(!dependency.contains("path ="));
 }
 
 /// Verifies the CI feature matrix tests both the minimal and parking-lot lock
@@ -157,6 +157,24 @@ fn extract_package_version(content: &str) -> Option<&str> {
     content
         .lines()
         .find_map(|line| line.strip_prefix("version = \"")?.strip_suffix('"'))
+}
+
+/// Finds the inline dependency specification for a package.
+///
+/// # Parameters
+///
+/// * `content` - Cargo manifest contents.
+/// * `package` - Dependency package name.
+///
+/// # Returns
+///
+/// The right-hand side of the matching dependency declaration, or `None` when
+/// the package is absent.
+fn find_dependency_spec<'a>(content: &'a str, package: &str) -> Option<&'a str> {
+    content.lines().find_map(|line| {
+        line.strip_prefix(package)?
+            .strip_prefix(" = ")
+    })
 }
 
 /// Extracts the qubit-dcl version from a README dependency snippet.
