@@ -272,6 +272,7 @@ is classified as `PanicPhase::LockRelease`.
 [dependencies]
 qubit-dcl = "0.11"
 qubit-lock = "0.12"
+parking_lot = "0.12"
 ```
 
 `qubit-dcl` does not re-export `Lock` or lock primitives owned by other crates.

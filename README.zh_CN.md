@@ -255,6 +255,7 @@ panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error�
 [dependencies]
 qubit-dcl = "0.11"
 qubit-lock = "0.12"
+parking_lot = "0.12"
 ```
 
 `qubit-dcl` 不重导出 `Lock` 或其他 crate 拥有的锁原语。调用方必须直接声明
