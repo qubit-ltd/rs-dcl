@@ -271,11 +271,17 @@ is classified as `PanicPhase::LockRelease`.
 ```toml
 [dependencies]
 qubit-dcl = "0.11"
-qubit-lock = "0.11"
+qubit-lock = "0.12"
 ```
 
 `qubit-dcl` does not re-export `Lock` or lock primitives owned by other crates.
-Declare `qubit-lock` and the selected lock backend directly.
+Declare `qubit-lock` and the selected lock backend directly. The default
+`parking-lot` feature enables `parking_lot` lock implementations through
+`qubit-lock`; consumers that use only standard-library locks can disable it:
+
+```toml
+qubit-dcl = { version = "0.11", default-features = false }
+```
 
 ## Migration from 0.10
 

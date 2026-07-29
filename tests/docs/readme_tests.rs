@@ -85,6 +85,19 @@ fn test_readme_dependency_versions_match_package_version() {
     }
 }
 
+/// Verifies the optional parking-lot lock implementation remains enabled by
+/// default while consumers can opt out of its transitive dependency.
+#[test]
+fn test_manifest_exposes_parking_lot_as_a_default_feature() {
+    assert!(CARGO_TOML.contains("[features]\ndefault = [\"parking-lot\"]"));
+    assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
+    assert!(
+        CARGO_TOML.contains(
+            "qubit-lock = { default-features = false, version = \"0.12.0\", path = \"../rs-lock\" }"
+        )
+    );
+}
+
 /// Verifies each README links to its language-specific 0.11 migration guide.
 #[test]
 fn test_readmes_link_migration_guides() {
