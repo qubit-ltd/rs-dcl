@@ -8,6 +8,8 @@
 //! Tests for the lifecycle-aware DCL executor.
 
 use std::{
+    error::Error,
+    fmt,
     io,
     panic::{
         AssertUnwindSafe,
@@ -39,6 +41,26 @@ use crate::support::{
     PanicOnDrop,
     PanickingReleaseLock,
 };
+
+/// Rollback error whose destructor panics to exercise panic-priority handling.
+#[derive(Debug)]
+struct PanicOnDropRollbackError;
+
+impl fmt::Display for PanicOnDropRollbackError {
+    /// Formats the error for the standard error trait.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("secondary rollback error")
+    }
+}
+
+impl Error for PanicOnDropRollbackError {}
+
+impl Drop for PanicOnDropRollbackError {
+    /// Panics to simulate an error whose destructor is not unwind-safe.
+    fn drop(&mut self) {
+        panic!("secondary rollback error drop panic");
+    }
+}
 
 /// Verifies a failed initial check bypasses every lifecycle callback and lock.
 #[test]
@@ -836,6 +858,50 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
         let _: LifecycleOutcome<(), io::Error, io::Error> = executor
             .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
+    }));
+
+    let payload = panic_result.expect_err("task panic should resume unwinding");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"original task panic"));
+}
+
+/// Verifies discarding a rollback error whose destructor panics cannot abort
+/// the process while the original task panic is resumed.
+#[test]
+fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
+    let test_binary = std::env::current_exe()
+        .expect("integration test binary path should be available");
+    let status = std::process::Command::new(test_binary)
+        .arg("--exact")
+        .arg("double_checked::lifecycle_double_checked_lock_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
+        .arg("--ignored")
+        .arg("--nocapture")
+        .status()
+        .expect("child integration test should start");
+
+    assert!(
+        status.success(),
+        "child process should preserve the original task panic without aborting"
+    );
+}
+
+/// Reproduces the rollback-error destructor panic in a child process because
+/// an abort cannot be observed safely in the parent test process.
+#[test]
+#[ignore]
+fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<(), PanicOnDropRollbackError>(()))
+        .no_commit()
+        .rollback(|_, _| Err::<(), _>(PanicOnDropRollbackError))
+        .build();
+
+    let panic_result = catch_unwind(AssertUnwindSafe(|| {
+        let _: LifecycleOutcome<(), io::Error, PanicOnDropRollbackError> =
+            executor.run(&parking_lot::Mutex::new(()), || {
                 panic!("original task panic")
             });
     }));

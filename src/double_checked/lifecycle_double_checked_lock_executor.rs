@@ -417,13 +417,36 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// Always resumes the original panic payload after rollback is attempted.
     fn rollback_then_resume(&self, token: P, panic: PanicInfo) -> ! {
         if let Some(rollback) = &self.rollback {
-            let _secondary = catch_unwind(AssertUnwindSafe(|| {
-                rollback(token, RollbackCause::Panicked(&panic))
-            }));
+            Self::discard_secondary(|| {
+                let _ = rollback(token, RollbackCause::Panicked(&panic));
+            });
         } else {
-            let _secondary = catch_unwind(AssertUnwindSafe(|| drop(token)));
+            Self::discard_secondary(|| drop(token));
         }
         resume_unwind(panic.into_payload())
+    }
+
+    /// Runs and discards secondary cleanup work without allowing its result,
+    /// panic payload, or destructor panic to replace an earlier panic.
+    ///
+    /// # Parameters
+    ///
+    /// * `operation` - Rollback work or token cleanup to discard.
+    ///
+    /// # Panics
+    ///
+    /// Never propagates a panic. A panic payload that cannot be safely dropped
+    /// is intentionally leaked because a prior panic takes precedence.
+    fn discard_secondary<F>(operation: F)
+    where
+        F: FnOnce(),
+    {
+        let secondary = catch_unwind(AssertUnwindSafe(|| {
+            let _ = catch_unwind(AssertUnwindSafe(operation));
+        }));
+        if let Err(payload) = secondary {
+            std::mem::forget(payload);
+        }
     }
 }
 
