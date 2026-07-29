@@ -170,11 +170,13 @@ fn extract_package_version(content: &str) -> Option<&str> {
 ///
 /// The right-hand side of the matching dependency declaration, or `None` when
 /// the package is absent.
-fn find_dependency_spec<'a>(content: &'a str, package: &str) -> Option<&'a str> {
-    content.lines().find_map(|line| {
-        line.strip_prefix(package)?
-            .strip_prefix(" = ")
-    })
+fn find_dependency_spec<'a>(
+    content: &'a str,
+    package: &str,
+) -> Option<&'a str> {
+    content
+        .lines()
+        .find_map(|line| line.strip_prefix(package)?.strip_prefix(" = "))
 }
 
 /// Extracts the qubit-dcl version from a README dependency snippet.

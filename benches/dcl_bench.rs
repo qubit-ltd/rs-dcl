@@ -11,19 +11,36 @@ use std::{
     convert::Infallible,
     hint::black_box,
     sync::{
-        atomic::{AtomicU8, AtomicUsize, Ordering},
-        Arc, Barrier, Mutex,
+        Arc,
+        Barrier,
+        Mutex,
+        atomic::{
+            AtomicU8,
+            AtomicUsize,
+            Ordering,
+        },
     },
     thread,
     time::Duration,
 };
 
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion, Throughput,
+    BenchmarkGroup,
+    Criterion,
+    Throughput,
+    criterion_group,
+    criterion_main,
+    measurement::WallTime,
 };
 use parking_lot::Mutex as ParkingLotMutex;
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
-use qubit_function::{ArcTester, Tester};
+use qubit_dcl::{
+    DoubleCheckedLockExecutor,
+    ExecutionOutcome,
+};
+use qubit_function::{
+    ArcTester,
+    Tester,
+};
 use qubit_lock::Lock;
 
 /// Executor accepts new work in this state.
@@ -33,7 +50,11 @@ const SHUT_DOWN: u8 = 1;
 
 /// Runs a submission after acquiring the lock before checking state.
 #[inline]
-fn submit_lock_first<L>(state: &AtomicU8, lock: &L, submitted: &AtomicUsize) -> bool
+fn submit_lock_first<L>(
+    state: &AtomicU8,
+    lock: &L,
+    submitted: &AtomicUsize,
+) -> bool
 where
     L: Lock + ?Sized,
 {
@@ -47,7 +68,11 @@ where
 
 /// Runs the handwritten double-checked submission path.
 #[inline]
-fn submit_handwritten_dcl<L>(state: &AtomicU8, lock: &L, submitted: &AtomicUsize) -> bool
+fn submit_handwritten_dcl<L>(
+    state: &AtomicU8,
+    lock: &L,
+    submitted: &AtomicUsize,
+) -> bool
 where
     L: Lock + ?Sized,
 {
@@ -100,12 +125,14 @@ fn benchmark_predicate_representations_for_state(
     let direct_state = Arc::clone(&state);
     let direct = move || direct_state.load(Ordering::Acquire) == RUNNING;
     let static_arc_state = Arc::clone(&state);
-    let static_arc = Arc::new(move || static_arc_state.load(Ordering::Acquire) == RUNNING);
+    let static_arc =
+        Arc::new(move || static_arc_state.load(Ordering::Acquire) == RUNNING);
     let dynamic_state = Arc::clone(&state);
     let dynamic: Arc<dyn Fn() -> bool + Send + Sync> =
         Arc::new(move || dynamic_state.load(Ordering::Acquire) == RUNNING);
     let tester_state = Arc::clone(&state);
-    let tester = ArcTester::new(move || tester_state.load(Ordering::Acquire) == RUNNING);
+    let tester =
+        ArcTester::new(move || tester_state.load(Ordering::Acquire) == RUNNING);
 
     group.bench_function(
         format!("predicate/{state_name}/direct_closure"),
@@ -113,23 +140,38 @@ fn benchmark_predicate_representations_for_state(
             bencher.iter(|| black_box(direct()));
         },
     );
-    group.bench_function(format!("predicate/{state_name}/arc_static"), |bencher| {
-        bencher.iter(|| black_box(static_arc()));
-    });
-    group.bench_function(format!("predicate/{state_name}/arc_dynamic"), |bencher| {
-        bencher.iter(|| black_box(dynamic()));
-    });
-    group.bench_function(format!("predicate/{state_name}/arc_tester"), |bencher| {
-        bencher.iter(|| black_box(tester.test()));
-    });
+    group.bench_function(
+        format!("predicate/{state_name}/arc_static"),
+        |bencher| {
+            bencher.iter(|| black_box(static_arc()));
+        },
+    );
+    group.bench_function(
+        format!("predicate/{state_name}/arc_dynamic"),
+        |bencher| {
+            bencher.iter(|| black_box(dynamic()));
+        },
+    );
+    group.bench_function(
+        format!("predicate/{state_name}/arc_tester"),
+        |bencher| {
+            bencher.iter(|| black_box(tester.test()));
+        },
+    );
 }
 
 /// Registers predicate representation measurements for running and shut-down
 /// states.
 fn benchmark_predicate_representations(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("dcl_cost_breakdown");
-    benchmark_predicate_representations_for_state(&mut group, "running", RUNNING);
-    benchmark_predicate_representations_for_state(&mut group, "shut_down", SHUT_DOWN);
+    benchmark_predicate_representations_for_state(
+        &mut group, "running", RUNNING,
+    );
+    benchmark_predicate_representations_for_state(
+        &mut group,
+        "shut_down",
+        SHUT_DOWN,
+    );
     group.finish();
 }
 
@@ -138,35 +180,47 @@ fn benchmark_predicate_representations(criterion: &mut Criterion) {
 /// Both paths evaluate the predicate twice on acceptance and once on rejection.
 /// The typed entry isolates the potential benefit of making the predicate a
 /// generic type parameter instead of the current `ArcTester` type erasure.
-fn benchmark_typed_dcl_backend<L>(group: &mut BenchmarkGroup<'_, WallTime>, backend: &str, lock: &L)
-where
+fn benchmark_typed_dcl_backend<L>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    backend: &str,
+    lock: &L,
+) where
     L: Lock + ?Sized,
 {
-    for (state_name, state_value) in [("running", RUNNING), ("shut_down", SHUT_DOWN)] {
+    for (state_name, state_value) in
+        [("running", RUNNING), ("shut_down", SHUT_DOWN)]
+    {
         let state = Arc::new(AtomicU8::new(state_value));
         let typed_state = Arc::clone(&state);
-        let typed_predicate = move || typed_state.load(Ordering::Acquire) == RUNNING;
+        let typed_predicate =
+            move || typed_state.load(Ordering::Acquire) == RUNNING;
         let executor_state = Arc::clone(&state);
         let executor = DoubleCheckedLockExecutor::builder()
             .when(move || executor_state.load(Ordering::Acquire) == RUNNING)
             .build();
         let submitted = AtomicUsize::new(0);
 
-        group.bench_function(format!("typed/{backend}/{state_name}"), |bencher| {
-            bencher.iter(|| {
-                black_box(run_typed_dcl(&typed_predicate, lock, || {
-                    submitted.fetch_add(1, Ordering::Relaxed);
-                }))
-            });
-        });
-        group.bench_function(format!("erased/{backend}/{state_name}"), |bencher| {
-            bencher.iter(|| {
-                black_box(executor.run(lock, || {
-                    submitted.fetch_add(1, Ordering::Relaxed);
-                    Ok::<(), Infallible>(())
-                }))
-            });
-        });
+        group.bench_function(
+            format!("typed/{backend}/{state_name}"),
+            |bencher| {
+                bencher.iter(|| {
+                    black_box(run_typed_dcl(&typed_predicate, lock, || {
+                        submitted.fetch_add(1, Ordering::Relaxed);
+                    }))
+                });
+            },
+        );
+        group.bench_function(
+            format!("erased/{backend}/{state_name}"),
+            |bencher| {
+                bencher.iter(|| {
+                    black_box(executor.run(lock, || {
+                        submitted.fetch_add(1, Ordering::Relaxed);
+                        Ok::<(), Infallible>(())
+                    }))
+                });
+            },
+        );
     }
 }
 
@@ -176,7 +230,11 @@ fn benchmark_typed_dcl(criterion: &mut Criterion) {
     let std_lock = Mutex::new(());
     benchmark_typed_dcl_backend(&mut group, "std_mutex", &std_lock);
     let parking_lot_lock = ParkingLotMutex::new(());
-    benchmark_typed_dcl_backend(&mut group, "parking_lot_mutex", &parking_lot_lock);
+    benchmark_typed_dcl_backend(
+        &mut group,
+        "parking_lot_mutex",
+        &parking_lot_lock,
+    );
     group.finish();
 }
 
@@ -203,9 +261,14 @@ fn benchmark_submission_backend<L>(
     group.bench_function(format!("{backend}/running/lock_first"), |bencher| {
         bencher.iter(|| black_box(submit_lock_first(&state, lock, &submitted)));
     });
-    group.bench_function(format!("{backend}/running/handwritten_dcl"), |bencher| {
-        bencher.iter(|| black_box(submit_handwritten_dcl(&state, lock, &submitted)));
-    });
+    group.bench_function(
+        format!("{backend}/running/handwritten_dcl"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_handwritten_dcl(&state, lock, &submitted))
+            });
+        },
+    );
     group.bench_function(format!("{backend}/running/qubit_dcl"), |bencher| {
         bencher.iter(|| {
             black_box(executor.run(lock, || {
@@ -227,12 +290,22 @@ fn benchmark_submission_backend<L>(
     );
 
     state.store(SHUT_DOWN, Ordering::Release);
-    group.bench_function(format!("{backend}/shut_down/lock_first"), |bencher| {
-        bencher.iter(|| black_box(submit_lock_first(&state, lock, &submitted)));
-    });
-    group.bench_function(format!("{backend}/shut_down/handwritten_dcl"), |bencher| {
-        bencher.iter(|| black_box(submit_handwritten_dcl(&state, lock, &submitted)));
-    });
+    group.bench_function(
+        format!("{backend}/shut_down/lock_first"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_lock_first(&state, lock, &submitted))
+            });
+        },
+    );
+    group.bench_function(
+        format!("{backend}/shut_down/handwritten_dcl"),
+        |bencher| {
+            bencher.iter(|| {
+                black_box(submit_handwritten_dcl(&state, lock, &submitted))
+            });
+        },
+    );
     group.bench_function(format!("{backend}/shut_down/qubit_dcl"), |bencher| {
         bencher.iter(|| {
             let outcome = executor.run(lock, || {
@@ -312,17 +385,20 @@ where
             let state = Arc::new(AtomicU8::new(RUNNING));
             let predicate_state = Arc::clone(&state);
             let executor = DoubleCheckedLockExecutor::builder()
-                .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
+                .when(move || {
+                    predicate_state.load(Ordering::Acquire) == RUNNING
+                })
                 .build();
             let barrier = &start_barrier;
             scope.spawn(move || {
                 barrier.wait();
                 for iteration in 0..iterations {
-                    let state_value = if iteration % 100 < u64::from(rejected_percentage) {
-                        SHUT_DOWN
-                    } else {
-                        RUNNING
-                    };
+                    let state_value =
+                        if iteration % 100 < u64::from(rejected_percentage) {
+                            SHUT_DOWN
+                        } else {
+                            RUNNING
+                        };
                     state.store(state_value, Ordering::Release);
                     let _ = black_box(executor.run(lock, || {
                         submitted.fetch_add(1, Ordering::Relaxed);
@@ -342,16 +418,23 @@ where
 /// Criterion's iteration count becomes the per-worker operation count. The
 /// group throughput is therefore configured as the worker count so reported
 /// rates represent total executor calls.
-fn benchmark_contention_backend<L>(criterion: &mut Criterion, backend: &str, lock: &L)
-where
+fn benchmark_contention_backend<L>(
+    criterion: &mut Criterion,
+    backend: &str,
+    lock: &L,
+) where
     L: Lock + Sync + ?Sized,
 {
     for worker_count in [1_usize, 2, 4, 8] {
-        for (state_name, state_value) in [("running", RUNNING), ("shut_down", SHUT_DOWN)] {
+        for (state_name, state_value) in
+            [("running", RUNNING), ("shut_down", SHUT_DOWN)]
+        {
             let state = Arc::new(AtomicU8::new(state_value));
             let predicate_state = Arc::clone(&state);
             let executor = DoubleCheckedLockExecutor::builder()
-                .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
+                .when(move || {
+                    predicate_state.load(Ordering::Acquire) == RUNNING
+                })
                 .build();
             let submitted = AtomicUsize::new(0);
             let mut group = criterion.benchmark_group(format!(
@@ -360,7 +443,13 @@ where
             group.throughput(Throughput::Elements(worker_count as u64));
             group.bench_function("qubit_dcl", |bencher| {
                 bencher.iter_custom(|iterations| {
-                    run_contention_round(&executor, lock, worker_count, iterations, &submitted)
+                    run_contention_round(
+                        &executor,
+                        lock,
+                        worker_count,
+                        iterations,
+                        &submitted,
+                    )
                 });
             });
             group.finish();
@@ -373,15 +462,22 @@ fn benchmark_contention(criterion: &mut Criterion) {
     let std_lock = Mutex::new(());
     benchmark_contention_backend(criterion, "std_mutex", &std_lock);
     let parking_lot_lock = ParkingLotMutex::new(());
-    benchmark_contention_backend(criterion, "parking_lot_mutex", &parking_lot_lock);
+    benchmark_contention_backend(
+        criterion,
+        "parking_lot_mutex",
+        &parking_lot_lock,
+    );
 }
 
 /// Registers four-worker throughput measurements at several rejection ratios.
 ///
 /// The worker count is kept fixed so this benchmark isolates the effect of
 /// reducing lock acquisition frequency while preserving concurrent callers.
-fn benchmark_rejection_ratios_backend<L>(criterion: &mut Criterion, backend: &str, lock: &L)
-where
+fn benchmark_rejection_ratios_backend<L>(
+    criterion: &mut Criterion,
+    backend: &str,
+    lock: &L,
+) where
     L: Lock + Sync + ?Sized,
 {
     const WORKER_COUNT: usize = 4;
@@ -412,7 +508,11 @@ fn benchmark_rejection_ratios(criterion: &mut Criterion) {
     let std_lock = Mutex::new(());
     benchmark_rejection_ratios_backend(criterion, "std_mutex", &std_lock);
     let parking_lot_lock = ParkingLotMutex::new(());
-    benchmark_rejection_ratios_backend(criterion, "parking_lot_mutex", &parking_lot_lock);
+    benchmark_rejection_ratios_backend(
+        criterion,
+        "parking_lot_mutex",
+        &parking_lot_lock,
+    );
 }
 
 /// Benchmarks submission gates matching executor shutdown coordination.
@@ -421,7 +521,11 @@ fn benchmark_dcl(criterion: &mut Criterion) {
     let std_lock = Mutex::new(());
     benchmark_submission_backend(&mut group, "std_mutex", &std_lock);
     let parking_lot_lock = ParkingLotMutex::new(());
-    benchmark_submission_backend(&mut group, "parking_lot_mutex", &parking_lot_lock);
+    benchmark_submission_backend(
+        &mut group,
+        "parking_lot_mutex",
+        &parking_lot_lock,
+    );
     group.finish();
 }
 
