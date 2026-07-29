@@ -52,4 +52,3 @@ required-features = ["parking-lot"]
 [[test]]
 name = "mod"
 path = "tests/mod.rs"
-required-features = ["parking-lot"]

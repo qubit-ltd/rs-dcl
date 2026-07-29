@@ -10,6 +10,7 @@
 use std::{
     io,
     panic::panic_any,
+    sync::Mutex,
 };
 
 use qubit_dcl::{
@@ -26,7 +27,7 @@ fn test_panic_info_preserves_string_payload() {
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> = executor
-        .run(&parking_lot::Mutex::new(()), || {
+        .run(&Mutex::new(()), || {
             panic_any(String::from("owned panic"))
         });
 
@@ -55,7 +56,7 @@ fn test_panic_info_preserves_non_string_payload_without_message() {
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic_any(123_u32));
+        executor.run(&Mutex::new(()), || panic_any(123_u32));
 
     let ExecutionOutcome::Panicked(panic) = outcome else {
         panic!("expected captured task panic");
