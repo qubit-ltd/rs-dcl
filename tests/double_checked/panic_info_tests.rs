@@ -27,9 +27,7 @@ fn test_panic_info_preserves_string_payload() {
         .catch_panics(true)
         .build();
     let outcome: ExecutionOutcome<(), io::Error> = executor
-        .run(&Mutex::new(()), || {
-            panic_any(String::from("owned panic"))
-        });
+        .run(&Mutex::new(()), || panic_any(String::from("owned panic")));
 
     let ExecutionOutcome::Panicked(panic) = outcome else {
         panic!("expected captured task panic");
