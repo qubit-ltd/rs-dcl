@@ -13,6 +13,7 @@ mod double_checked_lock_executor_ready_builder_tests;
 mod double_checked_lock_executor_tests;
 mod execution_outcome_tests;
 mod finalization_outcome_tests;
+mod internal;
 mod lifecycle_commit_builder_tests;
 mod lifecycle_double_checked_lock_executor_builder_tests;
 mod lifecycle_double_checked_lock_executor_tests;
