@@ -11,22 +11,18 @@ const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const FEATURE_MATRIX: &str = include_str!("../../.rs-ci-cargo-matrix.json");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
+const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
+const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 
-/// Verifies both README files document the final executor API and lifecycle
-/// choices.
+/// Verifies both README files document the supported public entry points while
+/// leaving detailed lifecycle guidance to the user guides.
 #[test]
 fn test_readmes_document_final_public_api() {
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains("DoubleCheckedLockExecutor::builder()"));
         assert!(readme.contains("executor.run(&lock"));
         assert!(readme.contains("LifecycleDoubleCheckedLockExecutor"));
-        assert!(readme.contains("run_with_token"));
-        assert!(readme.contains("no_commit"));
-        assert!(readme.contains("no_rollback"));
-        assert!(readme.contains("ExecutionOutcome"));
-        assert!(readme.contains("LifecycleOutcome"));
-        assert!(readme.contains("FinalizationOutcome"));
-        assert!(readme.contains("LockRelease"));
+        assert!(readme.contains("doc/user_guide"));
         assert!(!readme.contains("ExecutionReport"));
         assert!(!readme.contains("PreparationOutcome"));
         assert!(!readme.contains("ExecutionContext"));
@@ -36,38 +32,41 @@ fn test_readmes_document_final_public_api() {
     }
 }
 
-/// Verifies both README files state the three non-negotiable gate contracts.
+/// Verifies both user guides state the non-negotiable gate and lock contracts.
 #[test]
-fn test_readmes_document_gate_and_lock_contracts() {
-    let readme_en = README_EN.split_whitespace().collect::<Vec<_>>().join(" ");
-    let readme_zh = README_ZH.split_whitespace().collect::<Vec<_>>().join(" ");
+fn test_user_guides_document_gate_and_lock_contracts() {
+    let guide_en = USER_GUIDE_EN
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let guide_zh = USER_GUIDE_ZH
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
 
-    assert!(readme_en.contains("Acquire load"));
-    assert!(readme_en.contains("must not acquire the executor's lock"));
-    assert!(
-        readme_en
-            .contains("`Lock` represents an acquisition mode, not necessarily an exclusive one")
-    );
-    assert!(readme_en.contains("shared read mode"));
-    assert!(readme_en.contains("paired write mode"));
-    assert!(readme_en.contains("same executor"));
-    assert!(readme_en.contains("different captured data"));
-    assert!(
-        readme_en.contains("coordination mechanism rather than data ownership")
-    );
-    assert!(readme_en.contains("must use an `ExclusiveLock` mode"));
-    assert!(readme_en.contains("same underlying lock"));
+    assert!(guide_en.contains("Acquire load"));
+    assert!(guide_en.contains("must not acquire the same underlying lock"));
+    assert!(guide_en.contains(
+        "`Lock` represents an acquisition mode, not necessarily exclusivity"
+    ));
+    assert!(guide_en.contains("shared read mode"));
+    assert!(guide_en.contains("paired write mode"));
+    assert!(guide_en.contains("same executor"));
+    assert!(guide_en.contains("different data"));
+    assert!(guide_en.contains("owns neither the lock nor its protected data"));
+    assert!(guide_en.contains("exclusive mode"));
+    assert!(guide_en.contains("same underlying lock"));
 
-    assert!(readme_zh.contains("Acquire load"));
-    assert!(readme_zh.contains("不得获取 executor 的同一底层锁"));
-    assert!(readme_zh.contains("`Lock` 表示获取模式，并不必然表示排他锁"));
-    assert!(readme_zh.contains("共享 read mode"));
-    assert!(readme_zh.contains("配套的 write mode"));
-    assert!(readme_zh.contains("同一个 executor"));
-    assert!(readme_zh.contains("不同的捕获数据"));
-    assert!(readme_zh.contains("协调机制，而不是数据所有权"));
-    assert!(readme_zh.contains("必须使用 `ExclusiveLock` mode"));
-    assert!(readme_zh.contains("同一底层锁"));
+    assert!(guide_zh.contains("Acquire load"));
+    assert!(guide_zh.contains("不得获取同一个底层锁"));
+    assert!(guide_zh.contains("`Lock` 表示获取模式，并不必然表示排他性"));
+    assert!(guide_zh.contains("共享 read mode"));
+    assert!(guide_zh.contains("配套的 write mode"));
+    assert!(guide_zh.contains("同一个 executor"));
+    assert!(guide_zh.contains("不同的数据"));
+    assert!(guide_zh.contains("不拥有锁或锁保护的数据"));
+    assert!(guide_zh.contains("排他模式"));
+    assert!(guide_zh.contains("同一个底层锁"));
 }
 
 /// Verifies installation snippets use the package's current major/minor
@@ -128,6 +127,22 @@ fn test_feature_matrix_covers_minimal_and_parking_lot_backends() {
 fn test_readmes_link_migration_guides() {
     assert!(README_EN.contains("doc/user_guide_migration_0_11.md"));
     assert!(README_ZH.contains("doc/user_guide_migration_0_11.zh_CN.md"));
+}
+
+/// Verifies README files route readers to the matching-language user guide and
+/// both guides cover the public executor and outcome types.
+#[test]
+fn test_readmes_link_user_guides() {
+    assert!(README_EN.contains("doc/user_guide.md"));
+    assert!(README_ZH.contains("doc/user_guide.zh_CN.md"));
+
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(guide.contains("DoubleCheckedLockExecutor"));
+        assert!(guide.contains("LifecycleDoubleCheckedLockExecutor"));
+        assert!(guide.contains("ExecutionOutcome"));
+        assert!(guide.contains("LifecycleOutcome"));
+        assert!(guide.contains("PanicPhase"));
+    }
 }
 
 /// Verifies the required final four H2 sections are the last H2 headings in
