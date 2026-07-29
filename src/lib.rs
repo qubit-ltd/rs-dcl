@@ -10,6 +10,36 @@
 //! Reusable double-checked locking executors for atomic or equivalently
 //! synchronized gates and generic [`qubit_lock::Lock`] implementations.
 //!
+//! A basic executor can use an Acquire/Release gate with one shared lock:
+//!
+//! ```
+//! use std::sync::{
+//!     Arc,
+//!     Mutex,
+//!     atomic::{AtomicBool, Ordering},
+//! };
+//!
+//! use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+//!
+//! let gate = Arc::new(AtomicBool::new(true));
+//! let lock = Mutex::new(());
+//! let executor = DoubleCheckedLockExecutor::builder()
+//!     .when({
+//!         let gate = Arc::clone(&gate);
+//!         move || gate.load(Ordering::Acquire)
+//!     })
+//!     .build();
+//!
+//! let outcome = executor.run(&lock, {
+//!     let gate = Arc::clone(&gate);
+//!     move || {
+//!         gate.store(false, Ordering::Release);
+//!         Ok::<(), ()>(())
+//!     }
+//! });
+//! assert!(matches!(outcome, ExecutionOutcome::Success(())));
+//! ```
+//!
 //! Lifecycle builder states expose only valid next steps. The following
 //! incomplete configurations intentionally do not compile.
 //!
