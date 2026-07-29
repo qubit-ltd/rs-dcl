@@ -8,6 +8,7 @@
 //! README contract and version consistency tests for qubit-dcl.
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
+const FEATURE_MATRIX: &str = include_str!("../../.rs-ci-cargo-matrix.json");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 
@@ -85,6 +86,15 @@ fn test_readme_dependency_versions_match_package_version() {
     }
 }
 
+/// Verifies installation snippets declare the parking-lot backend used by the
+/// default examples.
+#[test]
+fn test_readme_installation_snippets_declare_parking_lot() {
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains("parking_lot = \"0.12\""));
+    }
+}
+
 /// Verifies the optional parking-lot lock implementation remains enabled by
 /// default while consumers can opt out of its transitive dependency.
 #[test]
@@ -96,6 +106,21 @@ fn test_manifest_exposes_parking_lot_as_a_default_feature() {
             "qubit-lock = { default-features = false, version = \"0.12.0\", path = \"../rs-lock\" }"
         )
     );
+}
+
+/// Verifies the CI feature matrix tests both the minimal and parking-lot lock
+/// backends.
+#[test]
+fn test_feature_matrix_covers_minimal_and_parking_lot_backends() {
+    assert!(FEATURE_MATRIX.contains("\"name\": \"base-locks\""));
+    assert!(FEATURE_MATRIX.contains("\"defaultFeatures\": false"));
+    assert!(FEATURE_MATRIX.contains("\"name\": \"parking-lot-locks\""));
+    assert!(
+        FEATURE_MATRIX
+            .contains("\"features\": [\n        \"parking-lot\"\n      ]")
+    );
+    assert!(FEATURE_MATRIX.contains("\"name\": \"all-features\""));
+    assert!(FEATURE_MATRIX.contains("\"allFeatures\": true"));
 }
 
 /// Verifies each README links to its language-specific 0.11 migration guide.
