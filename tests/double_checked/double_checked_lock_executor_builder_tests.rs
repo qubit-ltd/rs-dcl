@@ -19,7 +19,7 @@ use qubit_dcl::{
 fn test_builder_accepts_predicate() {
     let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }

@@ -25,7 +25,7 @@ fn test_commit_builder_selects_no_rollback() {
         .no_rollback()
         .build();
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

@@ -24,7 +24,7 @@ fn test_ready_builder_builds_reusable_executor() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let lock = parking_lot::Mutex::new(());
+    let lock = std::sync::Mutex::new(());
 
     for value in [1, 2] {
         let outcome = executor.run(&lock, || Ok::<u32, io::Error>(value));

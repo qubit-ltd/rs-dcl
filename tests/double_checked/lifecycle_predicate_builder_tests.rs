@@ -25,7 +25,7 @@ fn test_predicate_builder_configures_prepare() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(outcome, LifecycleOutcome::PrepareFailed(_)));
 }
