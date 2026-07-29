@@ -872,17 +872,18 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
 fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
     let test_binary = std::env::current_exe()
         .expect("integration test binary path should be available");
-    let status = std::process::Command::new(test_binary)
+    let output = std::process::Command::new(test_binary)
         .arg("--exact")
         .arg("double_checked::lifecycle_double_checked_lock_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
         .arg("--ignored")
-        .arg("--nocapture")
-        .status()
+        .output()
         .expect("child integration test should start");
 
     assert!(
-        status.success(),
-        "child process should preserve the original task panic without aborting"
+        output.status.success(),
+        "child process should preserve the original task panic without aborting\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
     );
 }
 
