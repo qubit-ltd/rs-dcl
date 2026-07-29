@@ -254,11 +254,16 @@ panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error�
 ```toml
 [dependencies]
 qubit-dcl = "0.11"
-qubit-lock = "0.11"
+qubit-lock = "0.12"
 ```
 
 `qubit-dcl` 不重导出 `Lock` 或其他 crate 拥有的锁原语。调用方必须直接声明
-`qubit-lock` 和所选锁后端依赖。
+`qubit-lock` 和所选锁后端依赖。默认 `parking-lot` feature 会通过
+`qubit-lock` 启用 `parking_lot` 锁实现；只使用标准库锁的调用方可以关闭它：
+
+```toml
+qubit-dcl = { version = "0.11", default-features = false }
+```
 
 ## 从 0.10 迁移
 
