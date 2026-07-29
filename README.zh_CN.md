@@ -7,45 +7,35 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`qubit-dcl` 将双重检查锁（Double-Checked Locking）设计模式封装为可复用
-executor。无锁 predicate 首先排除不需要执行的任务；条件满足后，executor
-获取本次调用传入的通用 `qubit_lock::Lock`，再次检查同一个 predicate，并在锁内
-执行任意 task。
+Qubit DCL 为 Rust 提供可复用的双重检查锁 executor。它帮助并发应用跳过已经不需要的
+工作，而不必在业务代码中重复拼接容易出错的同步流程。调用方提供 atomic 或具有等价
+同步语义的 gate，并在每次执行时选择锁模式；executor 先无锁检查，再在该模式下复查，
+只有两次都满足条件时才运行 task。
 
-0.11 是一次有意进行的破坏性重设计。executor 只持有 predicate 和 callback，
-每次 `run` 单独传入锁获取模式。锁在这里是协调机制，而不是数据所有权，因此
-executor 不会永久绑定某个锁，也不会绑定 task 使用的数据。
+## 安装
 
-## 并发契约
+```toml
+[dependencies]
+qubit-dcl = "0.11"
+qubit-lock = "0.12"
+parking_lot = "0.12"
+```
 
-正确使用 DCL 必须同时遵守以下三条规则：
+Qubit DCL 要求 Rust 1.94 或更高版本。默认 `parking-lot` feature 会通过
+`qubit-lock` 启用匹配的锁实现。只使用标准库锁时可以关闭该 feature：
 
-1. predicate 读取 atomic 或具有等价同步语义的 gate。常用协议是 Acquire load
-   配对 Release store。
-2. predicate 不得获取 executor 的同一底层锁，也不应执行阻塞操作。
-3. 锁模式必须匹配 task 的实际语义。`Lock` 表示获取模式，并不必然表示排他锁。
-   executor 会让第二次检查和 task 共用该模式产生的同一个 guard。
+```toml
+qubit-dcl = { version = "0.11", default-features = false }
+qubit-lock = { version = "0.12", default-features = false }
+```
 
-当 task 只读取协议保护的状态、所有冲突写入都使用同一底层锁配套的 write mode，
-并且调用方不要求 task 至多执行一次时，共享 read mode 是正确选择。此时多个调用
-可以同时通过第二次检查并并发执行。
+Qubit DCL 不重导出 `qubit_lock::Lock` 或其他 crate 所拥有的锁原语。请直接声明
+`qubit-lock` 和所选锁后端依赖。
 
-一个常见设计是由读线程和写线程调用同一个 executor：读线程传入某个 RWLock 的
-read mode 并执行只读 action；写线程传入同一底层锁配套的 write mode 并执行写
-action。两个 action 可以操作不同的捕获数据，只需读取同一个 atomic 状态变量。
-这正是每次调用才传入锁，而不是把锁或受保护数据固定在 executor 内的原因。
+## 快速开始
 
-如果 task 会修改 gate 或受保护状态、消费任务、执行一次性初始化，或者要求串行化，
-则必须使用 `ExclusiveLock` mode，例如 mutex 或 write-mode adapter。也可以使用独立
-的 compare-and-exchange 协议来选出唯一执行者。
-
-atomic gate 提供可见性；所选锁模式提供对应的共享或排他协调。
-`ptr::read_volatile` 面向 MMIO 等 volatile memory，不能替代 atomic 同步。
-
-## 基础 executor
-
-锁类型应直接从其所属 crate 导入。下面的例子有意使用 mutex，因此 task 运行在
-排他获取模式中，可以在该 guard 内直接关闭 gate：
+假设多个请求处理器都可能初始化同一个昂贵资源。第一个处理器在 mutex 内关闭 atomic
+gate；后续处理器看到 gate 已关闭后，不尝试获取锁便直接返回。
 
 ```rust
 use std::{
@@ -56,8 +46,8 @@ use std::{
     },
 };
 
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
 use parking_lot::Mutex;
+use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
@@ -71,206 +61,55 @@ let executor = DoubleCheckedLockExecutor::builder()
 let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
     move || {
-        // 第二次检查已经成功，task 此时位于 executor 锁内，可以直接关闭
-        // gate，无需重新获取同一把锁。
+        // task 已持有本次调用选择的 mutex。
         gate.store(false, Ordering::Release);
         Ok::<usize, io::Error>(42)
     }
 });
 
 assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+assert!(matches!(
+    executor.run(&lock, || Ok::<(), io::Error>(())),
+    ExecutionOutcome::ConditionNotMet
+));
 ```
 
-第一次检查返回 `false` 时，executor 不调用任何锁方法，直接返回
-`ExecutionOutcome::ConditionNotMet`。task 返回的错误会原样保存在
+第一次 predicate 返回 `false` 时，executor 不调用任何锁方法，直接返回
+`ExecutionOutcome::ConditionNotMet`。task error 会原样保存在
 `ExecutionOutcome::TaskFailed(E)` 中。
 
-同一个 executor 可以使用同一 RWLock 配套的 read mode 和 write mode。下面两个
-action 有意操作不同的捕获数据，只共享协调协议：
+## 为什么需要这个 crate
 
-```rust
-use std::sync::{
-    Arc,
-    RwLock,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-};
+双重检查锁很容易描述，却很容易实现得不一致：fast path 可能意外获取锁，第二次检查
+可能被遗漏，或者共享 read lock 被误当成“至多执行一次”机制。Qubit DCL 明确固定执行
+顺序，同时把锁所有权和受保护数据保留在调用方。
 
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
-use qubit_lock::ReadWriteLock;
+传给 `run` 的锁是协调模式，而不是 executor 持有的状态。因此，只要 task 遵守同一个
+gate 协议，读者与 writer 可以使用同一个 executor，并传入同一 RWLock 产生的配套模式。
 
-let lock = RwLock::new(());
-let gate = Arc::new(AtomicBool::new(true));
-let read_value = Arc::new(AtomicUsize::new(42));
-let write_value = Arc::new(AtomicUsize::new(0));
-let executor = DoubleCheckedLockExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
+## 它提供什么
 
-let read_mode = lock.read_lock();
-let read_outcome = executor.run(&read_mode, {
-    let read_value = Arc::clone(&read_value);
-    move || Ok::<usize, std::io::Error>(read_value.load(Ordering::Acquire))
-});
-assert!(matches!(read_outcome, ExecutionOutcome::Success(42)));
+- `DoubleCheckedLockExecutor`：复用 predicate、调用方选择
+  `qubit_lock::Lock`，并获得结构化 `ExecutionOutcome`。
+- `LifecycleDoubleCheckedLockExecutor`：适用于先准备每次调用独有的 token，再在
+  锁内执行后 commit 或 rollback 的工作流。
+- `LifecycleOutcome`、`FinalizationOutcome`、`RollbackCause`、`PanicInfo` 和
+  `PanicPhase`：用于检查全部生命周期终态。
+- 可选 `catch_panics(true)`：调用方需要结构化 panic 元数据而不是传播时使用。
 
-let write_mode = lock.write_lock();
-let write_outcome = executor.run(&write_mode, {
-    let gate = Arc::clone(&gate);
-    let write_value = Arc::clone(&write_value);
-    move || {
-        write_value.store(43, Ordering::Release);
-        gate.store(false, Ordering::Release);
-        Ok::<(), std::io::Error>(())
-    }
-});
-assert!(matches!(write_outcome, ExecutionOutcome::Success(())));
-assert_eq!(write_value.load(Ordering::Acquire), 43);
-```
+它不拥有锁、不暴露受保护数据、不缓存 task 结果、不替应用选择 memory ordering，也不会
+把共享锁模式变成排他执行。修改 gate 或受保护状态，或要求 task 至多执行一次时，必须
+使用排他锁模式或独立唯一性协议。
 
-如果由 task 外的路径修改 gate，该路径必须使用同一个锁对象：
+## 延伸阅读
 
-```rust
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
-use qubit_dcl::DoubleCheckedLockExecutor;
-use qubit_lock::Lock;
-
-let lock = Arc::new(parking_lot::Mutex::new(()));
-let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
-
-let guard = Lock::lock(&lock);
-gate.store(false, Ordering::Release);
-drop(guard);
-
-let outcome = executor.run(&lock, || Ok::<(), std::io::Error>(()));
-assert!(matches!(
-    outcome,
-    qubit_dcl::ExecutionOutcome::ConditionNotMet
-));
-```
-
-## 生命周期 executor
-
-`LifecycleDoubleCheckedLockExecutor` 在第一次检查之后、加锁之前执行 prepare。
-每次调用都有独立令牌 `P`。task 和解锁完成后，该令牌由 commit 或 rollback
-消费。
-
-```rust
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
-
-use qubit_dcl::{
-    FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
-    LifecycleOutcome,
-    RollbackCause,
-};
-
-let lock = std::sync::Mutex::new(());
-let gate = Arc::new(AtomicBool::new(true));
-let executor = LifecycleDoubleCheckedLockExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .catch_panics(true)
-    .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepared"]))
-    .commit(|token| {
-        assert_eq!(token, ["prepared", "task"]);
-        Ok::<(), io::Error>(())
-    })
-    .rollback(|token, cause| {
-        assert!(!token.is_empty());
-        match cause {
-            RollbackCause::ConditionNotMet => {}
-            RollbackCause::TaskFailed(error) => eprintln!("task failed: {error}"),
-            RollbackCause::Panicked(panic) => {
-                eprintln!("panic in {:?}", panic.phase());
-            }
-        }
-        Ok::<(), io::Error>(())
-    })
-    .build();
-
-let outcome = executor.run_with_token(&lock, |token| {
-    token.push("task");
-    Ok::<usize, io::Error>(token.len())
-});
-
-assert!(matches!(
-    outcome,
-    LifecycleOutcome::TaskSucceeded {
-        value: 2,
-        commit: FinalizationOutcome::Succeeded,
-    }
-));
-```
-
-typestate builder 只允许三种生命周期组合：
-
-- `prepare -> commit -> rollback -> build`
-- `prepare -> commit -> no_rollback -> build`
-- `prepare -> no_commit -> rollback -> build`
-
-不存在 `no_commit + no_rollback` 组合。没有实际令牌数据时，prepare 可以返回
-`()`，调用方继续使用 `run`，无需改用 `run_with_token`。
-
-## 结果与 panic 语义
-
-基础 executor 返回 `ExecutionOutcome<R, E>`。生命周期 executor 返回一个穷尽的
-`LifecycleOutcome<R, E, C>`，由 variant 直接表示最终控制流状态。执行 commit 或
-rollback 的 variant 包含 `FinalizationOutcome<C>`，其状态为 `NotRequired`、
-`Succeeded`、`Failed(C)` 或 `Panicked(PanicInfo)`。
-
-commit 失败不会覆盖 task 成功；rollback 失败不会覆盖触发它的 task error 或
-panic。`RollbackCause::TaskFailed` 在 rollback 调用期间借用原始 error，而
-`LifecycleOutcome` 仍然保留其所有权。
-
-默认不捕获 panic。启用 `.catch_panics(true)` 后，panic 信息包含准确的
-`PanicPhase` 和原始 payload。捕获边界位于 RAII guard 的作用域外，因此标准库锁
-会正常观察 unwind 并进入 poisoned 状态；parking-lot 锁则保持其不 poisoning 的
-正常语义。正常完成锁内工作后，显式释放 guard 时发生的 panic 会分类为
-`PanicPhase::LockRelease`。
-
-## 安装
-
-```toml
-[dependencies]
-qubit-dcl = "0.11"
-qubit-lock = "0.12"
-parking_lot = "0.12"
-```
-
-`qubit-dcl` 不重导出 `Lock` 或其他 crate 拥有的锁原语。调用方必须直接声明
-`qubit-lock` 和所选锁后端依赖。默认 `parking-lot` feature 会通过
-`qubit-lock` 启用 `parking_lot` 锁实现；只使用标准库锁的调用方可以关闭它：
-
-```toml
-qubit-dcl = { version = "0.11", default-features = false }
-```
-
-## 从 0.10 迁移
-
-0.11 将锁从 builder 状态移到每次 executor 调用，并采用与数据无关的
-`qubit_lock::Lock` trait。完整映射参见
-[0.11 迁移指南](doc/user_guide_migration_0_11.zh_CN.md)。
+- 阅读完整[用户手册](doc/user_guide.zh_CN.md)，了解同步契约、读写协调、生命周期
+  token、panic 处理、排障与限制。
+- Read the full [English User Guide](doc/user_guide.md).
+- 浏览 [API 文档](https://docs.rs/qubit-dcl)。
+- 从 0.10 升级时，阅读[迁移指南](doc/user_guide_migration_0_11.zh_CN.md)或
+  [English migration guide](doc/user_guide_migration_0_11.md)。
+- Read the [English README](README.md).
 
 ## 测试
 
