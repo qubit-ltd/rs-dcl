@@ -45,7 +45,7 @@ fn main() {
     });
     assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
-    let lifecycle_lock = parking_lot::Mutex::new(());
+    let lifecycle_lock = std::sync::Mutex::new(());
     let lifecycle_executor = LifecycleDoubleCheckedLockExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))

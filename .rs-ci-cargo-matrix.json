@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "name": "base-locks",
+      "defaultFeatures": false,
+      "features": [],
+      "commands": [
+        "test",
+        "doc",
+        "doc-test",
+        "clippy"
+      ]
+    },
+    {
+      "name": "parking-lot-locks",
+      "defaultFeatures": false,
+      "features": [
+        "parking-lot"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "doc-test",
+        "clippy"
+      ]
+    },
+    {
+      "name": "all-features",
+      "allFeatures": true,
+      "commands": [
+        "test",
+        "doc",
+        "doc-test",
+        "clippy"
+      ]
+    }
+  ]
+}

@@ -47,3 +47,9 @@ parking_lot = "0.12"
 [[bench]]
 name = "dcl_bench"
 harness = false
+required-features = ["parking-lot"]
+
+[[test]]
+name = "mod"
+path = "tests/mod.rs"
+required-features = ["parking-lot"]
