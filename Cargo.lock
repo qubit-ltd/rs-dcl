@@ -350,15 +350,8 @@ dependencies = [
  "criterion",
  "loom",
  "parking_lot",
- "qubit-function",
  "qubit-lock",
 ]
-
-[[package]]
-name = "qubit-function"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f6ad59d1256f6c62bc2fe153bdd87f224d7cfd7fa81b58dd8ab03aa4836f21a"
 
 [[package]]
 name = "qubit-lock"

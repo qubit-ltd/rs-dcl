@@ -32,11 +32,10 @@ name = "qubit_dcl"
 doctest = true
 
 [features]
-default = ["parking-lot"]
+default = []
 parking-lot = ["qubit-lock/parking-lot"]
 
 [dependencies]
-qubit-function = "0.18.1"
 qubit-lock = { default-features = false, path = "../rs-lock", version = "0.13" }
 
 [dev-dependencies]

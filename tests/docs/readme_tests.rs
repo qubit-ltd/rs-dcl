@@ -94,11 +94,10 @@ fn test_readme_installation_snippets_declare_parking_lot() {
     }
 }
 
-/// Verifies the optional parking-lot lock implementation remains enabled by
-/// default while consumers can opt out of its transitive dependency.
+/// Verifies the optional parking-lot lock implementation remains opt-in.
 #[test]
-fn test_manifest_exposes_parking_lot_as_a_default_feature() {
-    assert!(CARGO_TOML.contains("[features]\ndefault = [\"parking-lot\"]"));
+fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
+    assert!(CARGO_TOML.contains("[features]\ndefault = []"));
     assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
     let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock")
         .expect("Cargo.toml should declare qubit-lock");
@@ -107,19 +106,31 @@ fn test_manifest_exposes_parking_lot_as_a_default_feature() {
     assert!(dependency.contains("path = \"../rs-lock\""));
 }
 
-/// Verifies published and unpublished Qubit dependencies use their intended
-/// sources.
+/// Verifies the manifest retains only the lock dependency required at runtime.
 #[test]
-fn test_manifest_uses_expected_qubit_dependency_sources() {
-    let function = find_dependency_spec(CARGO_TOML, "qubit-function")
-        .expect("Cargo.toml should declare qubit-function");
-    assert!(function.contains("\"0.18.1\""));
-    assert!(!function.contains("path ="));
+fn test_manifest_uses_only_required_qubit_dependencies() {
+    assert!(find_dependency_spec(CARGO_TOML, "qubit-function").is_none());
 
     let lock = find_dependency_spec(CARGO_TOML, "qubit-lock")
         .expect("Cargo.toml should declare qubit-lock");
     assert!(lock.contains("version = \"0.13\""));
     assert!(lock.contains("path = \"../rs-lock\""));
+}
+
+/// Verifies installation snippets opt into the parking-lot feature and name
+/// the manifest's qubit-lock version.
+#[test]
+fn test_readmes_align_lock_feature_and_dependency_versions() {
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains(
+            "qubit-dcl = { version = \"0.11\", features = [\"parking-lot\"] }"
+        ));
+        assert!(readme.contains("qubit-lock = \"0.13\""));
+        assert!(readme.contains("qubit-dcl = \"0.11\""));
+        assert!(readme.contains(
+            "qubit-lock = { version = \"0.13\", default-features = false }"
+        ));
+    }
 }
 
 /// Verifies the CI feature matrix tests both the minimal and parking-lot lock

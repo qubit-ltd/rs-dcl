@@ -13,12 +13,9 @@ use std::{
         AssertUnwindSafe,
         catch_unwind,
     },
+    sync::Arc,
 };
 
-use qubit_function::{
-    ArcTester,
-    Tester,
-};
 use qubit_lock::Lock;
 
 use crate::double_checked::{
@@ -34,7 +31,7 @@ use crate::double_checked::{
 /// executors.
 pub(crate) struct DclCore {
     /// Lock-free predicate invoked before and after lock acquisition.
-    predicate: ArcTester,
+    predicate: Arc<dyn Fn() -> bool + Send + Sync + 'static>,
     /// Whether public calls convert panics into structured outcomes.
     catch_panics: bool,
 }
@@ -50,9 +47,12 @@ impl DclCore {
     ///
     /// A core ready to be configured or built into an executor.
     #[inline]
-    pub(crate) fn new(predicate: ArcTester) -> Self {
+    pub(crate) fn new<F>(predicate: F) -> Self
+    where
+        F: Fn() -> bool + Send + Sync + 'static,
+    {
         Self {
-            predicate,
+            predicate: Arc::new(predicate),
             catch_panics: false,
         }
     }
@@ -93,7 +93,7 @@ impl DclCore {
     /// Propagates a predicate panic.
     #[inline(always)]
     pub(crate) fn check_initial(&self) -> bool {
-        self.predicate.test()
+        (self.predicate)()
     }
 
     /// Performs the initial check and captures any panic.
@@ -133,7 +133,7 @@ impl DclCore {
         F: FnOnce() -> Result<R, E>,
     {
         let _guard = lock.lock();
-        if !self.predicate.test() {
+        if !(self.predicate)() {
             LockedExecution::ConditionNotMet
         } else {
             LockedExecution::Task(task())
@@ -167,7 +167,7 @@ impl DclCore {
         catch_unwind(AssertUnwindSafe(|| {
             let guard = lock.lock();
             phase.set(PanicPhase::SecondConditionCheck);
-            let outcome = if !self.predicate.test() {
+            let outcome = if !(self.predicate)() {
                 LockedExecution::ConditionNotMet
             } else {
                 phase.set(PanicPhase::Task);

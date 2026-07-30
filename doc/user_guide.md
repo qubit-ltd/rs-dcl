@@ -42,17 +42,17 @@ Add the crate and a lock backend:
 
 ```toml
 [dependencies]
-qubit-dcl = "0.11"
-qubit-lock = "0.12"
+qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
 
-The default `parking-lot` feature enables the matching `qubit-lock` support.
-For only standard-library locks, disable it:
+Enable the optional `parking-lot` feature for the matching `qubit-lock`
+support. For only standard-library locks, no DCL feature is needed:
 
 ```toml
-qubit-dcl = { version = "0.11", default-features = false }
-qubit-lock = { version = "0.12", default-features = false }
+qubit-dcl = "0.11"
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 Build one executor and pass the mutex on each call:

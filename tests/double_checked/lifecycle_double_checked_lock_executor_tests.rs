@@ -28,6 +28,10 @@ use std::{
     thread,
 };
 
+mod parking_lot {
+    pub use std::sync::Mutex;
+}
+
 use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::{
     FinalizationOutcome,
@@ -38,6 +42,7 @@ use qubit_dcl::{
 };
 
 use crate::support::{
+    NoopLock,
     PanicOnDrop,
     PanickingReleaseLock,
 };
@@ -167,7 +172,7 @@ fn panicking_coverage_task(
 /// Verifies a propagating matrix invocation resumes its original task panic.
 fn assert_original_coverage_task_panic(
     executor: &LifecycleDoubleCheckedLockExecutor<CoverageToken, io::Error>,
-    lock: &ParkingLotMutex<()>,
+    lock: &NoopLock,
 ) {
     let task = panicking_coverage_task as CoverageTask;
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
@@ -183,7 +188,7 @@ fn assert_original_coverage_task_panic(
 /// monomorphization.
 #[test]
 fn test_run_catching_covers_all_branches_with_one_task_type() {
-    let lock = ParkingLotMutex::new(());
+    let lock = NoopLock;
     let successful_task = successful_coverage_task as CoverageTask;
     let failing_task = failing_coverage_task as CoverageTask;
     let panicking_task = panicking_coverage_task as CoverageTask;
@@ -418,7 +423,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
 /// monomorphization.
 #[test]
 fn test_run_propagating_covers_all_branches_with_one_task_type() {
-    let lock = ParkingLotMutex::new(());
+    let lock = NoopLock;
     let successful_task = successful_coverage_task as CoverageTask;
     let failing_task = failing_coverage_task as CoverageTask;
 
@@ -772,7 +777,7 @@ fn test_run_second_false_rolls_back_after_unlock() {
                     Ordering::Relaxed,
                 );
                 rollback_obtained_lock
-                    .store(lock.try_lock().is_some(), Ordering::Relaxed);
+                    .store(lock.try_lock().is_ok(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
@@ -998,7 +1003,7 @@ fn test_run_success_commits_after_unlock() {
             move |token| {
                 committed_token.store(token, Ordering::Relaxed);
                 commit_obtained_lock
-                    .store(lock.try_lock().is_some(), Ordering::Relaxed);
+                    .store(lock.try_lock().is_ok(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })

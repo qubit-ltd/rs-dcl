@@ -16,17 +16,17 @@ Qubit DCL 为 Rust 提供可复用的双重检查锁 executor。它帮助并发�
 
 ```toml
 [dependencies]
-qubit-dcl = "0.11"
-qubit-lock = "0.12"
+qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
 
-Qubit DCL 要求 Rust 1.94 或更高版本。默认 `parking-lot` feature 会通过
-`qubit-lock` 启用匹配的锁实现。只使用标准库锁时可以关闭该 feature：
+Qubit DCL 要求 Rust 1.94 或更高版本。使用该后端时，请显式启用可选的
+`parking-lot` feature。只使用标准库锁时不需要启用 DCL feature：
 
 ```toml
-qubit-dcl = { version = "0.11", default-features = false }
-qubit-lock = { version = "0.12", default-features = false }
+qubit-dcl = "0.11"
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 Qubit DCL 不重导出 `qubit_lock::Lock` 或其他 crate 所拥有的锁原语。请直接声明

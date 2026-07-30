@@ -37,17 +37,17 @@ Release store。predicate 不得获取同一个底层锁，也不应阻塞。
 
 ```toml
 [dependencies]
-qubit-dcl = "0.11"
-qubit-lock = "0.12"
+qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
 
-默认 `parking-lot` feature 会启用匹配的 `qubit-lock` 支持。只使用标准库锁时可以
-关闭它：
+使用该后端时，请显式启用可选的 `parking-lot` feature，以获得匹配的 `qubit-lock`
+支持。只使用标准库锁时不需要启用 DCL feature：
 
 ```toml
-qubit-dcl = { version = "0.11", default-features = false }
-qubit-lock = { version = "0.12", default-features = false }
+qubit-dcl = "0.11"
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 构造一个 executor，并在每次调用时传入 mutex：

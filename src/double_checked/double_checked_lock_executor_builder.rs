@@ -7,8 +7,6 @@
 // =============================================================================
 //! Initial builder stage for the basic DCL executor.
 
-use qubit_function::ArcTester;
-
 use crate::double_checked::{
     DoubleCheckedLockExecutorReadyBuilder,
     internal::DclCore,
@@ -67,8 +65,6 @@ impl DoubleCheckedLockExecutorBuilder {
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
-        DoubleCheckedLockExecutorReadyBuilder::new(DclCore::new(
-            ArcTester::new(predicate),
-        ))
+        DoubleCheckedLockExecutorReadyBuilder::new(DclCore::new(predicate))
     }
 }

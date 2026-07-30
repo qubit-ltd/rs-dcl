@@ -11,5 +11,4 @@
 
 mod docs;
 mod double_checked;
-#[cfg(feature = "parking-lot")]
 mod support;

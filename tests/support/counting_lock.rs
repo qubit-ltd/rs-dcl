@@ -9,13 +9,14 @@
 
 use std::sync::{
     Arc,
+    Mutex,
+    TryLockError as StdTryLockError,
     atomic::{
         AtomicUsize,
         Ordering,
     },
 };
 
-use parking_lot::Mutex;
 use qubit_lock::{
     Lock,
     TryLockError,
@@ -23,7 +24,7 @@ use qubit_lock::{
 
 use super::CountingGuard;
 
-/// Wraps a real parking-lot mutex and counts calls to the `Lock` API.
+/// Wraps a real standard-library mutex and counts calls to the `Lock` API.
 #[derive(Clone)]
 pub struct CountingLock {
     /// Real lock used to preserve production locking behavior.
@@ -70,15 +71,22 @@ impl Lock for CountingLock {
     #[inline(always)]
     fn lock(&self) -> Self::Guard<'_> {
         self.record_call();
-        CountingGuard::new(self.inner.lock())
+        CountingGuard::new(
+            Mutex::lock(self.inner.as_ref())
+                .expect("counting lock mutex should not be poisoned"),
+        )
     }
 
     /// Records and delegates immediate acquisition.
     #[inline(always)]
     fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         self.record_call();
-        Mutex::try_lock(self.inner.as_ref())
-            .map(CountingGuard::new)
-            .ok_or(TryLockError::WouldBlock)
+        match Mutex::try_lock(self.inner.as_ref()) {
+            Ok(guard) => Ok(CountingGuard::new(guard)),
+            Err(StdTryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(StdTryLockError::Poisoned(_)) => {
+                panic!("counting lock mutex should not be poisoned")
+            }
+        }
     }
 }

@@ -7,7 +7,7 @@
 // =============================================================================
 //! RAII guard returned by the counting lock test double.
 
-use parking_lot::MutexGuard;
+use std::sync::MutexGuard;
 
 /// Retains the underlying mutex guard until this value is dropped.
 pub struct CountingGuard<'a> {
@@ -16,7 +16,7 @@ pub struct CountingGuard<'a> {
 }
 
 impl<'a> CountingGuard<'a> {
-    /// Wraps an acquired parking-lot guard.
+    /// Wraps an acquired standard-library mutex guard.
     ///
     /// # Parameters
     ///
