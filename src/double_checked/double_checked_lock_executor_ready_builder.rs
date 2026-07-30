@@ -37,6 +37,11 @@ impl DoubleCheckedLockExecutorReadyBuilder {
 
     /// Configures whether executor calls convert panics into outcomes.
     ///
+    /// Capture works only with an unwinding panic strategy and reports a panic
+    /// rather than recovering from it. Side effects and application invariants
+    /// remain the caller's responsibility; see
+    /// [`DoubleCheckedLockExecutor::run`].
+    ///
     /// # Parameters
     ///
     /// * `catch_panics` - `true` to capture panics, or `false` to propagate

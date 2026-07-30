@@ -96,6 +96,10 @@ assert!(matches!(
 
 `Lock` 表示获取模式，并不必然表示排他性。
 
+`run` 有意接受 `Lock` 而不是 `ExclusiveLock`，对共享模式和排他模式采用相同的控制
+流程，因此调用方可以传入同一 RWLock 的 read mode 或 write mode。Rust 无法证明 task
+闭包只读，所以传入共享模式时，必须由调用方保证只读契约。
+
 当 task 修改 gate 或受保护状态、消费工作、只允许一次初始化，或必须串行执行时，使用
 mutex 或 write-mode adapter 等排他模式。能够选出唯一执行者的独立
 compare-and-exchange 协议也同样有效。
@@ -246,6 +250,12 @@ prepare、第二次检查、task failure、task success 与 panic 路径。收�
 guard 作用域外：标准库锁保持正常 poisoning 语义，parking-lot 保持其正常的不 poisoning
 语义。正常完成锁内工作后，显式释放 guard 时发生的 panic 会归类为
 `PanicPhase::LockRelease`。
+
+只有使用 unwind panic 策略时才能捕获 panic。使用 `panic = "abort"` 时，进程会在返回
+outcome 或执行基于 unwind 的 rollback 之前终止。`PanicInfo` 只负责分类和传递 payload，
+并不提供恢复能力或事务边界：panic 前已经完成的副作用仍会保留，生命周期 rollback
+本身也可能失败或 panic。捕获到 outcome 不代表应用不变量已经恢复；再次使用相关状态前，
+调用方必须验证或重建这些不变量。
 
 ## 排障
 

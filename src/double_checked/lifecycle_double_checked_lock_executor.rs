@@ -139,6 +139,13 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// completes is classified as [`PanicPhase::LockRelease`] and triggers
     /// rollback.
     ///
+    /// Capture requires an unwinding panic strategy; with `panic = "abort"`,
+    /// the process terminates without returning an outcome or attempting
+    /// unwind-based rollback. A structured panic outcome does not make the
+    /// invocation transactional: effects completed before the panic remain,
+    /// and rollback can itself fail or panic. The caller must verify or
+    /// reestablish application invariants before continuing.
+    ///
     /// # Synchronization
     ///
     /// The predicate must read an atomic or equivalently synchronized gate.
@@ -154,6 +161,11 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     /// requirements. Gate mutation, protected writes, or serialized execution
     /// require an [`qubit_lock::ExclusiveLock`] mode. Lifecycle callbacks do
     /// not automatically reacquire that lock.
+    ///
+    /// This method intentionally accepts [`Lock`] rather than
+    /// [`qubit_lock::ExclusiveLock`] and does not branch on whether the
+    /// supplied mode is shared or exclusive. Rust cannot prove that `task` is
+    /// read-only, so callers supplying a shared mode must uphold that contract.
     ///
     /// The same executor may receive paired read and write modes from one
     /// RWLock on different calls. Those calls may operate on different
