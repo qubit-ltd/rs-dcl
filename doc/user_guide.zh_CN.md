@@ -9,7 +9,7 @@
 
 ## 概念模型
 
-`DoubleCheckedLockExecutor` 保存一个 predicate。每次 `run` 都遵循下列流程：
+`DclExecutor` 保存一个 predicate。每次 `run` 都遵循下列流程：
 
 ```text
 读取同步 gate
@@ -61,11 +61,11 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -121,14 +121,14 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 use qubit_lock::ReadWriteLock;
 
 let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
 let read_value = Arc::new(AtomicUsize::new(42));
 let write_value = Arc::new(AtomicUsize::new(0));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -166,7 +166,7 @@ task 外部修改 gate 的代码必须获取与冲突 `run` 调用相同的底�
 ## 生命周期执行
 
 当每次调用都需要在第一次检查后创建 token，并在锁内执行结束后完成收尾时，使用
-`LifecycleDoubleCheckedLockExecutor`。其 typestate builder 只暴露以下有效组合：
+`LifecycleDclExecutor`。其 typestate builder 只暴露以下有效组合：
 
 - `prepare -> commit -> rollback -> build`
 - `prepare -> commit -> no_rollback -> build`
@@ -184,14 +184,14 @@ use std::{
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
     RollbackCause,
 };
 
 let lock = std::sync::Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = LifecycleDoubleCheckedLockExecutor::builder()
+let executor = LifecycleDclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)

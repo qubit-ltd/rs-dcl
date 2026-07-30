@@ -11,7 +11,7 @@
 参考实现：
 
 - `java-common` 中的
-  `ltd.qubit.commons.concurrent.DoubleCheckedLockExecutor`
+  `ltd.qubit.commons.concurrent.DclExecutor`
 - `java-common` 中的
   `ltd.qubit.commons.service.impl.TaskExecutionServiceImpl`
 
@@ -164,11 +164,11 @@ Send + Sync 可以阻止安全 Rust 闭包直接共享 Cell、RefCell 等非线�
 
 公共执行器分为两种：
 
-    DoubleCheckedLockExecutor<L, T>
+    DclExecutor<L, T>
         - 无生命周期
         - 返回 ExecutionOutcome<R, E>
 
-    LifecycleDoubleCheckedLockExecutor<L, T, P, C>
+    LifecycleDclExecutor<L, T, P, C>
         - 包含 prepare / commit / rollback
         - 返回 ExecutionReport<R, E, C>
 
@@ -197,7 +197,7 @@ predicate 使用 Arc trait object 的原因：
 
 ### 6.1 构建
 
-    let executor = DoubleCheckedLockExecutor::builder(lock)
+    let executor = DclExecutor::builder(lock)
         .when(move || {
             state.load(Ordering::Acquire) == STARTED
         })
@@ -264,7 +264,7 @@ when 是必选项，缺少 predicate 的 builder 不提供 build。
 完整生命周期：
 
     let executor =
-        LifecycleDoubleCheckedLockExecutor::builder(lock)
+        LifecycleDclExecutor::builder(lock)
             .when(predicate)
             .catch_panics(true)
             .prepare(prepare)
@@ -635,7 +635,7 @@ rs-dcl 不再直接依赖 log，也不主动记录日志。
 - DoubleCheckedLock
 - DoubleCheckedLockBuilder
 - DoubleCheckedLockReadyBuilder
-- 旧 DoubleCheckedLockExecutor 实现
+- 旧 DclExecutor 实现
 - ExecutionContext
 - ExecutionResult
 - ExecutorError
@@ -652,8 +652,8 @@ rs-dcl 不再直接依赖 log，也不主动记录日志。
 
 新增并根导出：
 
-- DoubleCheckedLockExecutor
-- LifecycleDoubleCheckedLockExecutor
+- DclExecutor
+- LifecycleDclExecutor
 - ExecutionOutcome
 - ExecutionReport
 - PreparationOutcome
@@ -669,11 +669,11 @@ builder stage 类型保持 public 以满足 Rust 公共签名可达性，但标�
       lib.rs
       double_checked/
         mod.rs
-        double_checked_lock_executor.rs
-        double_checked_lock_executor_builder.rs
-        double_checked_lock_executor_ready_builder.rs
-        lifecycle_double_checked_lock_executor.rs
-        lifecycle_double_checked_lock_executor_builder.rs
+        dcl_executor.rs
+        dcl_executor_builder.rs
+        dcl_executor_ready_builder.rs
+        lifecycle_dcl_executor.rs
+        lifecycle_dcl_executor_builder.rs
         lifecycle_predicate_builder.rs
         lifecycle_prepare_builder.rs
         lifecycle_commit_builder.rs
@@ -697,8 +697,8 @@ builder stage 类型保持 public 以满足 Rust 公共签名可达性，但标�
 
     tests/
       double_checked/
-        double_checked_lock_executor_tests.rs
-        lifecycle_double_checked_lock_executor_tests.rs
+        dcl_executor_tests.rs
+        lifecycle_dcl_executor_tests.rs
         execution_outcome_tests.rs
         execution_report_tests.rs
         preparation_outcome_tests.rs

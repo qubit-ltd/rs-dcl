@@ -10,7 +10,7 @@ and need a reusable double-checked execution policy around it.
 
 ## Conceptual Model
 
-A `DoubleCheckedLockExecutor` stores a predicate. A call to `run` follows this
+A `DclExecutor` stores a predicate. A call to `run` follows this
 sequence:
 
 ```text
@@ -66,11 +66,11 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -133,14 +133,14 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 use qubit_lock::ReadWriteLock;
 
 let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
 let read_value = Arc::new(AtomicUsize::new(42));
 let write_value = Arc::new(AtomicUsize::new(0));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -178,7 +178,7 @@ volatile memory such as MMIO and is not synchronization.
 
 ## Lifecycle Execution
 
-Use `LifecycleDoubleCheckedLockExecutor` when each invocation needs a token
+Use `LifecycleDclExecutor` when each invocation needs a token
 created after the first check and finalized after locked execution. Its
 typestate builder only exposes these valid configurations:
 
@@ -199,14 +199,14 @@ use std::{
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
     RollbackCause,
 };
 
 let lock = std::sync::Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = LifecycleDoubleCheckedLockExecutor::builder()
+let executor = LifecycleDclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)

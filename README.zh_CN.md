@@ -47,11 +47,11 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -89,9 +89,9 @@ gate 协议，读者与 writer 可以使用同一个 executor，并传入同一 
 
 ## 它提供什么
 
-- `DoubleCheckedLockExecutor`：复用 predicate、调用方选择
+- `DclExecutor`：复用 predicate、调用方选择
   `qubit_lock::Lock`，并获得结构化 `ExecutionOutcome`。
-- `LifecycleDoubleCheckedLockExecutor`：适用于先准备每次调用独有的 token，再在
+- `LifecycleDclExecutor`：适用于先准备每次调用独有的 token，再在
   锁内执行后 commit 或 rollback 的工作流。
 - `LifecycleOutcome`、`FinalizationOutcome`、`RollbackCause`、`PanicInfo` 和
   `PanicPhase`：用于检查全部生命周期终态。
