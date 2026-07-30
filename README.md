@@ -18,18 +18,18 @@ that mode, then runs the task only when both checks succeed.
 
 ```toml
 [dependencies]
-qubit-dcl = "0.11"
-qubit-lock = "0.12"
+qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
 
-Qubit DCL requires Rust 1.94 or later. The default `parking-lot` feature
-enables matching lock implementations through `qubit-lock`. Applications that
-use only standard-library locks can disable it:
+Qubit DCL requires Rust 1.94 or later. Enable the optional `parking-lot`
+feature when using that backend. Applications using only standard-library locks
+need no DCL feature:
 
 ```toml
-qubit-dcl = { version = "0.11", default-features = false }
-qubit-lock = { version = "0.12", default-features = false }
+qubit-dcl = "0.11"
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 Qubit DCL does not re-export `qubit_lock::Lock` or lock primitives owned by

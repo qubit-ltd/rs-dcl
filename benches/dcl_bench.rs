@@ -37,10 +37,6 @@ use qubit_dcl::{
     DoubleCheckedLockExecutor,
     ExecutionOutcome,
 };
-use qubit_function::{
-    ArcTester,
-    Tester,
-};
 use qubit_lock::Lock;
 
 /// Executor accepts new work in this state.
@@ -113,9 +109,9 @@ where
 
 /// Registers predicate-only measurements for a fixed executor state.
 ///
-/// The four entries use identical atomic state reads and differ only in how
-/// the closure is represented. This isolates static dispatch, trait-object
-/// dispatch, and the `ArcTester` wrapper from locking and task work.
+/// The three entries use identical atomic state reads and differ only in how
+/// the closure is represented. This isolates static and trait-object dispatch
+/// from locking and task work.
 fn benchmark_predicate_representations_for_state(
     group: &mut BenchmarkGroup<'_, WallTime>,
     state_name: &str,
@@ -130,9 +126,6 @@ fn benchmark_predicate_representations_for_state(
     let dynamic_state = Arc::clone(&state);
     let dynamic: Arc<dyn Fn() -> bool + Send + Sync> =
         Arc::new(move || dynamic_state.load(Ordering::Acquire) == RUNNING);
-    let tester_state = Arc::clone(&state);
-    let tester =
-        ArcTester::new(move || tester_state.load(Ordering::Acquire) == RUNNING);
 
     group.bench_function(
         format!("predicate/{state_name}/direct_closure"),
@@ -150,12 +143,6 @@ fn benchmark_predicate_representations_for_state(
         format!("predicate/{state_name}/arc_dynamic"),
         |bencher| {
             bencher.iter(|| black_box(dynamic()));
-        },
-    );
-    group.bench_function(
-        format!("predicate/{state_name}/arc_tester"),
-        |bencher| {
-            bencher.iter(|| black_box(tester.test()));
         },
     );
 }
@@ -179,7 +166,7 @@ fn benchmark_predicate_representations(criterion: &mut Criterion) {
 ///
 /// Both paths evaluate the predicate twice on acceptance and once on rejection.
 /// The typed entry isolates the potential benefit of making the predicate a
-/// generic type parameter instead of the current `ArcTester` type erasure.
+/// generic type parameter instead of the current `Arc<dyn Fn()>` type erasure.
 fn benchmark_typed_dcl_backend<L>(
     group: &mut BenchmarkGroup<'_, WallTime>,
     backend: &str,
@@ -357,8 +344,9 @@ where
                 }
             });
         }
+        let start = std::time::Instant::now();
         start_barrier.wait();
-        std::time::Instant::now()
+        start
     });
     start.elapsed()
 }
@@ -407,8 +395,9 @@ where
                 }
             });
         }
+        let start = std::time::Instant::now();
         start_barrier.wait();
-        std::time::Instant::now()
+        start
     });
     start.elapsed()
 }

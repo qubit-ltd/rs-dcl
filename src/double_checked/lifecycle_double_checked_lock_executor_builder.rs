@@ -7,8 +7,6 @@
 // =============================================================================
 //! Initial builder stage for the lifecycle DCL executor.
 
-use qubit_function::ArcTester;
-
 use crate::double_checked::{
     LifecyclePredicateBuilder,
     internal::DclCore,
@@ -64,6 +62,6 @@ impl LifecycleDoubleCheckedLockExecutorBuilder {
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
-        LifecyclePredicateBuilder::new(DclCore::new(ArcTester::new(predicate)))
+        LifecyclePredicateBuilder::new(DclCore::new(predicate))
     }
 }

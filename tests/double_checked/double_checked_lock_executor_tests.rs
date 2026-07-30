@@ -24,6 +24,7 @@ use std::{
 
 use crate::support::{
     CountingLock,
+    NoopLock,
     PanickingReleaseLock,
 };
 use qubit_dcl::{
@@ -31,6 +32,10 @@ use qubit_dcl::{
     ExecutionOutcome,
     PanicPhase,
 };
+
+mod parking_lot {
+    pub use std::sync::Mutex;
+}
 
 /// Common task signature used to merge generic coverage across executor modes.
 type CoverageTask = fn() -> Result<(), io::Error>;
@@ -49,7 +54,7 @@ fn panicking_coverage_task() -> Result<(), io::Error> {
 /// monomorphization.
 #[test]
 fn test_run_covers_both_panic_configurations_with_one_task_type() {
-    let lock = parking_lot::Mutex::new(());
+    let lock = NoopLock;
     let successful_task = successful_coverage_task as CoverageTask;
     let panicking_task = panicking_coverage_task as CoverageTask;
 
@@ -303,9 +308,10 @@ fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
 
 /// Verifies a captured task unwind does not add poisoning to a parking-lot
 /// mutex.
+#[cfg(feature = "parking-lot")]
 #[test]
 fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
-    let lock = parking_lot::Mutex::new(());
+    let lock = ::parking_lot::Mutex::new(());
     let executor = DoubleCheckedLockExecutor::builder()
         .when(|| true)
         .catch_panics(true)
