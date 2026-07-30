@@ -103,6 +103,11 @@ original task error; it is not converted into a library-wide error type.
 
 `Lock` represents an acquisition mode, not necessarily exclusivity.
 
+`run` deliberately accepts `Lock` rather than `ExclusiveLock` and follows the
+same control flow for shared and exclusive modes. This lets callers pass either
+the read or write mode from one RWLock. Rust cannot prove that the task closure
+is read-only, so a caller supplying a shared mode must uphold that contract.
+
 Use an exclusive mode, such as a mutex or a write-mode adapter, when the task
 changes the gate or protected state, consumes work, initializes something only
 once, or otherwise needs serialization. An independent compare-and-exchange
@@ -263,6 +268,14 @@ panics propagate normally. Enable `catch_panics(true)` to receive
 guard's scope: standard locks preserve normal poisoning behavior, while
 parking-lot retains its normal non-poisoning behavior. A panic while explicitly
 releasing a normally completed guard is classified as `PanicPhase::LockRelease`.
+
+Capture works only with an unwinding panic strategy. With `panic = "abort"`,
+the process terminates before an outcome can be returned or unwind-based
+rollback can run. `PanicInfo` provides classification and payload transport,
+not recovery or a transaction boundary: side effects completed before the
+panic remain, and lifecycle rollback can itself fail or panic. A captured
+outcome does not prove that application invariants were restored; verify or
+reestablish them before reusing the affected state.
 
 ## Troubleshooting
 

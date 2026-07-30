@@ -41,6 +41,10 @@ impl LifecyclePredicateBuilder {
     /// Configures whether all lifecycle phases convert panics into report
     /// outcomes.
     ///
+    /// Capture works only with an unwinding panic strategy. It classifies
+    /// panics but does not make the lifecycle transactional or prove that
+    /// rollback restored application invariants.
+    ///
     /// # Parameters
     ///
     /// * `catch_panics` - `true` to capture panics, or `false` to propagate

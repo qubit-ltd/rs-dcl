@@ -68,6 +68,13 @@ impl DoubleCheckedLockExecutor {
     /// and task run under one RAII guard. That guard may represent shared or
     /// exclusive acquisition.
     ///
+    /// This method intentionally accepts [`Lock`] rather than
+    /// [`qubit_lock::ExclusiveLock`]. It uses the same execution algorithm for
+    /// every supplied acquisition mode and cannot determine whether `task` is
+    /// read-only. When a shared mode is supplied, upholding the read-only
+    /// contract is the caller's responsibility; Rust's type system does not
+    /// enforce it.
+    ///
     /// A shared mode is valid when the task is read-only with respect to the
     /// protected protocol, every conflicting writer uses the paired exclusive
     /// mode of the same underlying lock, and the caller does not require
@@ -106,6 +113,13 @@ impl DoubleCheckedLockExecutor {
     /// lock implementation, or task. When enabled, those panics are returned
     /// as [`ExecutionOutcome::Panicked`]. A guard-drop panic after locked work
     /// completes is classified as [`crate::PanicPhase::LockRelease`].
+    /// Capture requires an unwinding panic strategy; with `panic = "abort"`,
+    /// the process terminates without returning an outcome.
+    ///
+    /// Capturing a panic classifies and transports its payload. It does not
+    /// undo earlier side effects, restore application invariants, or make
+    /// poisoned state safe to reuse. The caller must verify or reestablish
+    /// those invariants before continuing.
     ///
     /// # Synchronization
     ///
