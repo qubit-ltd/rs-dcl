@@ -103,7 +103,7 @@ fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
         .expect("Cargo.toml should declare qubit-lock");
     assert!(dependency.contains("default-features = false"));
     assert!(dependency.contains("version = \"0.13\""));
-    assert!(dependency.contains("path = \"../rs-lock\""));
+    assert!(!dependency.contains("path ="));
 }
 
 /// Verifies the manifest retains only the lock dependency required at runtime.
@@ -114,7 +114,7 @@ fn test_manifest_uses_only_required_qubit_dependencies() {
     let lock = find_dependency_spec(CARGO_TOML, "qubit-lock")
         .expect("Cargo.toml should declare qubit-lock");
     assert!(lock.contains("version = \"0.13\""));
-    assert!(lock.contains("path = \"../rs-lock\""));
+    assert!(!lock.contains("path ="));
 }
 
 /// Verifies installation snippets opt into the parking-lot feature and name
