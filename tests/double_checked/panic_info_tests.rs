@@ -18,7 +18,7 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     PanicPhase,
 };
@@ -36,7 +36,7 @@ impl Drop for PanicOnDrop {
 /// Verifies a string payload remains inspectable and recoverable by value.
 #[test]
 fn test_panic_info_preserves_string_payload() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -63,7 +63,7 @@ fn test_panic_info_preserves_string_payload() {
 /// Verifies unknown payloads are retained without fabricating a message.
 #[test]
 fn test_panic_info_preserves_non_string_payload_without_message() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -82,7 +82,7 @@ fn test_panic_info_preserves_non_string_payload_without_message() {
 /// destructor panic.
 #[test]
 fn test_panic_info_drop_discards_panicking_payload() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();

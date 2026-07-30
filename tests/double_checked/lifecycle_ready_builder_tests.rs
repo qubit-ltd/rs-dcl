@@ -11,14 +11,14 @@ use std::io;
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies a ready lifecycle builder produces a reusable executor.
 #[test]
 fn test_ready_builder_builds_reusable_executor() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()

@@ -28,7 +28,7 @@ use crate::support::{
     PanickingReleaseLock,
 };
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     PanicPhase,
 };
@@ -58,7 +58,7 @@ fn test_run_covers_both_panic_configurations_with_one_task_type() {
     let successful_task = successful_coverage_task as CoverageTask;
     let panicking_task = panicking_coverage_task as CoverageTask;
 
-    let catching_false = DoubleCheckedLockExecutor::builder()
+    let catching_false = DclExecutor::builder()
         .when(|| false)
         .catch_panics(true)
         .build();
@@ -67,7 +67,7 @@ fn test_run_covers_both_panic_configurations_with_one_task_type() {
         ExecutionOutcome::ConditionNotMet
     ));
 
-    let catching_initial_panic = DoubleCheckedLockExecutor::builder()
+    let catching_initial_panic = DclExecutor::builder()
         .when(|| panic!("coverage initial panic"))
         .catch_panics(true)
         .build();
@@ -77,7 +77,7 @@ fn test_run_covers_both_panic_configurations_with_one_task_type() {
             if panic.phase() == PanicPhase::InitialConditionCheck
     ));
 
-    let catching_true = DoubleCheckedLockExecutor::builder()
+    let catching_true = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -90,15 +90,13 @@ fn test_run_covers_both_panic_configurations_with_one_task_type() {
         ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
     ));
 
-    let propagating_false =
-        DoubleCheckedLockExecutor::builder().when(|| false).build();
+    let propagating_false = DclExecutor::builder().when(|| false).build();
     assert!(matches!(
         propagating_false.run(&lock, successful_task),
         ExecutionOutcome::ConditionNotMet
     ));
 
-    let propagating_true =
-        DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let propagating_true = DclExecutor::builder().when(|| true).build();
     assert!(matches!(
         propagating_true.run(&lock, successful_task),
         ExecutionOutcome::Success(())
@@ -110,7 +108,7 @@ fn test_run_covers_both_panic_configurations_with_one_task_type() {
 fn test_run_initial_false_skips_lock_and_task() {
     let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder().when(|| false).build();
+    let executor = DclExecutor::builder().when(|| false).build();
 
     let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
@@ -127,7 +125,7 @@ fn test_run_initial_false_skips_lock_and_task() {
 fn test_run_catching_initial_false_skips_lock_and_task() {
     let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| false)
         .catch_panics(true)
         .build();
@@ -148,7 +146,7 @@ fn test_run_second_false_skips_task_after_locking() {
     let lock = CountingLock::new();
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
@@ -173,7 +171,7 @@ fn test_run_two_true_checks_preserves_success() {
     let lock = CountingLock::new();
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = AtomicUsize::new(0);
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {
@@ -197,7 +195,7 @@ fn test_run_two_true_checks_preserves_success() {
 /// Verifies a task error remains owned and unchanged.
 #[test]
 fn test_run_preserves_task_error() {
-    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
     let outcome = executor.run(&parking_lot::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task failed"))
@@ -214,7 +212,7 @@ fn test_run_preserves_task_error() {
 /// Verifies panic capture classifies the initial condition check.
 #[test]
 fn test_run_captures_initial_condition_panic() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| panic!("initial check"))
         .catch_panics(true)
         .build();
@@ -235,7 +233,7 @@ fn test_run_captures_initial_condition_panic() {
 #[test]
 fn test_run_captures_second_condition_panic() {
     let checks = Arc::new(AtomicUsize::new(0));
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {
@@ -264,7 +262,7 @@ fn test_run_captures_second_condition_panic() {
 /// Verifies panic capture classifies a task panic after the second check.
 #[test]
 fn test_run_captures_task_panic() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -286,7 +284,7 @@ fn test_run_captures_task_panic() {
 #[test]
 fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
     let lock = std::sync::Mutex::new(());
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -312,7 +310,7 @@ fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
 #[test]
 fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
     let lock = ::parking_lot::Mutex::new(());
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -338,7 +336,7 @@ fn test_run_captures_lock_acquisition_panic() {
         panic!("poison lock");
     }));
     assert!(poison_result.is_err());
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -357,7 +355,7 @@ fn test_run_captures_lock_acquisition_panic() {
 /// execution.
 #[test]
 fn test_run_captures_lock_release_panic() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();
@@ -377,7 +375,7 @@ fn test_run_captures_lock_release_panic() {
 /// Verifies disabling panic capture resumes unwinding through the caller.
 #[test]
 fn test_run_propagates_task_panic_when_capture_is_disabled() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .build();
@@ -395,7 +393,7 @@ fn test_run_propagates_task_panic_when_capture_is_disabled() {
 /// Verifies a built executor can be cloned independently of lock ownership.
 #[test]
 fn test_clone_shares_configuration_without_owning_lock() {
-    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let executor = DclExecutor::builder().when(|| true).build();
     let cloned = executor.clone();
 
     let outcome =

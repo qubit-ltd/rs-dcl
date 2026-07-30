@@ -26,9 +26,9 @@ use loom::{
     thread,
 };
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
 };
 use qubit_lock::{
     Lock,
@@ -107,8 +107,7 @@ where
 fn test_loom_initial_false_has_zero_lock_calls() {
     model(|| {
         let lock = LoomLock::new(());
-        let executor =
-            DoubleCheckedLockExecutor::builder().when(|| false).build();
+        let executor = DclExecutor::builder().when(|| false).build();
 
         let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
 
@@ -126,7 +125,7 @@ fn test_loom_task_gate_change_allows_one_success() {
         let task_calls = Arc::new(AtomicUsize::new(0));
         let lock = LoomLock::new(());
         let executor = Arc::new(
-            DoubleCheckedLockExecutor::builder()
+            DclExecutor::builder()
                 .when({
                     let gate = Arc::clone(&gate);
                     move || gate.load(Ordering::Acquire)
@@ -172,7 +171,7 @@ fn test_loom_external_same_lock_transition_blocks_stale_task() {
         let gate = Arc::new(AtomicBool::new(true));
         let checks = Arc::new(AtomicUsize::new(0));
         let task_calls = Arc::new(AtomicUsize::new(0));
-        let executor = DoubleCheckedLockExecutor::builder()
+        let executor = DclExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 let checks = Arc::clone(&checks);
@@ -212,7 +211,7 @@ fn test_loom_prepare_tokens_do_not_cross_invocations() {
         let committed_mask = Arc::new(AtomicUsize::new(0));
         let lock = LoomLock::new(());
         let executor = Arc::new(
-            LifecycleDoubleCheckedLockExecutor::builder()
+            LifecycleDclExecutor::builder()
                 .when(|| true)
                 .prepare(|| Ok::<usize, io::Error>(usize::MAX))
                 .commit({

@@ -20,7 +20,7 @@ use std::{
 use qubit_lock::Lock;
 
 use crate::double_checked::{
-    LifecycleDoubleCheckedLockExecutorBuilder,
+    LifecycleDclExecutorBuilder,
     LifecycleOutcome,
     PanicInfo,
     PanicPhase,
@@ -63,7 +63,7 @@ pub(crate) type RollbackCallback<P, C> = Arc<
 /// underlying lock provide the required coordination. This is why each
 /// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
 #[must_use = "an executor does nothing until run or run_with_token is called"]
-pub struct LifecycleDoubleCheckedLockExecutor<P, C> {
+pub struct LifecycleDclExecutor<P, C> {
     /// Shared DCL predicate and panic configuration.
     core: DclCore,
     /// Callback that creates one token for each prepared invocation.
@@ -74,19 +74,19 @@ pub struct LifecycleDoubleCheckedLockExecutor<P, C> {
     rollback: Option<RollbackCallback<P, C>>,
 }
 
-impl LifecycleDoubleCheckedLockExecutor<(), ()> {
+impl LifecycleDclExecutor<(), ()> {
     /// Starts building a lifecycle executor.
     ///
     /// # Returns
     ///
     /// A typestate builder requiring a predicate and lifecycle callbacks.
     #[inline]
-    pub fn builder() -> LifecycleDoubleCheckedLockExecutorBuilder {
-        LifecycleDoubleCheckedLockExecutorBuilder::new()
+    pub fn builder() -> LifecycleDclExecutorBuilder {
+        LifecycleDclExecutorBuilder::new()
     }
 }
 
-impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
+impl<P, C> LifecycleDclExecutor<P, C> {
     /// Creates a built lifecycle executor from typestate-validated parts.
     ///
     /// # Parameters
@@ -462,7 +462,7 @@ impl<P, C> LifecycleDoubleCheckedLockExecutor<P, C> {
     }
 }
 
-impl<P, C> Clone for LifecycleDoubleCheckedLockExecutor<P, C> {
+impl<P, C> Clone for LifecycleDclExecutor<P, C> {
     /// Shares all erased callbacks.
     #[inline]
     fn clone(&self) -> Self {

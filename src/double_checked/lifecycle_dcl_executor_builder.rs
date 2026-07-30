@@ -15,9 +15,9 @@ use crate::double_checked::{
 /// Builder stage that cannot proceed without a predicate.
 #[doc(hidden)]
 #[must_use = "the builder must be completed with when and lifecycle stages"]
-pub struct LifecycleDoubleCheckedLockExecutorBuilder;
+pub struct LifecycleDclExecutorBuilder;
 
-impl LifecycleDoubleCheckedLockExecutorBuilder {
+impl LifecycleDclExecutorBuilder {
     /// Creates the initial lifecycle builder stage.
     ///
     /// # Returns

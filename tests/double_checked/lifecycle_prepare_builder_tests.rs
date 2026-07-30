@@ -11,14 +11,14 @@ use std::io;
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies the prepare stage supports the explicit no-commit branch.
 #[test]
 fn test_prepare_builder_selects_no_commit() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<u32, io::Error>(1))
         .no_commit()

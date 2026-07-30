@@ -10,14 +10,14 @@
 use std::io;
 
 use qubit_dcl::{
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies the predicate stage accepts panic configuration and preparation.
 #[test]
 fn test_predicate_builder_configures_prepare() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Err::<(), _>(io::Error::other("prepare")))

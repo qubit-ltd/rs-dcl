@@ -20,7 +20,7 @@ use std::{
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
@@ -42,7 +42,7 @@ impl Drop for DropToken {
 #[test]
 fn test_no_commit_drops_token_and_reports_not_required() {
     let drops = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare({
             let drops = Arc::clone(&drops);
@@ -72,7 +72,7 @@ fn test_no_commit_drops_token_and_reports_not_required() {
 /// Verifies panic capture preserves an ordinary commit error.
 #[test]
 fn test_catching_commit_error_reports_failure() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -97,7 +97,7 @@ fn test_catching_commit_error_reports_failure() {
 #[test]
 fn test_catching_no_commit_drops_token_and_reports_not_required() {
     let drops = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare({
@@ -130,7 +130,7 @@ fn test_catching_no_commit_drops_token_and_reports_not_required() {
 #[test]
 fn test_catching_no_rollback_drops_token_and_reports_not_required() {
     let drops = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare({

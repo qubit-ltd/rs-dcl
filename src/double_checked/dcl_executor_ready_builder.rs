@@ -8,19 +8,19 @@
 //! Ready builder stage for the basic DCL executor.
 
 use crate::double_checked::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     internal::DclCore,
 };
 
 /// Builder stage containing every required basic-executor component.
 #[doc(hidden)]
 #[must_use = "the ready builder must be consumed by build"]
-pub struct DoubleCheckedLockExecutorReadyBuilder {
+pub struct DclExecutorReadyBuilder {
     /// Shared DCL configuration being built.
     core: DclCore,
 }
 
-impl DoubleCheckedLockExecutorReadyBuilder {
+impl DclExecutorReadyBuilder {
     /// Creates a ready builder from a configured DCL core.
     ///
     /// # Parameters
@@ -40,7 +40,7 @@ impl DoubleCheckedLockExecutorReadyBuilder {
     /// Capture works only with an unwinding panic strategy and reports a panic
     /// rather than recovering from it. Side effects and application invariants
     /// remain the caller's responsibility; see
-    /// [`DoubleCheckedLockExecutor::run`].
+    /// [`DclExecutor::run`].
     ///
     /// # Parameters
     ///
@@ -62,7 +62,7 @@ impl DoubleCheckedLockExecutorReadyBuilder {
     ///
     /// An executor sharing the configured predicate across cloned handles.
     #[inline]
-    pub fn build(self) -> DoubleCheckedLockExecutor {
-        DoubleCheckedLockExecutor::from_core(self.core)
+    pub fn build(self) -> DclExecutor {
+        DclExecutor::from_core(self.core)
     }
 }

@@ -24,7 +24,7 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 use qubit_lock::{
@@ -45,7 +45,7 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
         Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
     let lock = Arc::new(parking_lot::RwLock::new(()));
     let executor = Arc::new(
-        DoubleCheckedLockExecutor::builder()
+        DclExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 move || gate.load(Ordering::Acquire)
@@ -129,7 +129,7 @@ fn test_task_changes_gate_inside_executor_lock() {
     let start = Arc::new(Barrier::new(THREAD_COUNT));
     let lock = Arc::new(parking_lot::Mutex::new(()));
     let executor = Arc::new(
-        DoubleCheckedLockExecutor::builder()
+        DclExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 move || gate.load(Ordering::Acquire)
@@ -174,7 +174,7 @@ fn test_external_gate_change_uses_same_underlying_lock() {
     let gate = Arc::new(AtomicBool::new(true));
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = Arc::new(AtomicUsize::new(0));
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let gate = Arc::clone(&gate);
             let checks = Arc::clone(&checks);

@@ -8,16 +8,16 @@
 //! Initial builder stage for the basic DCL executor.
 
 use crate::double_checked::{
-    DoubleCheckedLockExecutorReadyBuilder,
+    DclExecutorReadyBuilder,
     internal::DclCore,
 };
 
 /// Builder stage that cannot build until a predicate is set.
 #[doc(hidden)]
 #[must_use = "the builder must be completed with when and build"]
-pub struct DoubleCheckedLockExecutorBuilder;
+pub struct DclExecutorBuilder;
 
-impl DoubleCheckedLockExecutorBuilder {
+impl DclExecutorBuilder {
     /// Creates the initial builder stage.
     ///
     /// # Returns
@@ -61,10 +61,10 @@ impl DoubleCheckedLockExecutorBuilder {
     /// `predicate` runs once without the executor lock and again while holding
     /// it. It must not acquire the same underlying lock itself.
     #[inline]
-    pub fn when<F>(self, predicate: F) -> DoubleCheckedLockExecutorReadyBuilder
+    pub fn when<F>(self, predicate: F) -> DclExecutorReadyBuilder
     where
         F: Fn() -> bool + Send + Sync + 'static,
     {
-        DoubleCheckedLockExecutorReadyBuilder::new(DclCore::new(predicate))
+        DclExecutorReadyBuilder::new(DclCore::new(predicate))
     }
 }

@@ -13,10 +13,10 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
@@ -25,14 +25,13 @@ use qubit_dcl::{
 #[test]
 fn test_standard_mutexes_work_without_parking_lot_feature() {
     let basic_lock = Mutex::new(());
-    let basic_executor =
-        DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let basic_executor = DclExecutor::builder().when(|| true).build();
     let basic_outcome =
         basic_executor.run(&basic_lock, || Ok::<usize, io::Error>(7));
     assert!(matches!(basic_outcome, ExecutionOutcome::Success(7)));
 
     let lifecycle_lock = Mutex::new(());
-    let lifecycle_executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let lifecycle_executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| Ok::<(), io::Error>(()))

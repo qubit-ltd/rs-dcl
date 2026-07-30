@@ -10,14 +10,14 @@
 use std::io;
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 
 /// Verifies the ready builder applies panic-capture configuration.
 #[test]
 fn test_ready_builder_enables_panic_capture() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();

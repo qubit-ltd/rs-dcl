@@ -11,14 +11,14 @@ use std::io;
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies rollback configuration receives a failed task outcome.
 #[test]
 fn test_rollback_builder_configures_rollback() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<u32, io::Error>(1))
         .no_commit()

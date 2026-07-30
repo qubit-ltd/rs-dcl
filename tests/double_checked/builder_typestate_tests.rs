@@ -11,14 +11,14 @@ use std::io;
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies the complete prepare/commit/rollback combination builds and runs.
 #[test]
 fn test_builder_full_lifecycle_combination() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<u32, io::Error>(1))
         .commit(|_| Ok::<(), io::Error>(()))
@@ -41,7 +41,7 @@ fn test_builder_full_lifecycle_combination() {
 /// explicit no-rollback path.
 #[test]
 fn test_builder_commit_without_rollback_combination() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<u32, io::Error>(1))
         .commit(|_| Ok::<(), io::Error>(()))
@@ -65,7 +65,7 @@ fn test_builder_commit_without_rollback_combination() {
 /// explicit no-commit path.
 #[test]
 fn test_builder_rollback_without_commit_combination() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<u32, io::Error>(1))
         .no_commit()

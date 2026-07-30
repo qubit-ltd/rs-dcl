@@ -20,7 +20,7 @@ use std::{
 
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
@@ -29,7 +29,7 @@ use qubit_dcl::{
 #[test]
 fn test_second_condition_failure_reports_not_required_rollback() {
     let gate = Arc::new(AtomicBool::new(true));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when({
             let gate = Arc::clone(&gate);
             move || gate.load(Ordering::Acquire)

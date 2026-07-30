@@ -10,14 +10,14 @@
 use std::io;
 
 use qubit_dcl::{
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
 /// Verifies the lifecycle builder starts with predicate selection.
 #[test]
 fn test_lifecycle_builder_accepts_predicate() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| false)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
