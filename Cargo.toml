@@ -36,7 +36,7 @@ default = []
 parking-lot = ["qubit-lock/parking-lot"]
 
 [dependencies]
-qubit-lock = { default-features = false, path = "../rs-lock", version = "0.13" }
+qubit-lock = { default-features = false, version = "0.13" }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
