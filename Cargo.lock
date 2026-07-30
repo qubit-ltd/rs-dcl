@@ -356,15 +356,13 @@ dependencies = [
 
 [[package]]
 name = "qubit-function"
-version = "0.16.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59f10e916324739b811520fbfb24746f4822ad9ea1adb53c79fc04b7c090e5ed"
+checksum = "1f6ad59d1256f6c62bc2fe153bdd87f224d7cfd7fa81b58dd8ab03aa4836f21a"
 
 [[package]]
 name = "qubit-lock"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4de9185e2b12054c496b984993aec0c0a5fbbecf871281df34658db8942d8576"
+version = "0.13.0"
 dependencies = [
  "parking_lot",
 ]
