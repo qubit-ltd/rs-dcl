@@ -62,6 +62,514 @@ impl Drop for PanicOnDropRollbackError {
     }
 }
 
+/// Token destructor behavior used by the generic coverage matrix.
+#[derive(Clone, Copy)]
+enum CoverageTokenDrop {
+    /// Drops normally.
+    Quiet,
+    /// Panics with a string payload.
+    Panic,
+    /// Panics with a payload whose destructor also panics.
+    PanickingPayload,
+}
+
+/// Token used to exercise lifecycle branches through one generic
+/// monomorphization.
+struct CoverageToken {
+    /// Behavior selected for this token's destructor.
+    drop_behavior: CoverageTokenDrop,
+}
+
+impl CoverageToken {
+    /// Creates a token that drops normally.
+    fn quiet() -> Self {
+        Self {
+            drop_behavior: CoverageTokenDrop::Quiet,
+        }
+    }
+
+    /// Creates a token that panics normally while being dropped.
+    fn panicking() -> Self {
+        Self {
+            drop_behavior: CoverageTokenDrop::Panic,
+        }
+    }
+
+    /// Creates a token whose panic payload also panics while being dropped.
+    fn panicking_payload() -> Self {
+        Self {
+            drop_behavior: CoverageTokenDrop::PanickingPayload,
+        }
+    }
+}
+
+impl Drop for CoverageToken {
+    /// Applies the configured destructor behavior.
+    fn drop(&mut self) {
+        match self.drop_behavior {
+            CoverageTokenDrop::Quiet => {}
+            CoverageTokenDrop::Panic => panic!("coverage token drop panic"),
+            CoverageTokenDrop::PanickingPayload => {
+                std::panic::panic_any(PanicOnDrop)
+            }
+        }
+    }
+}
+
+/// Common task signature used to merge lifecycle generic coverage.
+type CoverageTask = fn(&mut CoverageToken) -> Result<u32, io::Error>;
+
+/// Produces a normal token for the generic coverage matrix.
+fn prepare_quiet_coverage_token() -> Result<CoverageToken, io::Error> {
+    Ok(CoverageToken::quiet())
+}
+
+/// Produces a token with a normally panicking destructor.
+fn prepare_panicking_coverage_token() -> Result<CoverageToken, io::Error> {
+    Ok(CoverageToken::panicking())
+}
+
+/// Produces a token with a destructor that panics with a panicking payload.
+fn prepare_panicking_payload_coverage_token() -> Result<CoverageToken, io::Error>
+{
+    Ok(CoverageToken::panicking_payload())
+}
+
+/// Returns a prepare error for the generic coverage matrix.
+fn fail_coverage_prepare() -> Result<CoverageToken, io::Error> {
+    Err(io::Error::other("coverage prepare failed"))
+}
+
+/// Panics during prepare for the generic coverage matrix.
+fn panic_coverage_prepare() -> Result<CoverageToken, io::Error> {
+    panic!("coverage prepare panic")
+}
+
+/// Completes successfully for the generic coverage matrix.
+fn successful_coverage_task(
+    _token: &mut CoverageToken,
+) -> Result<u32, io::Error> {
+    Ok(42)
+}
+
+/// Returns an error for the generic coverage matrix.
+fn failing_coverage_task(_token: &mut CoverageToken) -> Result<u32, io::Error> {
+    Err(io::Error::other("coverage task failed"))
+}
+
+/// Panics for the generic coverage matrix.
+fn panicking_coverage_task(
+    _token: &mut CoverageToken,
+) -> Result<u32, io::Error> {
+    panic!("coverage task panic")
+}
+
+/// Verifies a propagating matrix invocation resumes its original task panic.
+fn assert_original_coverage_task_panic(
+    executor: &LifecycleDoubleCheckedLockExecutor<CoverageToken, io::Error>,
+    lock: &ParkingLotMutex<()>,
+) {
+    let task = panicking_coverage_task as CoverageTask;
+    let panic_result = catch_unwind(AssertUnwindSafe(|| {
+        let _: LifecycleOutcome<u32, io::Error, io::Error> =
+            executor.run_with_token(lock, task);
+    }));
+
+    let payload = panic_result.expect_err("coverage task panic should resume");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"coverage task panic"));
+}
+
+/// Exercises every captured lifecycle branch through one generic
+/// monomorphization.
+#[test]
+fn test_run_catching_covers_all_branches_with_one_task_type() {
+    let lock = ParkingLotMutex::new(());
+    let successful_task = successful_coverage_task as CoverageTask;
+    let failing_task = failing_coverage_task as CoverageTask;
+    let panicking_task = panicking_coverage_task as CoverageTask;
+
+    let initial_false = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        initial_false.run_with_token(&lock, successful_task),
+        LifecycleOutcome::InitialConditionNotMet
+    ));
+
+    let initial_panic = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| panic!("coverage initial panic"))
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        initial_panic.run_with_token(&lock, successful_task),
+        LifecycleOutcome::InitialConditionCheckPanicked(panic)
+            if panic.phase() == PanicPhase::InitialConditionCheck
+    ));
+
+    let prepare_error = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(fail_coverage_prepare)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        prepare_error.run_with_token(&lock, successful_task),
+        LifecycleOutcome::PrepareFailed(error)
+            if error.to_string() == "coverage prepare failed"
+    ));
+
+    let prepare_panic = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(panic_coverage_prepare)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        prepare_panic.run_with_token(&lock, successful_task),
+        LifecycleOutcome::PreparePanicked(panic)
+            if panic.phase() == PanicPhase::Prepare
+    ));
+
+    let checks = Arc::new(AtomicUsize::new(0));
+    let second_false = LifecycleDoubleCheckedLockExecutor::builder()
+        .when({
+            let checks = Arc::clone(&checks);
+            move || checks.fetch_add(1, Ordering::Relaxed) == 0
+        })
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        second_false.run_with_token(&lock, successful_task),
+        LifecycleOutcome::SecondConditionNotMet {
+            rollback: FinalizationOutcome::Succeeded,
+        }
+    ));
+
+    let task_paths = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        task_paths.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::NotRequired,
+        }
+    ));
+    assert!(matches!(
+        task_paths.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            error,
+            rollback: FinalizationOutcome::Succeeded,
+        } if error.to_string() == "coverage task failed"
+    ));
+    assert!(matches!(
+        task_paths.run_with_token(&lock, panicking_task),
+        LifecycleOutcome::ExecutionPanicked {
+            panic,
+            rollback: FinalizationOutcome::Succeeded,
+        } if panic.phase() == PanicPhase::Task
+    ));
+
+    let successful_commit = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        successful_commit.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Succeeded,
+        }
+    ));
+
+    let failing_commit = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Err::<(), _>(io::Error::other("coverage commit failed")))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        failing_commit.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Failed(error),
+        } if error.to_string() == "coverage commit failed"
+    ));
+
+    let panicking_commit = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| -> Result<(), io::Error> {
+            panic!("coverage commit panic")
+        })
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        panicking_commit.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Panicked(panic),
+        } if panic.phase() == PanicPhase::Commit
+    ));
+
+    let failing_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| {
+            Err::<(), _>(io::Error::other("coverage rollback failed"))
+        })
+        .build();
+    assert!(matches!(
+        failing_rollback.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            error,
+            rollback: FinalizationOutcome::Failed(rollback_error),
+        } if error.to_string() == "coverage task failed"
+            && rollback_error.to_string() == "coverage rollback failed"
+    ));
+
+    let panicking_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| -> Result<(), io::Error> {
+            panic!("coverage rollback panic")
+        })
+        .build();
+    assert!(matches!(
+        panicking_rollback.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::Panicked(panic),
+            ..
+        } if panic.phase() == PanicPhase::Rollback
+    ));
+
+    let no_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        no_rollback.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::NotRequired,
+            ..
+        }
+    ));
+
+    let panicking_commit_drop = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_panicking_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        panicking_commit_drop.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Panicked(panic),
+        } if panic.phase() == PanicPhase::Commit
+    ));
+
+    let panicking_rollback_drop = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(prepare_panicking_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        panicking_rollback_drop.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::Panicked(panic),
+            ..
+        } if panic.phase() == PanicPhase::Rollback
+    ));
+}
+
+/// Exercises every propagating lifecycle branch through one generic
+/// monomorphization.
+#[test]
+fn test_run_propagating_covers_all_branches_with_one_task_type() {
+    let lock = ParkingLotMutex::new(());
+    let successful_task = successful_coverage_task as CoverageTask;
+    let failing_task = failing_coverage_task as CoverageTask;
+
+    let initial_false = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        initial_false.run_with_token(&lock, successful_task),
+        LifecycleOutcome::InitialConditionNotMet
+    ));
+
+    let prepare_error = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(fail_coverage_prepare)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        prepare_error.run_with_token(&lock, successful_task),
+        LifecycleOutcome::PrepareFailed(error)
+            if error.to_string() == "coverage prepare failed"
+    ));
+
+    let checks = Arc::new(AtomicUsize::new(0));
+    let second_false = LifecycleDoubleCheckedLockExecutor::builder()
+        .when({
+            let checks = Arc::clone(&checks);
+            move || checks.fetch_add(1, Ordering::Relaxed) == 0
+        })
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        second_false.run_with_token(&lock, successful_task),
+        LifecycleOutcome::SecondConditionNotMet {
+            rollback: FinalizationOutcome::Succeeded,
+        }
+    ));
+
+    let task_paths = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+    assert!(matches!(
+        task_paths.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::NotRequired,
+        }
+    ));
+    assert!(matches!(
+        task_paths.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            error,
+            rollback: FinalizationOutcome::Succeeded,
+        } if error.to_string() == "coverage task failed"
+    ));
+    assert_original_coverage_task_panic(&task_paths, &lock);
+
+    let successful_commit = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        successful_commit.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Succeeded,
+        }
+    ));
+
+    let failing_commit = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Err::<(), _>(io::Error::other("coverage commit failed")))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        failing_commit.run_with_token(&lock, successful_task),
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Failed(error),
+        } if error.to_string() == "coverage commit failed"
+    ));
+
+    let failing_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| {
+            Err::<(), _>(io::Error::other("coverage rollback failed"))
+        })
+        .build();
+    assert!(matches!(
+        failing_rollback.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            error,
+            rollback: FinalizationOutcome::Failed(rollback_error),
+        } if error.to_string() == "coverage task failed"
+            && rollback_error.to_string() == "coverage rollback failed"
+    ));
+
+    let no_rollback_task_error = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert!(matches!(
+        no_rollback_task_error.run_with_token(&lock, failing_task),
+        LifecycleOutcome::TaskFailed {
+            rollback: FinalizationOutcome::NotRequired,
+            ..
+        }
+    ));
+
+    let panicking_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .no_commit()
+        .rollback(|_, _| -> Result<(), io::Error> {
+            std::panic::panic_any(PanicOnDrop)
+        })
+        .build();
+    assert_original_coverage_task_panic(&panicking_rollback, &lock);
+
+    let no_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_quiet_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert_original_coverage_task_panic(&no_rollback, &lock);
+
+    let panicking_token = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .prepare(prepare_panicking_payload_coverage_token)
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    assert_original_coverage_task_panic(&panicking_token, &lock);
+}
+
 /// Verifies a failed initial check bypasses every lifecycle callback and lock.
 #[test]
 fn test_run_initial_false_does_not_prepare_or_finalize() {
@@ -281,6 +789,47 @@ fn test_run_second_false_rolls_back_after_unlock() {
     assert_eq!(rolled_back_token.load(Ordering::Relaxed), 17);
     assert!(saw_condition_cause.load(Ordering::Relaxed));
     assert!(rollback_obtained_lock.load(Ordering::Relaxed));
+}
+
+/// Verifies panic capture preserves the second-false rollback path.
+#[test]
+fn test_run_catching_second_false_rolls_back() {
+    let checks = Arc::new(AtomicUsize::new(0));
+    let rolled_back_token = Arc::new(AtomicUsize::new(0));
+    let saw_condition_cause = Arc::new(AtomicBool::new(false));
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when({
+            let checks = Arc::clone(&checks);
+            move || checks.fetch_add(1, Ordering::Relaxed) == 0
+        })
+        .catch_panics(true)
+        .prepare(|| Ok::<usize, io::Error>(17))
+        .no_commit()
+        .rollback({
+            let rolled_back_token = Arc::clone(&rolled_back_token);
+            let saw_condition_cause = Arc::clone(&saw_condition_cause);
+            move |token, cause| {
+                rolled_back_token.store(token, Ordering::Relaxed);
+                saw_condition_cause.store(
+                    matches!(cause, RollbackCause::ConditionNotMet),
+                    Ordering::Relaxed,
+                );
+                Ok::<(), io::Error>(())
+            }
+        })
+        .build();
+
+    let outcome =
+        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+
+    assert!(matches!(
+        outcome,
+        LifecycleOutcome::SecondConditionNotMet {
+            rollback: FinalizationOutcome::Succeeded,
+        }
+    ));
+    assert_eq!(rolled_back_token.load(Ordering::Relaxed), 17);
+    assert!(saw_condition_cause.load(Ordering::Relaxed));
 }
 
 /// Verifies a captured second predicate panic releases the lock and supplies
@@ -922,6 +1471,31 @@ fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
         .no_commit()
         .rollback(|_, _| -> Result<(), io::Error> {
             panic!("secondary rollback panic")
+        })
+        .build();
+
+    let panic_result = catch_unwind(AssertUnwindSafe(|| {
+        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
+            .run(&parking_lot::Mutex::new(()), || {
+                panic!("original task panic")
+            });
+    }));
+
+    let payload = panic_result.expect_err("task panic should resume unwinding");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"original task panic"));
+}
+
+/// Verifies a rollback panic payload whose destructor also panics cannot
+/// replace the original locked-phase panic.
+#[test]
+fn test_run_uncaptured_task_panic_outranks_panicking_rollback_payload_drop() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .no_commit()
+        .rollback(|_, _| -> Result<(), io::Error> {
+            std::panic::panic_any(PanicOnDrop)
         })
         .build();
 

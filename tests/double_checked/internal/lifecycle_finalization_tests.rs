@@ -5,7 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Behavior tests for lifecycle finalization without callbacks.
+//! Behavior tests for lifecycle finalization branches.
 
 use std::{
     io,
@@ -65,6 +65,96 @@ fn test_no_commit_drops_token_and_reports_not_required() {
             value: (),
             commit: FinalizationOutcome::NotRequired,
         }
+    ));
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+}
+
+/// Verifies panic capture preserves an ordinary commit error.
+#[test]
+fn test_catching_commit_error_reports_failure() {
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
+        .no_rollback()
+        .build();
+
+    let outcome =
+        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(42));
+
+    assert!(matches!(
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            value: 42,
+            commit: FinalizationOutcome::Failed(error),
+        } if error.to_string() == "commit failed"
+    ));
+}
+
+/// Verifies panic capture drops a token normally when no commit callback is
+/// configured.
+#[test]
+fn test_catching_no_commit_drops_token_and_reports_not_required() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare({
+            let drops = Arc::clone(&drops);
+            move || {
+                Ok::<DropToken, io::Error>(DropToken {
+                    drops: Arc::clone(&drops),
+                })
+            }
+        })
+        .no_commit()
+        .rollback(|_, _| Ok::<(), io::Error>(()))
+        .build();
+
+    let outcome =
+        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+
+    assert!(matches!(
+        outcome,
+        LifecycleOutcome::TaskSucceeded {
+            value: (),
+            commit: FinalizationOutcome::NotRequired,
+        }
+    ));
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
+}
+
+/// Verifies panic capture drops a token normally when no rollback callback is
+/// configured.
+#[test]
+fn test_catching_no_rollback_drops_token_and_reports_not_required() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .prepare({
+            let drops = Arc::clone(&drops);
+            move || {
+                Ok::<DropToken, io::Error>(DropToken {
+                    drops: Arc::clone(&drops),
+                })
+            }
+        })
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+
+    let outcome = executor.run(&std::sync::Mutex::new(()), || {
+        Err::<(), _>(io::Error::other("task failed"))
+    });
+
+    assert!(matches!(
+        outcome,
+        LifecycleOutcome::TaskFailed {
+            error,
+            rollback: FinalizationOutcome::NotRequired,
+        } if error.to_string() == "task failed"
     ));
     assert_eq!(drops.load(Ordering::Relaxed), 1);
 }
