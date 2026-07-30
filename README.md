@@ -51,11 +51,11 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .when({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -96,9 +96,9 @@ RWLock when their tasks follow the same gate protocol.
 
 ## What It Provides
 
-- `DoubleCheckedLockExecutor` for a reusable predicate, a caller-selected
+- `DclExecutor` for a reusable predicate, a caller-selected
   `qubit_lock::Lock`, and structured `ExecutionOutcome` values.
-- `LifecycleDoubleCheckedLockExecutor` for workflows that prepare a
+- `LifecycleDclExecutor` for workflows that prepare a
   per-invocation token, then commit or roll it back after locked execution.
 - `LifecycleOutcome`, `FinalizationOutcome`, `RollbackCause`, `PanicInfo`,
   and `PanicPhase` for inspecting every terminal lifecycle path.

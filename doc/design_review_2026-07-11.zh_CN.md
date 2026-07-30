@@ -86,7 +86,7 @@ self.lock.with_write(|data| {
 let data = ArcMutex::new(None::<i32>);
 let condition_data = data.clone();
 
-let executor = DoubleCheckedLockExecutor::builder()
+let executor = DclExecutor::builder()
     .on(data)
     .when(move || condition_data.with_read(Option::is_none))
     .build();
@@ -181,7 +181,7 @@ enum DclOutcome<R, E> {
 
 ### 4.6 中优先级：一次性入口与可复用 executor 重复了大部分 API
 
-`DoubleCheckedLock` fluent chain 和 `DoubleCheckedLockExecutor` builder 最终进入同一执行模型，但各自又暴露 panic、logging、prepare 等配置。它们降低了少量调用代码，却扩大了文档、测试和兼容面。
+`DoubleCheckedLock` fluent chain 和 `DclExecutor` builder 最终进入同一执行模型，但各自又暴露 panic、logging、prepare 等配置。它们降低了少量调用代码，却扩大了文档、测试和兼容面。
 
 建议只保留一个核心配置对象：
 
