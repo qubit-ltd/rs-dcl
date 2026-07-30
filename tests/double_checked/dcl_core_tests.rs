@@ -19,7 +19,7 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 
@@ -31,7 +31,7 @@ mod parking_lot {
 #[test]
 fn test_core_performs_two_condition_checks() {
     let checks = Arc::new(AtomicUsize::new(0));
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {

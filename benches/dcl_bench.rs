@@ -34,7 +34,7 @@ use criterion::{
 };
 use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 use qubit_lock::Lock;
@@ -182,7 +182,7 @@ fn benchmark_typed_dcl_backend<L>(
         let typed_predicate =
             move || typed_state.load(Ordering::Acquire) == RUNNING;
         let executor_state = Arc::clone(&state);
-        let executor = DoubleCheckedLockExecutor::builder()
+        let executor = DclExecutor::builder()
             .when(move || executor_state.load(Ordering::Acquire) == RUNNING)
             .build();
         let submitted = AtomicUsize::new(0);
@@ -236,11 +236,11 @@ fn benchmark_submission_backend<L>(
     let state = Arc::new(AtomicU8::new(RUNNING));
     let submitted = AtomicUsize::new(0);
     let predicate_state = Arc::clone(&state);
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
         .build();
     let panic_predicate_state = Arc::clone(&state);
-    let panic_executor = DoubleCheckedLockExecutor::builder()
+    let panic_executor = DclExecutor::builder()
         .when(move || panic_predicate_state.load(Ordering::Acquire) == RUNNING)
         .catch_panics(true)
         .build();
@@ -322,7 +322,7 @@ fn benchmark_submission_backend<L>(
 /// elapsed duration includes contention on `lock` but excludes thread creation.
 /// `executor`, `lock`, and `state` must remain valid for all scoped workers.
 fn run_contention_round<L>(
-    executor: &DoubleCheckedLockExecutor,
+    executor: &DclExecutor,
     lock: &L,
     worker_count: usize,
     iterations: u64,
@@ -372,7 +372,7 @@ where
         for _ in 0..worker_count {
             let state = Arc::new(AtomicU8::new(RUNNING));
             let predicate_state = Arc::clone(&state);
-            let executor = DoubleCheckedLockExecutor::builder()
+            let executor = DclExecutor::builder()
                 .when(move || {
                     predicate_state.load(Ordering::Acquire) == RUNNING
                 })
@@ -420,7 +420,7 @@ fn benchmark_contention_backend<L>(
         {
             let state = Arc::new(AtomicU8::new(state_value));
             let predicate_state = Arc::clone(&state);
-            let executor = DoubleCheckedLockExecutor::builder()
+            let executor = DclExecutor::builder()
                 .when(move || {
                     predicate_state.load(Ordering::Acquire) == RUNNING
                 })

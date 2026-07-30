@@ -9,7 +9,7 @@
 
 use crate::double_checked::{
     CommitCallback,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     PrepareCallback,
     RollbackCallback,
     internal::DclCore,
@@ -64,8 +64,8 @@ impl<P, C> LifecycleReadyBuilder<P, C> {
     /// An executor sharing callbacks while producing an independent token for
     /// each invocation.
     #[inline]
-    pub fn build(self) -> LifecycleDoubleCheckedLockExecutor<P, C> {
-        LifecycleDoubleCheckedLockExecutor::from_parts(
+    pub fn build(self) -> LifecycleDclExecutor<P, C> {
+        LifecycleDclExecutor::from_parts(
             self.core,
             self.prepare,
             self.commit,

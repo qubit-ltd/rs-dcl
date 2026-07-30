@@ -19,11 +19,11 @@
 //!     atomic::{AtomicBool, Ordering},
 //! };
 //!
-//! use qubit_dcl::{DoubleCheckedLockExecutor, ExecutionOutcome};
+//! use qubit_dcl::{DclExecutor, ExecutionOutcome};
 //!
 //! let gate = Arc::new(AtomicBool::new(true));
 //! let lock = Mutex::new(());
-//! let executor = DoubleCheckedLockExecutor::builder()
+//! let executor = DclExecutor::builder()
 //!     .when({
 //!         let gate = Arc::clone(&gate);
 //!         move || gate.load(Ordering::Acquire)
@@ -46,18 +46,18 @@
 //! A predicate is required before lifecycle configuration can continue:
 //!
 //! ```compile_fail
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder();
+//! let builder = LifecycleDclExecutor::builder();
 //! let _executor = builder.build();
 //! ```
 //!
 //! Prepare is required after the predicate:
 //!
 //! ```compile_fail
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
+//! let builder = LifecycleDclExecutor::builder()
 //!         .when(|| true);
 //! let _executor = builder.build();
 //! ```
@@ -67,9 +67,9 @@
 //! ```compile_fail
 //! use std::io;
 //!
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
+//! let builder = LifecycleDclExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()));
 //! let _executor = builder.build();
@@ -80,9 +80,9 @@
 //! ```compile_fail
 //! use std::io;
 //!
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
+//! let builder = LifecycleDclExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()))
 //!         .commit(|_| Ok::<(), io::Error>(()));
@@ -94,9 +94,9 @@
 //! ```compile_fail
 //! use std::io;
 //!
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
+//! let builder = LifecycleDclExecutor::builder()
 //!         .when(|| true)
 //!         .prepare(|| Ok::<(), io::Error>(()))
 //!         .no_commit();
@@ -108,9 +108,9 @@
 //! ```compile_fail
 //! use std::io;
 //!
-//! use qubit_dcl::LifecycleDoubleCheckedLockExecutor;
+//! use qubit_dcl::LifecycleDclExecutor;
 //!
-//! let builder = LifecycleDoubleCheckedLockExecutor::builder()
+//! let builder = LifecycleDclExecutor::builder()
 //!         .when(|| true);
 //! let _builder = builder.commit(|_| Ok::<(), io::Error>(()));
 //! ```
@@ -118,10 +118,10 @@
 pub mod double_checked;
 
 pub use double_checked::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
     PanicInfo,
     PanicPhase,

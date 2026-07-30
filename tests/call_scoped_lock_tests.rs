@@ -16,14 +16,14 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 
 /// Verifies one executor accepts a different generic lock on every call.
 #[test]
 fn test_executor_accepts_different_lock_types_per_call() {
-    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let executor = DclExecutor::builder().when(|| true).build();
     let borrowed_lock = Mutex::new(());
     let shared_lock = Arc::new(Mutex::new(()));
 

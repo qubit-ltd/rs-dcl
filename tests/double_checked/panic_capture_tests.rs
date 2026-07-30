@@ -13,7 +13,7 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     PanicPhase,
 };
@@ -21,7 +21,7 @@ use qubit_dcl::{
 /// Verifies a captured task panic retains its phase and message.
 #[test]
 fn test_panic_capture_retains_task_context() {
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .build();

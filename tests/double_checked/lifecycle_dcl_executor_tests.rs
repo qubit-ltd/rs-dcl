@@ -35,7 +35,7 @@ mod parking_lot {
 use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::{
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
     PanicPhase,
     RollbackCause,
@@ -171,7 +171,7 @@ fn panicking_coverage_task(
 
 /// Verifies a propagating matrix invocation resumes its original task panic.
 fn assert_original_coverage_task_panic(
-    executor: &LifecycleDoubleCheckedLockExecutor<CoverageToken, io::Error>,
+    executor: &LifecycleDclExecutor<CoverageToken, io::Error>,
     lock: &NoopLock,
 ) {
     let task = panicking_coverage_task as CoverageTask;
@@ -193,7 +193,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
     let failing_task = failing_coverage_task as CoverageTask;
     let panicking_task = panicking_coverage_task as CoverageTask;
 
-    let initial_false = LifecycleDoubleCheckedLockExecutor::builder()
+    let initial_false = LifecycleDclExecutor::builder()
         .when(|| false)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -205,7 +205,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         LifecycleOutcome::InitialConditionNotMet
     ));
 
-    let initial_panic = LifecycleDoubleCheckedLockExecutor::builder()
+    let initial_panic = LifecycleDclExecutor::builder()
         .when(|| panic!("coverage initial panic"))
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -218,7 +218,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
             if panic.phase() == PanicPhase::InitialConditionCheck
     ));
 
-    let prepare_error = LifecycleDoubleCheckedLockExecutor::builder()
+    let prepare_error = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(fail_coverage_prepare)
@@ -231,7 +231,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
             if error.to_string() == "coverage prepare failed"
     ));
 
-    let prepare_panic = LifecycleDoubleCheckedLockExecutor::builder()
+    let prepare_panic = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(panic_coverage_prepare)
@@ -245,7 +245,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
     ));
 
     let checks = Arc::new(AtomicUsize::new(0));
-    let second_false = LifecycleDoubleCheckedLockExecutor::builder()
+    let second_false = LifecycleDclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
@@ -262,7 +262,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let task_paths = LifecycleDoubleCheckedLockExecutor::builder()
+    let task_paths = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -291,7 +291,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         } if panic.phase() == PanicPhase::Task
     ));
 
-    let successful_commit = LifecycleDoubleCheckedLockExecutor::builder()
+    let successful_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -306,7 +306,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let failing_commit = LifecycleDoubleCheckedLockExecutor::builder()
+    let failing_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -321,7 +321,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         } if error.to_string() == "coverage commit failed"
     ));
 
-    let panicking_commit = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -338,7 +338,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         } if panic.phase() == PanicPhase::Commit
     ));
 
-    let failing_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let failing_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -356,7 +356,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
             && rollback_error.to_string() == "coverage rollback failed"
     ));
 
-    let panicking_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -373,7 +373,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         } if panic.phase() == PanicPhase::Rollback
     ));
 
-    let no_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let no_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_quiet_coverage_token)
@@ -388,7 +388,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let panicking_commit_drop = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_commit_drop = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_panicking_coverage_token)
@@ -403,7 +403,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         } if panic.phase() == PanicPhase::Commit
     ));
 
-    let panicking_rollback_drop = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_rollback_drop = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(prepare_panicking_coverage_token)
@@ -427,7 +427,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
     let successful_task = successful_coverage_task as CoverageTask;
     let failing_task = failing_coverage_task as CoverageTask;
 
-    let initial_false = LifecycleDoubleCheckedLockExecutor::builder()
+    let initial_false = LifecycleDclExecutor::builder()
         .when(|| false)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
@@ -438,7 +438,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         LifecycleOutcome::InitialConditionNotMet
     ));
 
-    let prepare_error = LifecycleDoubleCheckedLockExecutor::builder()
+    let prepare_error = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(fail_coverage_prepare)
         .no_commit()
@@ -451,7 +451,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
     ));
 
     let checks = Arc::new(AtomicUsize::new(0));
-    let second_false = LifecycleDoubleCheckedLockExecutor::builder()
+    let second_false = LifecycleDclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
@@ -467,7 +467,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let task_paths = LifecycleDoubleCheckedLockExecutor::builder()
+    let task_paths = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
@@ -489,7 +489,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
     ));
     assert_original_coverage_task_panic(&task_paths, &lock);
 
-    let successful_commit = LifecycleDoubleCheckedLockExecutor::builder()
+    let successful_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
@@ -503,7 +503,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let failing_commit = LifecycleDoubleCheckedLockExecutor::builder()
+    let failing_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Err::<(), _>(io::Error::other("coverage commit failed")))
@@ -517,7 +517,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         } if error.to_string() == "coverage commit failed"
     ));
 
-    let failing_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let failing_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
@@ -534,7 +534,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
             && rollback_error.to_string() == "coverage rollback failed"
     ));
 
-    let no_rollback_task_error = LifecycleDoubleCheckedLockExecutor::builder()
+    let no_rollback_task_error = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
@@ -548,7 +548,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         }
     ));
 
-    let panicking_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
@@ -558,7 +558,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         .build();
     assert_original_coverage_task_panic(&panicking_rollback, &lock);
 
-    let no_rollback = LifecycleDoubleCheckedLockExecutor::builder()
+    let no_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
@@ -566,7 +566,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         .build();
     assert_original_coverage_task_panic(&no_rollback, &lock);
 
-    let panicking_token = LifecycleDoubleCheckedLockExecutor::builder()
+    let panicking_token = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_panicking_payload_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
@@ -581,7 +581,7 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
     let commit_calls = Arc::new(AtomicUsize::new(0));
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| false)
         .prepare({
             let prepare_calls = Arc::clone(&prepare_calls);
@@ -619,7 +619,7 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
 #[test]
 fn test_run_prepare_error_does_not_rollback_without_token() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Err::<u32, _>(io::Error::other("prepare failed")))
         .no_commit()
@@ -648,7 +648,7 @@ fn test_run_prepare_error_does_not_rollback_without_token() {
 #[test]
 fn test_run_captures_initial_predicate_panic_before_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| panic!("initial predicate panic"))
         .catch_panics(true)
         .prepare({
@@ -678,7 +678,7 @@ fn test_run_captures_initial_predicate_panic_before_prepare() {
 #[test]
 fn test_run_captures_prepare_panic_without_rollback() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
@@ -707,7 +707,7 @@ fn test_run_captures_prepare_panic_without_rollback() {
 #[test]
 fn test_run_catching_initial_false_does_not_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| false)
         .catch_panics(true)
         .prepare({
@@ -731,7 +731,7 @@ fn test_run_catching_initial_false_does_not_prepare() {
 /// Verifies the capturing state machine retains a returned prepare error.
 #[test]
 fn test_run_catching_prepare_error_preserves_lifecycle_error() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Err::<(), _>(io::Error::other("prepare failed")))
@@ -758,7 +758,7 @@ fn test_run_second_false_rolls_back_after_unlock() {
     let rolled_back_token = Arc::new(AtomicUsize::new(0));
     let saw_condition_cause = Arc::new(AtomicBool::new(false));
     let rollback_obtained_lock = Arc::new(AtomicBool::new(false));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
@@ -802,7 +802,7 @@ fn test_run_catching_second_false_rolls_back() {
     let checks = Arc::new(AtomicUsize::new(0));
     let rolled_back_token = Arc::new(AtomicUsize::new(0));
     let saw_condition_cause = Arc::new(AtomicBool::new(false));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
@@ -843,7 +843,7 @@ fn test_run_catching_second_false_rolls_back() {
 fn test_run_captures_second_predicate_panic_then_rolls_back() {
     let checks = Arc::new(AtomicUsize::new(0));
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when({
             let checks = Arc::clone(&checks);
             move || {
@@ -905,7 +905,7 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
     }));
     assert!(poison_result.is_err());
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -948,7 +948,7 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
 #[test]
 fn test_run_captures_lock_release_panic_then_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -993,7 +993,7 @@ fn test_run_success_commits_after_unlock() {
     let lock = Arc::new(ParkingLotMutex::new(()));
     let committed_token = Arc::new(AtomicUsize::new(0));
     let commit_obtained_lock = Arc::new(AtomicBool::new(false));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<usize, io::Error>(23))
         .commit({
@@ -1028,7 +1028,7 @@ fn test_run_success_commits_after_unlock() {
 #[test]
 fn test_run_task_error_rolls_back_with_original_error_view() {
     let rollback_message = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
@@ -1076,7 +1076,7 @@ fn test_run_task_error_rolls_back_with_original_error_view() {
 #[test]
 fn test_run_with_token_commits_task_updates() {
     let committed_token = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
         .commit({
@@ -1117,7 +1117,7 @@ fn test_run_with_token_commits_task_updates() {
 /// Verifies commit failure does not overwrite task success.
 #[test]
 fn test_run_commit_failure_preserves_success() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
@@ -1141,7 +1141,7 @@ fn test_run_commit_failure_preserves_success() {
 /// Verifies a captured commit panic remains beside the task success.
 #[test]
 fn test_run_captures_commit_panic_without_overwriting_success() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1166,7 +1166,7 @@ fn test_run_captures_commit_panic_without_overwriting_success() {
 /// commit-phase panic while preserving task success.
 #[test]
 fn test_run_captures_token_drop_panic_without_commit() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
@@ -1192,7 +1192,7 @@ fn test_run_captures_token_drop_panic_without_commit() {
 /// rollback errors.
 #[test]
 fn test_run_catching_task_and_rollback_errors_preserves_both() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1219,7 +1219,7 @@ fn test_run_catching_task_and_rollback_errors_preserves_both() {
 #[test]
 fn test_clone_shares_lifecycle_callbacks() {
     let commit_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<u32, io::Error>(17))
@@ -1251,7 +1251,7 @@ fn test_clone_shares_lifecycle_callbacks() {
 /// Verifies rollback failure does not overwrite the original task error.
 #[test]
 fn test_run_rollback_failure_preserves_task_error() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
@@ -1275,7 +1275,7 @@ fn test_run_rollback_failure_preserves_task_error() {
 #[test]
 fn test_run_captured_task_panic_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1316,7 +1316,7 @@ fn test_run_captured_task_panic_rolls_back() {
 /// Verifies a rollback panic is retained independently from the task panic.
 #[test]
 fn test_run_captured_task_and_rollback_panics_preserves_both() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1341,7 +1341,7 @@ fn test_run_captured_task_and_rollback_panics_preserves_both() {
 /// rollback-phase panic without replacing the task error.
 #[test]
 fn test_run_captures_token_drop_panic_without_rollback() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(true)
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
@@ -1369,7 +1369,7 @@ fn test_run_captures_token_drop_panic_without_rollback() {
 #[test]
 fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1399,7 +1399,7 @@ fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
 /// when panic capture is disabled.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_error() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1428,7 +1428,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
         .expect("integration test binary path should be available");
     let output = std::process::Command::new(test_binary)
         .arg("--exact")
-        .arg("double_checked::lifecycle_double_checked_lock_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
+        .arg("double_checked::lifecycle_dcl_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
         .arg("--ignored")
         .output()
         .expect("child integration test should start");
@@ -1446,7 +1446,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
 #[test]
 #[ignore]
 fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<(), PanicOnDropRollbackError>(()))
@@ -1469,7 +1469,7 @@ fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
 /// phase panic when panic capture is disabled.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1494,7 +1494,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
 /// replace the original locked-phase panic.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_panicking_rollback_payload_drop() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<(), io::Error>(()))
@@ -1519,7 +1519,7 @@ fn test_run_uncaptured_task_panic_outranks_panicking_rollback_payload_drop() {
 #[test]
 fn test_run_uncaptured_initial_predicate_panic_propagates() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| panic!("initial predicate panic"))
         .prepare({
             let prepare_calls = Arc::clone(&prepare_calls);
@@ -1551,7 +1551,7 @@ fn test_run_uncaptured_initial_predicate_panic_propagates() {
 #[test]
 fn test_run_uncaptured_prepare_panic_propagates_without_rollback() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
         .no_commit()
@@ -1578,7 +1578,7 @@ fn test_run_uncaptured_prepare_panic_propagates_without_rollback() {
 /// lock release.
 #[test]
 fn test_run_uncaptured_commit_panic_propagates() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
@@ -1598,7 +1598,7 @@ fn test_run_uncaptured_commit_panic_propagates() {
 /// locked-phase panic exists.
 #[test]
 fn test_run_uncaptured_ordinary_rollback_panic_propagates() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
@@ -1619,7 +1619,7 @@ fn test_run_uncaptured_ordinary_rollback_panic_propagates() {
 /// panic after consuming its token.
 #[test]
 fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| Ok::<(), io::Error>(()))
@@ -1641,7 +1641,7 @@ fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
 /// panic when no rollback callback is configured.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
-    let executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .catch_panics(false)
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
@@ -1671,7 +1671,7 @@ fn test_run_concurrent_prepare_tokens_do_not_cross_calls() {
     let committed = Arc::new(Mutex::new(Vec::new()));
     let rolled_back = Arc::new(Mutex::new(Vec::new()));
     let executor = Arc::new(
-        LifecycleDoubleCheckedLockExecutor::builder()
+        LifecycleDclExecutor::builder()
             .when({
                 let gate = Arc::clone(&gate);
                 move || gate.load(Ordering::Acquire)

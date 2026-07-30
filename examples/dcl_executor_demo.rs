@@ -19,10 +19,10 @@ use std::{
 };
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
     FinalizationOutcome,
-    LifecycleDoubleCheckedLockExecutor,
+    LifecycleDclExecutor,
     LifecycleOutcome,
 };
 
@@ -30,7 +30,7 @@ use qubit_dcl::{
 fn main() {
     let gate = Arc::new(AtomicBool::new(true));
     let lock = std::sync::Mutex::new(());
-    let executor = DoubleCheckedLockExecutor::builder()
+    let executor = DclExecutor::builder()
         .when({
             let gate = Arc::clone(&gate);
             move || gate.load(Ordering::Acquire)
@@ -46,7 +46,7 @@ fn main() {
     assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
     let lifecycle_lock = std::sync::Mutex::new(());
-    let lifecycle_executor = LifecycleDoubleCheckedLockExecutor::builder()
+    let lifecycle_executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))
         .commit(|token| {

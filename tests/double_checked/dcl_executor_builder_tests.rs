@@ -10,14 +10,14 @@
 use std::io;
 
 use qubit_dcl::{
-    DoubleCheckedLockExecutor,
+    DclExecutor,
     ExecutionOutcome,
 };
 
 /// Verifies the initial builder accepts a predicate and produces an executor.
 #[test]
 fn test_builder_accepts_predicate() {
-    let executor = DoubleCheckedLockExecutor::builder().when(|| true).build();
+    let executor = DclExecutor::builder().when(|| true).build();
     let outcome =
         executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
 

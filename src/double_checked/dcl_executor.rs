@@ -10,7 +10,7 @@
 use qubit_lock::Lock;
 
 use crate::double_checked::{
-    DoubleCheckedLockExecutorBuilder,
+    DclExecutorBuilder,
     ExecutionOutcome,
     internal::DclCore,
 };
@@ -33,20 +33,20 @@ use crate::double_checked::{
 /// different captured data while consulting the same atomic gate. Passing the
 /// mode to each [`Self::run`] call preserves this coordination-only role.
 #[must_use = "an executor does nothing until run is called"]
-pub struct DoubleCheckedLockExecutor {
+pub struct DclExecutor {
     /// Shared predicate and panic configuration.
     core: DclCore,
 }
 
-impl DoubleCheckedLockExecutor {
+impl DclExecutor {
     /// Starts building an executor.
     ///
     /// # Returns
     ///
     /// A typestate builder that requires a predicate before it can build.
     #[inline]
-    pub fn builder() -> DoubleCheckedLockExecutorBuilder {
-        DoubleCheckedLockExecutorBuilder::new()
+    pub fn builder() -> DclExecutorBuilder {
+        DclExecutorBuilder::new()
     }
 
     /// Creates a built executor from its configured core.
@@ -162,7 +162,7 @@ impl DoubleCheckedLockExecutor {
     }
 }
 
-impl Clone for DoubleCheckedLockExecutor {
+impl Clone for DclExecutor {
     /// Shares the predicate configuration.
     #[inline]
     fn clone(&self) -> Self {
