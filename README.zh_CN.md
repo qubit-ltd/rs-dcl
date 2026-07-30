@@ -107,8 +107,6 @@ gate 协议，读者与 writer 可以使用同一个 executor，并传入同一 
   token、panic 处理、排障与限制。
 - Read the full [English User Guide](doc/user_guide.md).
 - 浏览 [API 文档](https://docs.rs/qubit-dcl)。
-- 从 0.10 升级时，阅读[迁移指南](doc/user_guide_migration_0_11.zh_CN.md)或
-  [English migration guide](doc/user_guide_migration_0_11.md)。
 - Read the [English README](README.md).
 
 ## 测试

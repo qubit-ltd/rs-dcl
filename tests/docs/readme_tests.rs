@@ -148,11 +148,13 @@ fn test_feature_matrix_covers_minimal_and_parking_lot_backends() {
     assert!(FEATURE_MATRIX.contains("\"allFeatures\": true"));
 }
 
-/// Verifies each README links to its language-specific 0.11 migration guide.
+/// Verifies public documentation does not retain migration guidance.
 #[test]
-fn test_readmes_link_migration_guides() {
-    assert!(README_EN.contains("doc/user_guide_migration_0_11.md"));
-    assert!(README_ZH.contains("doc/user_guide_migration_0_11.zh_CN.md"));
+fn test_public_docs_omit_migration_guidance() {
+    for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(!document.contains("migration"));
+        assert!(!document.contains("迁移"));
+    }
 }
 
 /// Verifies README files route readers to the matching-language user guide and

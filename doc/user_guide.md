@@ -1,8 +1,7 @@
 # Qubit DCL User Guide
 
 [中文](user_guide.zh_CN.md) · [README](../README.md) ·
-[API reference](https://docs.rs/qubit-dcl) ·
-[0.11 migration guide](user_guide_migration_0_11.md)
+[API reference](https://docs.rs/qubit-dcl)
 
 This guide explains how to use `qubit-dcl` 0.11 to avoid unnecessary
 serialized work while preserving a correct synchronization protocol. It is for
@@ -303,5 +302,3 @@ reestablish them before reusing the affected state.
 
 - Return to the [English README](../README.md) or [中文 README](../README.zh_CN.md).
 - Read the [API reference](https://docs.rs/qubit-dcl).
-- For upgrades from 0.10, read the
-  [migration guide](user_guide_migration_0_11.md).

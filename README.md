@@ -117,8 +117,6 @@ exclusive lock mode or a separate uniqueness protocol.
   troubleshooting, and limitations.
 - 阅读[中文用户手册](doc/user_guide.zh_CN.md)。
 - Browse the [API reference](https://docs.rs/qubit-dcl).
-- Read the [0.11 migration guide](doc/user_guide_migration_0_11.md) or
-  [中文迁移指南](doc/user_guide_migration_0_11.zh_CN.md).
 - 阅读[中文 README](README.zh_CN.md)。
 
 ## Testing
