@@ -103,8 +103,23 @@ fn test_manifest_exposes_parking_lot_as_a_default_feature() {
     let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock")
         .expect("Cargo.toml should declare qubit-lock");
     assert!(dependency.contains("default-features = false"));
-    assert!(dependency.contains("version = \"0.12\""));
-    assert!(!dependency.contains("path ="));
+    assert!(dependency.contains("version = \"0.13\""));
+    assert!(dependency.contains("path = \"../rs-lock\""));
+}
+
+/// Verifies published and unpublished Qubit dependencies use their intended
+/// sources.
+#[test]
+fn test_manifest_uses_expected_qubit_dependency_sources() {
+    let function = find_dependency_spec(CARGO_TOML, "qubit-function")
+        .expect("Cargo.toml should declare qubit-function");
+    assert!(function.contains("\"0.18.1\""));
+    assert!(!function.contains("path ="));
+
+    let lock = find_dependency_spec(CARGO_TOML, "qubit-lock")
+        .expect("Cargo.toml should declare qubit-lock");
+    assert!(lock.contains("version = \"0.13\""));
+    assert!(lock.contains("path = \"../rs-lock\""));
 }
 
 /// Verifies the CI feature matrix tests both the minimal and parking-lot lock
