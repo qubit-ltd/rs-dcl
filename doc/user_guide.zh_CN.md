@@ -1,8 +1,7 @@
 # Qubit DCL 用户手册
 
 [English](user_guide.md) · [README](../README.zh_CN.md) ·
-[API 文档](https://docs.rs/qubit-dcl) ·
-[0.11 迁移指南](user_guide_migration_0_11.zh_CN.md)
+[API 文档](https://docs.rs/qubit-dcl)
 
 本手册说明如何使用 `qubit-dcl` 0.11，在保持同步协议正确性的同时避免不必要的串行
 工作。它面向已经拥有 atomic 或等价同步 gate，并需要复用双重检查执行策略的 Rust
@@ -279,4 +278,3 @@ outcome 或执行基于 unwind 的 rollback 之前终止。`PanicInfo` 只负责
 
 - 返回 [English README](../README.md) 或[中文 README](../README.zh_CN.md)。
 - 阅读 [API 文档](https://docs.rs/qubit-dcl)。
-- 从 0.10 升级时，阅读 [迁移指南](user_guide_migration_0_11.zh_CN.md)。

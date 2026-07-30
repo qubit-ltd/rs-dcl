@@ -826,33 +826,7 @@ README 最后四节按项目规范排列：
 - Contributing / 贡献
 - Author / 作者
 
-## 20. 版本与迁移
-
-Cargo package version 更新为 0.10.0。
-
-不提供 deprecated API 或 compatibility feature。
-
-迁移文档提供概念映射：
-
-    旧 tester()
-        -> 新 when(|| atomic_state.load(...))
-
-    旧 call/execute
-        -> 新 run
-
-    旧 call_with/execute_with
-        -> LifecycleDoubleCheckedLockExecutor
-
-    旧 prepare/rollback/commit 的共享 FnMut
-        -> prepare 产生 P，Fn 回调消费每次调用独立 P
-
-    旧 ExecutionContext/ExecutionResult
-        -> ExecutionOutcome 或 ExecutionReport
-
-    旧 logger 配置
-        -> 调用方 match 结构化结果后自行记录
-
-## 21. 验收标准
+## 20. 验收标准
 
 设计实现完成必须同时满足：
 
@@ -867,11 +841,11 @@ Cargo package version 更新为 0.10.0。
 9. panic catch 位于 lock.with_write 外层。
 10. prepare/commit/rollback 无共享 FnMut mutex。
 11. 当前旧公共类型和兼容入口全部移除。
-12. README、Rustdoc、examples 和迁移说明与新语义一致。
+12. README、Rustdoc 和 examples 与新语义一致。
 13. align-ci.sh、ci-check.sh、coverage.sh json 按顺序通过。
 14. 不执行 git add、commit 或 push，除非用户另行明确授权。
 
-## 22. 明确排除的误解
+## 21. 明确排除的误解
 
 - Send + Sync 不等于 lock-free；predicate 的无锁约束仍是调用方协议。
 - Acquire load 不能替代相关 gate 写入时的 Release store。

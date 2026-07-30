@@ -233,16 +233,8 @@ execute_if_locked(&lock, |state| condition(state), |state| apply(state))
 3. compensating lifecycle adapter，明确无事务保证；
 4. panic-to-error adapter，放在锁调用外，并明确 poison 与部分写入语义。
 
-### 5.3 迁移顺序
-
-1. 先新增能够接收 `&T` 的 locked predicate，并为自然 DCL 用法建立并发测试。
-2. 将旧零参数 tester 标记为仅适用于独立 atomic fast flag，并进入弃用流程。
-3. 从核心执行路径移出锁内 panic 捕获。
-4. 收缩结果类型和重复 builder。
-5. 找到至少一个真实生产下游后，再决定 prepare lifecycle 是否值得保留。
-
 ## 6. 最终意见
 
 `rs-dcl` 的问题不是代码写得粗糙，而是实现得很完整的 API 建立在一个不够自然的核心 predicate 边界上。继续补测试、日志开关或 builder 方法会进一步固化错误抽象。
 
-由于目前没有生产下游，建议利用低迁移成本窗口先重做核心：**锁外检查显式独立，锁内检查直接接收受保护数据，panic 不伪装成回滚，外围生命周期从核心剥离**。完成这一点后，crate 才适合继续推广。
+由于目前没有生产下游，建议现在先重做核心：**锁外检查显式独立，锁内检查直接接收受保护数据，panic 不伪装成回滚，外围生命周期从核心剥离**。完成这一点后，crate 才适合继续推广。
