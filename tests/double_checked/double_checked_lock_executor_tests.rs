@@ -32,12 +32,100 @@ use qubit_dcl::{
     PanicPhase,
 };
 
+/// Common task signature used to merge generic coverage across executor modes.
+type CoverageTask = fn() -> Result<(), io::Error>;
+
+/// Completes successfully for the generic coverage matrix.
+fn successful_coverage_task() -> Result<(), io::Error> {
+    Ok(())
+}
+
+/// Panics for the generic coverage matrix.
+fn panicking_coverage_task() -> Result<(), io::Error> {
+    panic!("coverage task panic")
+}
+
+/// Exercises every panic-configuration branch through one `run`
+/// monomorphization.
+#[test]
+fn test_run_covers_both_panic_configurations_with_one_task_type() {
+    let lock = parking_lot::Mutex::new(());
+    let successful_task = successful_coverage_task as CoverageTask;
+    let panicking_task = panicking_coverage_task as CoverageTask;
+
+    let catching_false = DoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .catch_panics(true)
+        .build();
+    assert!(matches!(
+        catching_false.run(&lock, successful_task),
+        ExecutionOutcome::ConditionNotMet
+    ));
+
+    let catching_initial_panic = DoubleCheckedLockExecutor::builder()
+        .when(|| panic!("coverage initial panic"))
+        .catch_panics(true)
+        .build();
+    assert!(matches!(
+        catching_initial_panic.run(&lock, successful_task),
+        ExecutionOutcome::Panicked(panic)
+            if panic.phase() == PanicPhase::InitialConditionCheck
+    ));
+
+    let catching_true = DoubleCheckedLockExecutor::builder()
+        .when(|| true)
+        .catch_panics(true)
+        .build();
+    assert!(matches!(
+        catching_true.run(&lock, successful_task),
+        ExecutionOutcome::Success(())
+    ));
+    assert!(matches!(
+        catching_true.run(&lock, panicking_task),
+        ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
+    ));
+
+    let propagating_false =
+        DoubleCheckedLockExecutor::builder().when(|| false).build();
+    assert!(matches!(
+        propagating_false.run(&lock, successful_task),
+        ExecutionOutcome::ConditionNotMet
+    ));
+
+    let propagating_true =
+        DoubleCheckedLockExecutor::builder().when(|| true).build();
+    assert!(matches!(
+        propagating_true.run(&lock, successful_task),
+        ExecutionOutcome::Success(())
+    ));
+}
+
 /// Verifies the fast failure path performs no lock operation.
 #[test]
 fn test_run_initial_false_skips_lock_and_task() {
     let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
     let executor = DoubleCheckedLockExecutor::builder().when(|| false).build();
+
+    let outcome = executor.run(&lock, || {
+        task_calls.fetch_add(1, Ordering::Relaxed);
+        Ok::<(), io::Error>(())
+    });
+
+    assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
+    assert_eq!(lock.calls(), 0);
+    assert_eq!(task_calls.load(Ordering::Relaxed), 0);
+}
+
+/// Verifies panic capture preserves the initial-false fast path.
+#[test]
+fn test_run_catching_initial_false_skips_lock_and_task() {
+    let lock = CountingLock::new();
+    let task_calls = AtomicUsize::new(0);
+    let executor = DoubleCheckedLockExecutor::builder()
+        .when(|| false)
+        .catch_panics(true)
+        .build();
 
     let outcome = executor.run(&lock, || {
         task_calls.fetch_add(1, Ordering::Relaxed);
