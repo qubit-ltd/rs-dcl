@@ -10,6 +10,10 @@
 use std::{
     any::Any,
     fmt,
+    panic::{
+        AssertUnwindSafe,
+        catch_unwind,
+    },
 };
 
 use crate::double_checked::PanicPhase;
@@ -18,13 +22,15 @@ use crate::double_checked::PanicPhase;
 ///
 /// Unknown payload types remain available through [`Self::payload`] and
 /// [`Self::into_payload`] but are deliberately not formatted by `Debug`.
+/// Dropping this value discards any payload-destructor panic so a captured
+/// panic does not re-propagate while its structured outcome is disposed.
 pub struct PanicInfo {
     /// Phase in which the panic was captured.
     phase: PanicPhase,
     /// String message extracted from common panic payload types.
     message: Option<String>,
     /// Original panic payload used for inspection or resumed unwinding.
-    payload: Box<dyn Any + Send + 'static>,
+    payload: Option<Box<dyn Any + Send + 'static>>,
 }
 
 impl PanicInfo {
@@ -50,7 +56,7 @@ impl PanicInfo {
         Self {
             phase,
             message,
-            payload,
+            payload: Some(payload),
         }
     }
 
@@ -82,7 +88,9 @@ impl PanicInfo {
     /// The payload retained from `catch_unwind`.
     #[inline(always)]
     pub fn payload(&self) -> &(dyn Any + Send + 'static) {
-        self.payload.as_ref()
+        self.payload
+            .as_deref()
+            .expect("PanicInfo payload must exist while it is borrowed")
     }
 
     /// Consumes the metadata and returns the original panic payload.
@@ -91,8 +99,23 @@ impl PanicInfo {
     ///
     /// The owned payload suitable for `resume_unwind`.
     #[inline(always)]
-    pub fn into_payload(self) -> Box<dyn Any + Send + 'static> {
+    pub fn into_payload(mut self) -> Box<dyn Any + Send + 'static> {
         self.payload
+            .take()
+            .expect("PanicInfo payload must exist before it is consumed")
+    }
+}
+
+impl Drop for PanicInfo {
+    /// Discards the retained payload without allowing a destructor panic to
+    /// escape from structured panic metadata disposal.
+    fn drop(&mut self) {
+        let Some(payload) = self.payload.take() else {
+            return;
+        };
+        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
+            std::mem::forget(payload);
+        }
     }
 }
 
