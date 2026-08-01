@@ -3,7 +3,7 @@
 [中文](user_guide.zh_CN.md) · [README](../README.md) ·
 [API reference](https://docs.rs/qubit-dcl)
 
-This guide explains how to use `qubit-dcl` 0.11 to avoid unnecessary
+This guide explains how to use `qubit-dcl` 0.12 to avoid unnecessary
 serialized work while preserving a correct synchronization protocol. It is for
 Rust developers who already have an atomic or equivalently synchronized gate
 and need a reusable double-checked execution policy around it.
@@ -41,7 +41,7 @@ Add the crate and a lock backend:
 
 ```toml
 [dependencies]
-qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-dcl = { version = "0.12", features = ["parking-lot"] }
 qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
@@ -50,7 +50,7 @@ Enable the optional `parking-lot` feature for the matching `qubit-lock`
 support. For only standard-library locks, no DCL feature is needed:
 
 ```toml
-qubit-dcl = "0.11"
+qubit-dcl = "0.12"
 qubit-lock = { version = "0.13", default-features = false }
 ```
 
@@ -245,28 +245,28 @@ needs its own synchronization.
 
 ## Outcomes and Panic Handling
 
-The basic executor returns `ExecutionOutcome<R, E>`:
+`run` returns `ExecutionOutcome<R, E>`:
 
 | Variant | Meaning |
 | --- | --- |
 | `Success(R)` | The task ran under the selected guard and returned a value. |
 | `ConditionNotMet` | Either condition check returned false. |
 | `TaskFailed(E)` | The task returned its unchanged error. |
-| `Panicked(PanicInfo)` | A configured panic boundary captured a panic. |
 
-The lifecycle executor returns one exhaustive `LifecycleOutcome<R, E, C>`.
-It distinguishes the first check, prepare, second check, task failure, task
-success, and panic paths. Finalization fields use
-`FinalizationOutcome<C>`: `NotRequired`, `Succeeded`, `Failed(C)`, or
-`Panicked(PanicInfo)`. Commit failure never erases task success; rollback
-failure never erases the original task error or panic.
+The captured form (`run_catching`) returns `Result<ExecutionOutcome<R, E>, PanicInfo>`.
 
-Panic capture is disabled by default, so predicate, lock, callback, and task
-panics propagate normally. Enable `catch_panics(true)` to receive
-`PanicInfo` with a `PanicPhase`. The capture boundary is outside the RAII
-guard's scope: standard locks preserve normal poisoning behavior, while
-parking-lot retains its normal non-poisoning behavior. A panic while explicitly
-releasing a normally completed guard is classified as `PanicPhase::LockRelease`.
+Lifecycle methods return exhaustive `LifecycleOutcome<R, E, C>` from
+`run`/`run_with_token`.
+
+The captured lifecycle methods (`run_catching`/`run_with_token_catching`) return
+`CapturedLifecycleOutcome<R, E, C>` for panic-aware paths. A captured panic
+keeps the original panic phase and returns captured finalization outcomes from
+`CapturedFinalizationOutcome<C>`.
+
+Panic capture is disabled by default. `run` and `run_with_token` propagate panic
+from predicate, lock, callbacks, and task directly. Captured methods keep panic
+metadata with the same lock boundary semantics: standard-lock poisoning is
+preserved while parking-lot remains non-poisoning.
 
 Capture works only with an unwinding panic strategy. With `panic = "abort"`,
 the process terminates before an outcome can be returned or unwind-based

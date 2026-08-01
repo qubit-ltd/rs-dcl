@@ -201,7 +201,6 @@ predicate 使用 Arc trait object 的原因：
         .when(move || {
             state.load(Ordering::Acquire) == STARTED
         })
-        .catch_panics(true)
         .build();
 
 builder 阶段：
@@ -266,7 +265,6 @@ when 是必选项，缺少 predicate 的 builder 不提供 build。
     let executor =
         LifecycleDclExecutor::builder(lock)
             .when(predicate)
-            .catch_panics(true)
             .prepare(prepare)
             .commit(commit)
             .rollback(rollback)
@@ -488,8 +486,7 @@ commit 和 rollback 始终在锁外执行，不延长数据锁临界区。
 
 ### 11.1 配置
 
-    .catch_panics(false)  // 默认
-    .catch_panics(true)
+    // 默认
 
 配置作用于：
 
