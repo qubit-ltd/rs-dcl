@@ -44,14 +44,10 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
     let release =
         Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
     let lock = Arc::new(parking_lot::RwLock::new(()));
-    let executor = Arc::new(
-        DclExecutor::builder()
-            .when({
-                let gate = Arc::clone(&gate);
-                move || gate.load(Ordering::Acquire)
-            })
-            .build(),
-    );
+    let executor = Arc::new(DclExecutor::new({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    }));
 
     let handles = (0..READER_COUNT)
         .map(|_| {
@@ -128,14 +124,10 @@ fn test_task_changes_gate_inside_executor_lock() {
     let task_calls = Arc::new(AtomicUsize::new(0));
     let start = Arc::new(Barrier::new(THREAD_COUNT));
     let lock = Arc::new(parking_lot::Mutex::new(()));
-    let executor = Arc::new(
-        DclExecutor::builder()
-            .when({
-                let gate = Arc::clone(&gate);
-                move || gate.load(Ordering::Acquire)
-            })
-            .build(),
-    );
+    let executor = Arc::new(DclExecutor::new({
+        let gate = Arc::clone(&gate);
+        move || gate.load(Ordering::Acquire)
+    }));
 
     let handles = (0..THREAD_COUNT)
         .map(|_| {
@@ -174,16 +166,15 @@ fn test_external_gate_change_uses_same_underlying_lock() {
     let gate = Arc::new(AtomicBool::new(true));
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = Arc::new(AtomicUsize::new(0));
-    let executor = DclExecutor::builder()
-        .when({
-            let gate = Arc::clone(&gate);
-            let checks = Arc::clone(&checks);
-            move || {
-                checks.fetch_add(1, Ordering::Relaxed);
-                gate.load(Ordering::Acquire)
-            }
-        })
-        .build();
+    let executor = DclExecutor::new({
+        let gate = Arc::clone(&gate);
+        let checks = Arc::clone(&checks);
+        move || {
+            let result = gate.load(Ordering::Acquire);
+            checks.fetch_add(1, Ordering::Release);
+            result
+        }
+    });
 
     let guard = lock.lock();
     let worker_task_calls = Arc::clone(&task_calls);
