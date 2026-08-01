@@ -3,7 +3,7 @@
 评审日期：2026-07-11
 
 > 该评审对应 `qubit-dcl 0.9.3` 版本，已作为历史记录保留。
-> 当前 `0.12` 采用显式 `run` / `run_catching` API，`catch_panics`
+> 当前 `0.12` 采用显式 `run` / `run_catching` API，`legacy panic-capture mode`
 > 及相关语义请以重构后的公开文档为准。
 
 评审版本：`qubit-dcl 0.9.3`
@@ -61,7 +61,7 @@
 
 ### 3.5 panic 默认传播是正确默认值
 
-当前默认不捕获 panic，只有显式 `.catch_panics()` 才转换为 executor error。对 Rust 库而言，默认保留 unwind 语义比默认吞掉 panic 更安全。
+当前默认不捕获 panic，只有显式 `legacy panic-capture mode` 才转换为 executor error。对 Rust 库而言，默认保留 unwind 语义比默认吞掉 panic 更安全。
 
 ## 4. 主要问题
 
@@ -109,7 +109,7 @@ README 通过要求 tester 使用独立原子变量规避这一问题，但这�
 
 核心问题位于 `src/double_checked/double_checked_lock_executor.rs` 的 `execute_with_write_lock`。
 
-### 4.2 高优先级：`catch_panics` 改变 poison 语义并保留部分写入
+### 4.2 高优先级：`legacy panic-capture mode` 改变 poison 语义并保留部分写入
 
 任务在获得 `&mut T` 后由 `try_run` 内部的 `catch_unwind` 捕获。panic 在离开 `lock.write` closure 之前已经被转换为 `ExecutionResult`，因此：
 
@@ -125,7 +125,7 @@ README 通过要求 tester 使用独立原子变量规避这一问题，但这�
 1. 核心 API 保持 panic 传播，不在持锁 closure 内转换 panic。
 2. 若保留捕获能力，应在 `lock.with_write(...)` 外层执行 `catch_unwind`，让 guard 先按底层锁语义完成 unwind/poison。
 3. 明确说明任何 panic capture 都不提供受保护数据的回滚。
-4. 对需要回滚的场景，应要求用户任务先计算新值再一次性提交，或使用显式 snapshot/transaction abstraction，而不是依赖通用 `catch_panics`。
+4. 对需要回滚的场景，应要求用户任务先计算新值再一次性提交，或使用显式 snapshot/transaction abstraction，而不是依赖通用 `legacy panic-capture mode`。
 
 ### 4.3 高优先级：prepare/commit/rollback 名称暗示了实际不存在的事务保证
 

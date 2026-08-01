@@ -3,7 +3,7 @@
 日期：2026-07-18
 
 > 该文档为 `qubit-dcl 0.10` 及更早版本的历史设计草案。
-> 当前 `0.12` 已移除基于 `catch_panics` 的配置入口，改为
+> 当前 `0.12` 已移除基于 `legacy panic-capture mode` 的配置入口，改为
 > 通过 `run` 与 `run_catching` 显式区分 panic 行为；现行可用 API 请以
 > `README` 与 `doc/user_guide.md` 为准。
 
@@ -182,7 +182,7 @@ Send + Sync 可以阻止安全 Rust 闭包直接共享 Cell、RefCell 等非线�
     struct DclCore<L, T: ?Sized> {
         lock: L,
         predicate: Arc<dyn Fn() -> bool + Send + Sync + 'static>,
-        catch_panics: bool,
+        legacy panic-capture mode: bool,
         marker: PhantomData<fn(&T)>,
     }
 
@@ -212,7 +212,7 @@ builder 阶段：
 
 1. builder(lock)：持有锁，尚不能 build。
 2. when(predicate)：进入 ready 状态。
-3. catch_panics(bool)：仅在 ready 状态提供，默认 false。
+3. legacy panic-capture mode(bool)：仅在 ready 状态提供，默认 false。
 4. build()：产生 executor。
 
 when 是必选项，缺少 predicate 的 builder 不提供 build。
@@ -237,7 +237,7 @@ when 是必选项，缺少 predicate 的 builder 不提供 build。
         ExecutionOutcome::Success(()) => {}
         ExecutionOutcome::ConditionNotMet => {}
         ExecutionOutcome::TaskFailed(error) => handle(error),
-        ExecutionOutcome::Panicked(panic) => handle_panic(panic),
+        LegacyExecutionOutcome::LegacyPanic(panic) => handle_panic(panic),
         ExecutionOutcome::NotExecuted => unreachable!(),
     }
 
@@ -298,7 +298,7 @@ typestate 保证：
 - 不存在 no_commit + no_rollback。
 - commit/rollback 不能在 prepare 之前配置。
 - 不完整状态没有 build。
-- catch_panics 只在 prepare 前的配置阶段提供一次。
+- legacy panic-capture mode 只在 prepare 前的配置阶段提供一次。
 
 no_commit/no_rollback 表示该路径无需 finalizer。对应路径中的 P 在 executor 内自然结束生命周期，但该实现细节不进入方法命名。
 
@@ -344,7 +344,7 @@ rollback 不应通过读取外部共享状态猜测失败发生在哪个阶段�
             &'a (dyn Error + Send + Sync + 'static),
         ),
 
-        Panicked(&'a PanicInfo),
+        LegacyPanic(&'a PanicInfo),
     }
 
 TaskFailed 提供对原始 E 的 trait-object 视图：
@@ -354,7 +354,7 @@ TaskFailed 提供对原始 E 的 trait-object 视图：
 - 调用方可通过 Error::downcast_ref 检查具体错误类型。
 - rollback 完成后，原始 E 原封不动返回给调用方。
 
-Panicked 中的 PanicInfo 包含具体阶段，因此不再需要为每个 panic 阶段增加 RollbackCause 变体。
+LegacyPanic 中的 PanicInfo 包含具体阶段，因此不再需要为每个 panic 阶段增加 RollbackCause 变体。
 
 prepare 失败时尚未产生 P，因此不调用 rollback。
 
@@ -370,7 +370,7 @@ commit 失败时 task 已成功，且业务副作用可能已被其他线程观�
         ConditionNotMet,
         NotExecuted,
         TaskFailed(E),
-        Panicked(PanicInfo),
+        LegacyPanic(PanicInfo),
     }
 
 语义：
@@ -379,7 +379,7 @@ commit 失败时 task 已成功，且业务副作用可能已被其他线程观�
 - ConditionNotMet：第一次或第二次检查不满足。
 - NotExecuted：仅生命周期 executor 使用；prepare 未成功完成。
 - TaskFailed：task 返回 Err，保留原始 E。
-- Panicked：启用 panic capture 后，predicate、锁或 task panic。
+- LegacyPanic：启用 panic capture 后，predicate、锁或 task panic。
 
 ### 9.2 PreparationOutcome
 
@@ -480,7 +480,7 @@ prepare 失败：
 8. 第二次 true：锁内执行 task。
 9. task Ok(R)：释放锁，调用 commit(P) 或 no_commit。
 10. task Err(E)：释放锁，调用 rollback(P, TaskFailed(&E)) 或 no_rollback。
-11. locked phase panic：锁的 guard 先观察 unwind 并释放；随后调用 rollback(P, Panicked) 或 no_rollback。
+11. locked phase panic：锁的 guard 先观察 unwind 并释放；随后调用 rollback(P, LegacyPanic) 或 no_rollback。
 12. 将 execution 和 preparation 两个结果组合返回。
 
 prepare 始终在锁外，可以被多个竞争调用并发执行。每个调用持有自己的 P。
@@ -530,21 +530,21 @@ PanicInfo 提供：
 
 Debug 实现不尝试格式化未知 payload。
 
-### 11.3 catch_panics = true
+### 11.3 legacy panic-capture mode = true
 
-- panic 被转换为对应的 Panicked outcome。
+- panic 被转换为对应的 LegacyPanic outcome。
 - prepare 之后的 locked-phase panic 会先释放锁，再执行 rollback。
 - task/lock/predicate panic 与 rollback panic 可以同时保留在双轴 report 中。
 - commit panic 不改变 Success(R)。
 
-### 11.4 catch_panics = false
+### 11.4 legacy panic-capture mode = false
 
 - 第一次 predicate、prepare、commit 的 panic 直接传播。
 - prepare 成功后的 locked phase 仍在 with_write 外临时 catch，以便释放锁并执行 rollback。
 - rollback 完成后通过 resume_unwind 继续传播原始 panic。
 - 标准库锁可以正常观察 task unwind 并进入 poisoned 状态。
 - parking_lot 锁按其自身语义不 poisoning。
-- 若原始 panic 传播期间 rollback 返回 Err 或发生第二个 panic，原始 panic 优先；secondary rollback failure 无法通过普通返回值报告。需要完整双轴诊断的调用方应启用 catch_panics。
+- 若原始 panic 传播期间 rollback 返回 Err 或发生第二个 panic，原始 panic 优先；secondary rollback failure 无法通过普通返回值报告。需要完整双轴诊断的调用方应启用 legacy panic-capture mode。
 
 executor 不承诺撤销 task panic 前已经发生的副作用。
 
@@ -747,7 +747,7 @@ builder stage 类型保持 public 以满足 Rust 公共签名可达性，但标�
 - P 在每条终止路径上仅消费一次。
 - no_commit/no_rollback 返回对应 outcome。
 - commit failure 不覆盖 Success。
-- rollback failure不覆盖 ConditionNotMet、TaskFailed 或 Panicked。
+- rollback failure不覆盖 ConditionNotMet、TaskFailed 或 LegacyPanic。
 
 ### 18.4 panic 与锁语义
 
@@ -760,8 +760,8 @@ builder stage 类型保持 public 以满足 Rust 公共签名可达性，但标�
 - task panic 后先解锁再 rollback。
 - commit panic。
 - rollback panic。
-- catch_panics true 返回完整双轴 report。
-- catch_panics false 在 rollback 后恢复原始 unwind。
+- legacy panic-capture mode true 返回完整双轴 report。
+- legacy panic-capture mode false 在 rollback 后恢复原始 unwind。
 - task 在 panic 前的副作用不会被虚假宣称已撤销。
 
 ### 18.5 typestate
