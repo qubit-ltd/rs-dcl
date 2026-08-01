@@ -5,7 +5,7 @@
 
 ## 说明
 
-该评审文档为历史资料，当前 `qubit-dcl 0.12` 已采用显式 `run` / `run_catching` 的 panic 行为区分方式，不再延续评审中讨论的 `catch_panics` 风格。
+该评审文档为历史资料，当前 `qubit-dcl 0.12` 已采用显式 `run` / `run_catching` 的 panic 行为区分方式，不再延续评审中讨论的 legacy catch configuration 风格。
 
 ## 当前版本入口
 
