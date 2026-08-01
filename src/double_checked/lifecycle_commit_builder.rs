@@ -21,7 +21,7 @@ use crate::double_checked::{
 #[doc(hidden)]
 #[must_use = "the commit stage requires rollback or no_rollback"]
 pub struct LifecycleCommitBuilder<P, C> {
-    /// DCL predicate and panic configuration.
+    /// DCL predicate configuration.
     core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
@@ -34,7 +34,7 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL predicate and panic configuration.
+    /// * `core` - DCL predicate configuration.
     /// * `prepare` - Erased prepare callback.
     /// * `commit` - Erased commit callback.
     ///
@@ -72,8 +72,8 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     ///
     /// # Panics
     ///
-    /// This method does not invoke `rollback`. Its panic behavior is determined
-    /// by the built executor's panic-capture setting.
+    /// This method does not invoke `rollback`. Panic behavior is selected at
+    /// execution time by calling `run` or `run_catching`.
     ///
     /// # Synchronization
     ///

@@ -7,9 +7,7 @@
 // =============================================================================
 //! Complete outcomes for lifecycle-aware double-checked execution.
 
-use crate::double_checked::{
-    FinalizationOutcome,
-};
+use crate::double_checked::FinalizationOutcome;
 
 /// Describes the single valid terminal state of a lifecycle invocation.
 ///
@@ -41,8 +39,8 @@ pub enum LifecycleOutcome<R, E, C> {
     TaskFailed {
         /// Original error returned by the task.
         error: E,
-    /// Outcome of rollback or of dropping a token that required no
-    /// rollback.
+        /// Outcome of rollback or of dropping a token that required no
+        /// rollback.
         rollback: FinalizationOutcome<C>,
     },
 }

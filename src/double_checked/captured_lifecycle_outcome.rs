@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Captured lifecycle outcomes for panic-aware invocations.
 
@@ -31,14 +33,16 @@ pub enum CapturedLifecycleOutcome<R, E, C> {
     },
     /// The second condition check returned `false` after prepare completed.
     SecondConditionNotMet {
-        /// Outcome of rollback or of dropping a token that required no rollback.
+        /// Outcome of rollback or of dropping a token that required no
+        /// rollback.
         rollback: CapturedFinalizationOutcome<C>,
     },
     /// The task returned its original error and the token followed rollback.
     TaskFailed {
         /// Original error returned by the task.
         error: E,
-        /// Outcome of rollback or of dropping a token that required no rollback.
+        /// Outcome of rollback or of dropping a token that required no
+        /// rollback.
         rollback: CapturedFinalizationOutcome<C>,
     },
     /// Locked execution panicked after prepare and the token followed rollback.
@@ -46,7 +50,8 @@ pub enum CapturedLifecycleOutcome<R, E, C> {
         /// Original panic captured from lock acquisition, the second condition
         /// check, the task, or lock release.
         panic: PanicInfo,
-        /// Outcome of rollback or of dropping a token that required no rollback.
+        /// Outcome of rollback or of dropping a token that required no
+        /// rollback.
         rollback: CapturedFinalizationOutcome<C>,
     },
 }

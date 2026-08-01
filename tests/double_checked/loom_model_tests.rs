@@ -107,7 +107,7 @@ where
 fn test_loom_initial_false_has_zero_lock_calls() {
     model(|| {
         let lock = LoomLock::new(());
-        let executor = DclExecutor::builder().when(|| false).build();
+        let executor = DclExecutor::new(|| false);
 
         let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
 
@@ -124,14 +124,10 @@ fn test_loom_task_gate_change_allows_one_success() {
         let gate = Arc::new(AtomicBool::new(true));
         let task_calls = Arc::new(AtomicUsize::new(0));
         let lock = LoomLock::new(());
-        let executor = Arc::new(
-            DclExecutor::builder()
-                .when({
-                    let gate = Arc::clone(&gate);
-                    move || gate.load(Ordering::Acquire)
-                })
-                .build(),
-        );
+        let executor = Arc::new(DclExecutor::new({
+            let gate = Arc::clone(&gate);
+            move || gate.load(Ordering::Acquire)
+        }));
 
         let handles = (0..2)
             .map(|_| {
@@ -171,16 +167,14 @@ fn test_loom_external_same_lock_transition_blocks_stale_task() {
         let gate = Arc::new(AtomicBool::new(true));
         let checks = Arc::new(AtomicUsize::new(0));
         let task_calls = Arc::new(AtomicUsize::new(0));
-        let executor = DclExecutor::builder()
-            .when({
-                let gate = Arc::clone(&gate);
-                let checks = Arc::clone(&checks);
-                move || {
-                    checks.fetch_add(1, Ordering::Relaxed);
-                    gate.load(Ordering::Acquire)
-                }
-            })
-            .build();
+        let executor = DclExecutor::new({
+            let gate = Arc::clone(&gate);
+            let checks = Arc::clone(&checks);
+            move || {
+                checks.fetch_add(1, Ordering::Relaxed);
+                gate.load(Ordering::Acquire)
+            }
+        });
 
         let guard = Lock::lock(&lock);
         let worker_task_calls = Arc::clone(&task_calls);

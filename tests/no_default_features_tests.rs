@@ -25,7 +25,7 @@ use qubit_dcl::{
 #[test]
 fn test_standard_mutexes_work_without_parking_lot_feature() {
     let basic_lock = Mutex::new(());
-    let basic_executor = DclExecutor::builder().when(|| true).build();
+    let basic_executor = DclExecutor::new(|| true);
     let basic_outcome =
         basic_executor.run(&basic_lock, || Ok::<usize, io::Error>(7));
     assert!(matches!(basic_outcome, ExecutionOutcome::Success(7)));

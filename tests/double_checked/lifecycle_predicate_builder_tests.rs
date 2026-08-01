@@ -14,12 +14,11 @@ use qubit_dcl::{
     LifecycleOutcome,
 };
 
-/// Verifies the predicate stage accepts panic configuration and preparation.
+/// Verifies the predicate stage accepts lifecycle preparation.
 #[test]
 fn test_predicate_builder_configures_prepare() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        
         .prepare(|| Err::<(), _>(io::Error::other("prepare")))
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))

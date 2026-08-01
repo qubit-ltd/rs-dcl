@@ -36,7 +36,7 @@ impl LifecycleDclExecutorBuilder {
     ///
     /// # Returns
     ///
-    /// A builder that accepts panic configuration and prepare.
+    /// A builder that accepts lifecycle preparation.
     ///
     /// # Errors
     ///

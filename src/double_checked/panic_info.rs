@@ -12,8 +12,8 @@ use std::{
     fmt,
     panic::{
         AssertUnwindSafe,
-        resume_unwind,
         catch_unwind,
+        resume_unwind,
     },
 };
 
