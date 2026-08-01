@@ -74,7 +74,7 @@ fn test_no_commit_drops_token_and_reports_not_required() {
 fn test_catching_commit_error_reports_failure() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| Err::<(), _>(io::Error::other("commit failed")))
         .no_rollback()
@@ -99,7 +99,7 @@ fn test_catching_no_commit_drops_token_and_reports_not_required() {
     let drops = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare({
             let drops = Arc::clone(&drops);
             move || {
@@ -132,7 +132,7 @@ fn test_catching_no_rollback_drops_token_and_reports_not_required() {
     let drops = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare({
             let drops = Arc::clone(&drops);
             move || {

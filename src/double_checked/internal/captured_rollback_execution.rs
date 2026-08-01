@@ -2,26 +2,28 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Private unsuccessful execution state used to drive lifecycle rollback.
+//! Private unsuccessful execution state used to drive captured lifecycle rollback.
 
 use crate::double_checked::{
-    FinalizationOutcome,
-    LifecycleOutcome,
+    CapturedFinalizationOutcome,
+    CapturedLifecycleOutcome,
+    PanicInfo,
     RollbackCause,
 };
 
-/// Represents the locked execution state that requires lifecycle rollback.
-pub(crate) enum RollbackExecution<E> {
+/// Represents the locked execution state that requires lifecycle rollback when
+/// panic capture is enabled.
+pub(crate) enum CapturedRollbackExecution<E> {
     /// The second condition check returned `false`.
     ConditionNotMet,
     /// The task returned its original error.
     TaskFailed(E),
+    /// Lock acquisition, the second check, the task, or lock release panicked.
+    Panicked(PanicInfo),
 }
 
-impl<E> RollbackExecution<E> {
+impl<E> CapturedRollbackExecution<E> {
     /// Creates the borrowed cause passed to the rollback callback.
     ///
     /// # Returns
@@ -32,6 +34,7 @@ impl<E> RollbackExecution<E> {
         match self {
             Self::ConditionNotMet => RollbackCause::ConditionNotMet,
             Self::TaskFailed(error) => RollbackCause::TaskFailed(error),
+            Self::Panicked(panic) => RollbackCause::Panicked(panic),
         }
     }
 
@@ -44,18 +47,22 @@ impl<E> RollbackExecution<E> {
     ///
     /// # Returns
     ///
-    /// The terminal lifecycle outcome preserving the original execution state.
+    /// The terminal captured lifecycle outcome preserving the original execution
+    /// state.
     #[inline]
     pub(crate) fn into_outcome<R, C>(
         self,
-        rollback: FinalizationOutcome<C>,
-    ) -> LifecycleOutcome<R, E, C> {
+        rollback: CapturedFinalizationOutcome<C>,
+    ) -> CapturedLifecycleOutcome<R, E, C> {
         match self {
             Self::ConditionNotMet => {
-                LifecycleOutcome::SecondConditionNotMet { rollback }
+                CapturedLifecycleOutcome::SecondConditionNotMet { rollback }
             }
             Self::TaskFailed(error) => {
-                LifecycleOutcome::TaskFailed { error, rollback }
+                CapturedLifecycleOutcome::TaskFailed { error, rollback }
+            }
+            Self::Panicked(panic) => {
+                CapturedLifecycleOutcome::ExecutionPanicked { panic, rollback }
             }
         }
     }

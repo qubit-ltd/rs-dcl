@@ -118,6 +118,8 @@
 pub mod double_checked;
 
 pub use double_checked::{
+    CapturedFinalizationOutcome,
+    CapturedLifecycleOutcome,
     DclExecutor,
     ExecutionOutcome,
     FinalizationOutcome,

@@ -7,8 +7,6 @@
 // =============================================================================
 //! Task execution outcomes for double-checked execution.
 
-use crate::double_checked::PanicInfo;
-
 /// Describes whether and how the guarded task was executed.
 #[derive(Debug)]
 #[must_use = "the execution outcome must be inspected"]
@@ -19,6 +17,4 @@ pub enum ExecutionOutcome<R, E> {
     ConditionNotMet,
     /// The task ran and returned its original error value.
     TaskFailed(E),
-    /// A configured panic boundary captured a panic.
-    Panicked(PanicInfo),
 }

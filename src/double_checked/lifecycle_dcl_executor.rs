@@ -2,8 +2,6 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Reusable lifecycle-aware double-checked lock executor.
 
@@ -12,7 +10,6 @@ use std::{
     panic::{
         AssertUnwindSafe,
         catch_unwind,
-        resume_unwind,
     },
     sync::Arc,
 };
@@ -20,6 +17,9 @@ use std::{
 use qubit_lock::Lock;
 
 use crate::double_checked::{
+    CapturedFinalizationOutcome,
+    CapturedLifecycleOutcome,
+    FinalizationOutcome,
     LifecycleDclExecutorBuilder,
     LifecycleOutcome,
     PanicInfo,
@@ -27,11 +27,14 @@ use crate::double_checked::{
     RollbackCause,
     internal::{
         DclCore,
+        CapturedRollbackExecution,
         LockedExecution,
         RollbackExecution,
         catch_phase,
         finalize_commit,
+        finalize_commit_catching,
         finalize_rollback,
+        finalize_rollback_catching,
     },
 };
 
@@ -64,7 +67,7 @@ pub(crate) type RollbackCallback<P, C> = Arc<
 /// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
 #[must_use = "an executor does nothing until run or run_with_token is called"]
 pub struct LifecycleDclExecutor<P, C> {
-    /// Shared DCL predicate and panic configuration.
+    /// Shared DCL predicate.
     core: DclCore,
     /// Callback that creates one token for each prepared invocation.
     prepare: PrepareCallback<P, C>,
@@ -91,7 +94,7 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// # Parameters
     ///
-    /// * `core` - Complete predicate and panic configuration.
+    /// * `core` - Predicate configuration.
     /// * `prepare` - Per-invocation token producer.
     /// * `commit` - Optional successful-path finalizer.
     /// * `rollback` - Optional unsuccessful-path finalizer.
@@ -119,64 +122,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// * `lock` - Generic synchronous lock used for this invocation.
     /// * `task` - One-shot task executed inside the lock after the second
-    ///   condition check.
+    ///   check.
     ///
     /// # Returns
     ///
     /// The single terminal lifecycle outcome.
-    ///
-    /// # Errors
-    ///
-    /// Task and lifecycle errors are retained in the same structured outcome
-    /// and never overwrite one another.
-    ///
-    /// # Panics
-    ///
-    /// When panic capture is disabled, propagates callback, lock, predicate,
-    /// and task panics. A panic after prepare in the locked phase first
-    /// releases the lock and attempts rollback before the original panic is
-    /// resumed. With capture enabled, a guard-drop panic after locked work
-    /// completes is classified as [`PanicPhase::LockRelease`] and triggers
-    /// rollback.
-    ///
-    /// Capture requires an unwinding panic strategy; with `panic = "abort"`,
-    /// the process terminates without returning an outcome or attempting
-    /// unwind-based rollback. A structured panic outcome does not make the
-    /// invocation transactional: effects completed before the panic remain,
-    /// and rollback can itself fail or panic. The caller must verify or
-    /// reestablish application invariants before continuing.
-    ///
-    /// # Synchronization
-    ///
-    /// The predicate must read an atomic or equivalently synchronized gate.
-    /// Prepare, commit, and rollback are shared `Fn` callbacks and may be
-    /// called concurrently by separate invocations.
-    ///
-    /// # Locking
-    ///
-    /// The initial check, prepare, commit, and rollback run outside the
-    /// executor lock. The second check and task share one guard from the
-    /// supplied acquisition mode. A shared/read mode permits concurrent tasks
-    /// and is valid only for read-only protected protocols without at-most-once
-    /// requirements. Gate mutation, protected writes, or serialized execution
-    /// require an [`qubit_lock::ExclusiveLock`] mode. Lifecycle callbacks do
-    /// not automatically reacquire that lock.
-    ///
-    /// This method intentionally accepts [`Lock`] rather than
-    /// [`qubit_lock::ExclusiveLock`] and does not branch on whether the
-    /// supplied mode is shared or exclusive. Rust cannot prove that `task` is
-    /// read-only, so callers supplying a shared mode must uphold that contract.
-    ///
-    /// The same executor may receive paired read and write modes from one
-    /// RWLock on different calls. Those calls may operate on different
-    /// captured data; the modes must refer to the same underlying lock whenever
-    /// their actions conflict through the shared gate protocol.
     #[inline(always)]
-    pub fn run<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> LifecycleOutcome<R, E, C>
+    pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -185,7 +137,7 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         self.run_with_token(lock, move |_| task())
     }
 
-    /// Runs a task with mutable access to its invocation's prepare token.
+    /// Runs a task with direct access to its invocation token.
     ///
     /// The token exists on the invocation stack rather than in shared executor
     /// state. The task runs while the executor guard is held; commit or
@@ -200,126 +152,8 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// # Returns
     ///
     /// The single terminal lifecycle outcome.
-    ///
-    /// # Errors
-    ///
-    /// Task and lifecycle errors are retained in the same structured outcome
-    /// and never overwrite one another.
-    ///
-    /// # Panics
-    ///
-    /// Uses the same panic behavior and lock-release classification as
-    /// [`Self::run`].
-    ///
-    /// # Synchronization
-    ///
-    /// Each invocation owns its token on its call stack. The callback objects
-    /// are shared and may be invoked concurrently, so captured mutable state
-    /// requires its own synchronization.
-    ///
-    /// # Locking
-    ///
-    /// Token mutation by `task` occurs while the executor guard is held.
-    /// Because each token belongs to one invocation, mutating the token alone
-    /// does not require exclusive lock acquisition. Mutating captured gate or
-    /// protected shared state does require an [`qubit_lock::ExclusiveLock`]
-    /// mode or a separate uniqueness mechanism. Commit and rollback consume the
-    /// token only after the guard has been released.
-    ///
-    /// As with [`Self::run`], callers may supply read and write modes from one
-    /// RWLock to the same executor. Tasks may capture different data; the
-    /// shared underlying lock and atomic gate establish their coordination.
     #[inline]
     pub fn run_with_token<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> LifecycleOutcome<R, E, C>
-    where
-        L: Lock + ?Sized,
-        E: Error + Send + Sync + 'static,
-        F: FnOnce(&mut P) -> Result<R, E>,
-    {
-        if self.core.catch_panics() {
-            self.run_catching(lock, task)
-        } else {
-            self.run_propagating(lock, task)
-        }
-    }
-
-    /// Executes every lifecycle phase with structured panic capture enabled.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Lock used for this invocation.
-    /// * `task` - Token-aware task to run in the locked phase.
-    ///
-    /// # Returns
-    ///
-    /// The complete lifecycle outcome, including captured panic metadata.
-    fn run_catching<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> LifecycleOutcome<R, E, C>
-    where
-        L: Lock + ?Sized,
-        E: Error + Send + Sync + 'static,
-        F: FnOnce(&mut P) -> Result<R, E>,
-    {
-        match self.core.check_initial_catching() {
-            Ok(true) => {}
-            Ok(false) => {
-                return LifecycleOutcome::InitialConditionNotMet;
-            }
-            Err(panic) => {
-                return LifecycleOutcome::InitialConditionCheckPanicked(panic);
-            }
-        }
-
-        let mut token =
-            match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
-                Ok(Ok(token)) => token,
-                Ok(Err(error)) => {
-                    return LifecycleOutcome::PrepareFailed(error);
-                }
-                Err(panic) => {
-                    return LifecycleOutcome::PreparePanicked(panic);
-                }
-            };
-
-        match self.core.execute_locked_catching(lock, || task(&mut token)) {
-            Ok(LockedExecution::ConditionNotMet) => {
-                self.finish_rollback(token, RollbackExecution::ConditionNotMet)
-            }
-            Ok(LockedExecution::Task(Ok(value))) => {
-                self.finish_commit(token, value)
-            }
-            Ok(LockedExecution::Task(Err(error))) => self
-                .finish_rollback(token, RollbackExecution::TaskFailed(error)),
-            Err(panic) => {
-                self.finish_rollback(token, RollbackExecution::Panicked(panic))
-            }
-        }
-    }
-
-    /// Executes uncaptured phases directly while retaining a temporary outer
-    /// boundary around the locked phase for rollback.
-    ///
-    /// # Parameters
-    ///
-    /// * `lock` - Lock used for this invocation.
-    /// * `task` - Token-aware task to run in the locked phase.
-    ///
-    /// # Returns
-    ///
-    /// The complete lifecycle outcome when no phase panics.
-    ///
-    /// # Panics
-    ///
-    /// Propagates initial-check, prepare, commit, and ordinary rollback panics.
-    /// A locked-phase panic is resumed after rollback is attempted.
-    fn run_propagating<L, R, E, F>(
         &self,
         lock: &L,
         task: F,
@@ -346,54 +180,112 @@ impl<P, C> LifecycleDclExecutor<P, C> {
             Ok(LockedExecution::Task(Ok(value))) => {
                 self.finish_commit(token, value)
             }
-            Ok(LockedExecution::Task(Err(error))) => self
-                .finish_rollback(token, RollbackExecution::TaskFailed(error)),
+            Ok(LockedExecution::Task(Err(error))) => {
+                self.finish_rollback(token, RollbackExecution::TaskFailed(error))
+            }
             Err(panic) => self.rollback_then_resume(token, panic),
         }
     }
 
-    /// Finalizes a successful task without holding the executor lock.
+    /// Runs a task with panic capture enabled.
     ///
     /// # Parameters
     ///
-    /// * `token` - Token produced for this invocation.
-    /// * `value` - Successful task value.
+    /// * `lock` - Lock used for this invocation.
+    /// * `task` - Task to run in the locked phase.
     ///
     /// # Returns
     ///
-    /// A task-success outcome retaining the commit status.
+    /// Captured lifecycle outcome when execution crosses panic boundaries.
+    pub fn run_catching<L, R, E, F>(&self, lock: &L, task: F) -> CapturedLifecycleOutcome<R, E, C>
+    where
+        L: Lock + ?Sized,
+        E: Error + Send + Sync + 'static,
+        F: FnOnce() -> Result<R, E>,
+    {
+        self.run_with_token_catching(lock, move |_| task())
+    }
+
+    /// Runs a task with panic capture enabled.
     ///
-    /// # Panics
+    /// # Parameters
     ///
-    /// Propagates a commit panic when panic capture is disabled.
-    fn finish_commit<R, E>(
+    /// * `lock` - Lock used for this invocation.
+    /// * `task` - Token-aware task to run in the locked phase.
+    ///
+    /// # Returns
+    ///
+    /// Captured lifecycle outcome preserving task/rollback panics.
+    pub fn run_with_token_catching<L, R, E, F>(
         &self,
-        token: P,
-        value: R,
-    ) -> LifecycleOutcome<R, E, C> {
-        let commit = finalize_commit(
-            self.core.catch_panics(),
-            self.commit.as_deref(),
-            token,
-        );
+        lock: &L,
+        task: F,
+    ) -> CapturedLifecycleOutcome<R, E, C>
+    where
+        L: Lock + ?Sized,
+        E: Error + Send + Sync + 'static,
+        F: FnOnce(&mut P) -> Result<R, E>,
+    {
+        match self.core.check_initial_catching() {
+            Ok(true) => {}
+            Ok(false) => {
+                return CapturedLifecycleOutcome::InitialConditionNotMet;
+            }
+            Err(panic) => {
+                return CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic);
+            }
+        }
+
+        let mut token = match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
+            Ok(Ok(token)) => token,
+            Ok(Err(error)) => {
+                return CapturedLifecycleOutcome::PrepareFailed(error);
+            }
+            Err(panic) => {
+                return CapturedLifecycleOutcome::PreparePanicked(panic);
+            }
+        };
+
+        match self.core.execute_locked_catching(lock, || task(&mut token)) {
+            Ok(LockedExecution::ConditionNotMet) => {
+                self.finish_rollback_catching(
+                    token,
+                    CapturedRollbackExecution::ConditionNotMet,
+                )
+            }
+            Ok(LockedExecution::Task(Ok(value))) => {
+                self.finish_commit_catching(token, value)
+            }
+            Ok(LockedExecution::Task(Err(error))) => self.finish_rollback_catching(
+                token,
+                CapturedRollbackExecution::TaskFailed(error),
+            ),
+            Err(panic) => self.finish_rollback_catching(
+                token,
+                CapturedRollbackExecution::Panicked(panic),
+            ),
+        }
+    }
+
+    /// Finalizes a successful task without holding the executor lock.
+    #[inline]
+    fn finish_commit<R, E>(&self, token: P, value: R) -> LifecycleOutcome<R, E, C> {
+        let commit = finalize_commit(self.commit.as_deref(), token);
         LifecycleOutcome::TaskSucceeded { value, commit }
     }
 
+    /// Finalizes a successful task without holding the executor lock.
+    fn finish_commit_catching<R, E>(
+        &self,
+        token: P,
+        value: R,
+    ) -> CapturedLifecycleOutcome<R, E, C> {
+        let commit = finalize_commit_catching(self.commit.as_deref(), token);
+        CapturedLifecycleOutcome::TaskSucceeded { value, commit }
+    }
+
     /// Finalizes an unsuccessful invocation without holding the executor lock.
-    ///
-    /// # Parameters
-    ///
-    /// * `token` - Token produced for this invocation.
-    /// * `execution` - Condition, task-error, or captured-panic state that
-    ///   requires rollback.
-    ///
-    /// # Returns
-    ///
-    /// A lifecycle outcome retaining `execution` and rollback status.
-    ///
-    /// # Panics
-    ///
-    /// Propagates a rollback panic when panic capture is disabled.
+    #[inline]
     fn finish_rollback<R, E>(
         &self,
         token: P,
@@ -403,30 +295,24 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         E: Error + Send + Sync + 'static,
     {
         let cause = execution.cause();
-        let rollback = finalize_rollback(
-            self.core.catch_panics(),
-            self.rollback.as_deref(),
-            token,
-            cause,
-        );
+        let rollback = finalize_rollback(self.rollback.as_deref(), token, cause);
+        execution.into_outcome(rollback)
+    }
+
+    /// Finalizes an unsuccessful invocation without holding the executor lock.
+    fn finish_rollback_catching<R, E>(
+        &self,
+        token: P,
+        execution: CapturedRollbackExecution<E>,
+    ) -> CapturedLifecycleOutcome<R, E, C> {
+        let cause = execution.cause();
+        let rollback = finalize_rollback_catching(self.rollback.as_deref(), token, cause);
         execution.into_outcome(rollback)
     }
 
     /// Attempts rollback after a locked-phase panic and then resumes the
     /// original unwind payload.
-    ///
-    /// Secondary rollback errors, rollback panics, or token destructor panics
-    /// are intentionally discarded so they cannot replace the original panic
-    /// when capture is disabled.
-    ///
-    /// # Parameters
-    ///
-    /// * `token` - Token produced for the panicking invocation.
-    /// * `panic` - Original locked-phase panic metadata.
-    ///
-    /// # Panics
-    ///
-    /// Always resumes the original panic payload after rollback is attempted.
+    #[inline]
     fn rollback_then_resume(&self, token: P, panic: PanicInfo) -> ! {
         if let Some(rollback) = &self.rollback {
             Self::discard_secondary(|| {
@@ -435,20 +321,12 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         } else {
             Self::discard_secondary(|| drop(token));
         }
-        resume_unwind(panic.into_payload())
+        panic.resume_unwind()
     }
 
     /// Runs and discards secondary cleanup work without allowing its result,
     /// panic payload, or destructor panic to replace an earlier panic.
-    ///
-    /// # Parameters
-    ///
-    /// * `operation` - Rollback work or token cleanup to discard.
-    ///
-    /// # Panics
-    ///
-    /// Never propagates a panic. A panic payload that cannot be safely dropped
-    /// is intentionally leaked because a prior panic takes precedence.
+    #[inline]
     fn discard_secondary<F>(operation: F)
     where
         F: FnOnce(),

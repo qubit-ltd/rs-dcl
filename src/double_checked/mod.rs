@@ -11,6 +11,8 @@ mod dcl_executor;
 mod dcl_executor_builder;
 mod dcl_executor_ready_builder;
 mod execution_outcome;
+mod captured_finalization_outcome;
+mod captured_lifecycle_outcome;
 mod finalization_outcome;
 mod internal;
 mod lifecycle_commit_builder;
@@ -31,6 +33,7 @@ pub use dcl_executor_builder::DclExecutorBuilder;
 #[doc(hidden)]
 pub use dcl_executor_ready_builder::DclExecutorReadyBuilder;
 pub use execution_outcome::ExecutionOutcome;
+pub use captured_finalization_outcome::CapturedFinalizationOutcome;
 pub use finalization_outcome::FinalizationOutcome;
 #[doc(hidden)]
 pub use lifecycle_commit_builder::LifecycleCommitBuilder;
@@ -43,6 +46,7 @@ pub(crate) use lifecycle_dcl_executor::{
 #[doc(hidden)]
 pub use lifecycle_dcl_executor_builder::LifecycleDclExecutorBuilder;
 pub use lifecycle_outcome::LifecycleOutcome;
+pub use captured_lifecycle_outcome::CapturedLifecycleOutcome;
 #[doc(hidden)]
 pub use lifecycle_predicate_builder::LifecyclePredicateBuilder;
 #[doc(hidden)]

@@ -2,8 +2,6 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Reusable basic double-checked lock executor.
 
@@ -12,6 +10,7 @@ use qubit_lock::Lock;
 use crate::double_checked::{
     DclExecutorBuilder,
     ExecutionOutcome,
+    PanicInfo,
     internal::DclCore,
 };
 
@@ -34,7 +33,7 @@ use crate::double_checked::{
 /// mode to each [`Self::run`] call preserves this coordination-only role.
 #[must_use = "an executor does nothing until run is called"]
 pub struct DclExecutor {
-    /// Shared predicate and panic configuration.
+    /// Shared predicate.
     core: DclCore,
 }
 
@@ -53,7 +52,7 @@ impl DclExecutor {
     ///
     /// # Parameters
     ///
-    /// * `core` - Complete predicate and panic configuration.
+    /// * `core` - Complete predicate configuration.
     ///
     /// # Returns
     ///
@@ -100,26 +99,16 @@ impl DclExecutor {
     ///
     /// # Returns
     ///
-    /// A structured condition, task, or captured-panic outcome.
+    /// A structured condition, task, or failure outcome.
     ///
     /// # Errors
     ///
-    /// A task error is preserved in [`ExecutionOutcome::TaskFailed`]; this
+    /// A task error is preserved in [`ExecutionOutcome::TaskFailed`]. this
     /// method does not collapse or transform it.
     ///
     /// # Panics
     ///
-    /// When panic capture is disabled, propagates panics from the predicate,
-    /// lock implementation, or task. When enabled, those panics are returned
-    /// as [`ExecutionOutcome::Panicked`]. A guard-drop panic after locked work
-    /// completes is classified as [`crate::PanicPhase::LockRelease`].
-    /// Capture requires an unwinding panic strategy; with `panic = "abort"`,
-    /// the process terminates without returning an outcome.
-    ///
-    /// Capturing a panic classifies and transports its payload. It does not
-    /// undo earlier side effects, restore application invariants, or make
-    /// poisoned state safe to reuse. The caller must verify or reestablish
-    /// those invariants before continuing.
+    /// Propagates panics from the predicate, lock implementation, and task.
     ///
     /// # Synchronization
     ///
@@ -143,22 +132,47 @@ impl DclExecutor {
         L: Lock + ?Sized,
         F: FnOnce() -> Result<R, E>,
     {
-        if self.core.catch_panics() {
-            match self.core.check_initial_catching() {
-                Ok(true) => {}
-                Ok(false) => return ExecutionOutcome::ConditionNotMet,
-                Err(panic) => return ExecutionOutcome::Panicked(panic),
-            }
-            match self.core.execute_locked_catching(lock, task) {
-                Ok(locked) => locked.into_outcome(),
-                Err(panic) => ExecutionOutcome::Panicked(panic),
-            }
-        } else {
-            if !self.core.check_initial() {
-                return ExecutionOutcome::ConditionNotMet;
-            }
-            self.core.execute_locked(lock, task).into_outcome()
+        if !self.core.check_initial() {
+            return ExecutionOutcome::ConditionNotMet;
         }
+        self.core.execute_locked(lock, task).into_outcome()
+    }
+
+    /// Runs `task` with panic capture enabled.
+    ///
+    /// Panic boundaries include both predicate invocations, lock acquisition,
+    /// task execution, and guard drop. Any panic is converted into
+    /// [`PanicInfo`].
+    ///
+    /// # Parameters
+    ///
+    /// * `lock` - Generic synchronous lock used for this invocation.
+    /// * `task` - One-shot task executed inside the lock after the second
+    ///   check.
+    ///
+    /// # Returns
+    ///
+    /// `Ok` with an execution outcome when no panic occurs, or `Err` with
+    /// panic metadata when one is captured.
+    pub fn run_catching<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> Result<ExecutionOutcome<R, E>, PanicInfo>
+    where
+        L: Lock + ?Sized,
+        F: FnOnce() -> Result<R, E>,
+    {
+        match self.core.check_initial_catching() {
+            Ok(true) => {}
+            Ok(false) => return Ok(ExecutionOutcome::ConditionNotMet),
+            Err(panic) => return Err(panic),
+        }
+
+        self.core
+            .execute_locked_catching(lock, task)
+            .map(|locked| locked.into_outcome())
+            .map_err(|panic| panic)
     }
 }
 

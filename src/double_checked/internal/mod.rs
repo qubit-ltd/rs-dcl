@@ -12,12 +12,16 @@ mod lifecycle_finalization;
 mod locked_execution;
 mod panic_capture;
 mod rollback_execution;
+mod captured_rollback_execution;
 
 pub(crate) use dcl_core::DclCore;
 pub(crate) use lifecycle_finalization::{
     finalize_commit,
+    finalize_commit_catching,
     finalize_rollback,
+    finalize_rollback_catching,
 };
 pub(crate) use locked_execution::LockedExecution;
 pub(crate) use panic_capture::catch_phase;
 pub(crate) use rollback_execution::RollbackExecution;
+pub(crate) use captured_rollback_execution::CapturedRollbackExecution;
