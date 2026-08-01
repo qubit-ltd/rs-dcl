@@ -2,7 +2,7 @@
 
 - 目标版本：`0.10.0`
 - 文档状态：已归档，保留供版本回溯
-- 生效范围：当前 `qubit-dcl 0.12` 不再兼容本设计中的 `catch_panics` 与历史 panic 处理约定
+- 生效范围：当前 `qubit-dcl 0.12` 不再兼容本设计中的 legacy catch configuration 与历史 panic 处理约定
 
 ## 说明
 
