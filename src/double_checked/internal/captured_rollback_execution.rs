@@ -2,8 +2,13 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Private unsuccessful execution state used to drive captured lifecycle rollback.
+//! Private unsuccessful execution state used to drive captured lifecycle
+//! rollback.
+
+use std::error::Error;
 
 use crate::double_checked::{
     CapturedFinalizationOutcome,
@@ -23,7 +28,10 @@ pub(crate) enum CapturedRollbackExecution<E> {
     Panicked(PanicInfo),
 }
 
-impl<E> CapturedRollbackExecution<E> {
+impl<E> CapturedRollbackExecution<E>
+where
+    E: Error + Send + Sync + 'static,
+{
     /// Creates the borrowed cause passed to the rollback callback.
     ///
     /// # Returns
@@ -47,8 +55,8 @@ impl<E> CapturedRollbackExecution<E> {
     ///
     /// # Returns
     ///
-    /// The terminal captured lifecycle outcome preserving the original execution
-    /// state.
+    /// The terminal captured lifecycle outcome preserving the original
+    /// execution state.
     #[inline]
     pub(crate) fn into_outcome<R, C>(
         self,
