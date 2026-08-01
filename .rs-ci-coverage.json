@@ -1,0 +1,8 @@
+{
+  "threshold_exempt_files": {
+    "qubit-dcl": [
+      "src/double_checked/dcl_executor.rs",
+      "src/double_checked/execution_outcome.rs"
+    ]
+  }
+}
