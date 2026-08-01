@@ -55,12 +55,10 @@ use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DclExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
+let executor = DclExecutor::new({
+    let gate = Arc::clone(&gate);
+    move || gate.load(Ordering::Acquire)
+});
 
 let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
@@ -97,7 +95,10 @@ RWLock when their tasks follow the same gate protocol.
 ## What It Provides
 
 - `DclExecutor` for a reusable predicate, a caller-selected
-  `qubit_lock::Lock`, and structured `ExecutionOutcome` values.
+  `qubit_lock::Lock`, and structured `ExecutionOutcome` values. Construct it
+  directly with `DclExecutor::new(predicate)`; use
+  `ExecutionOutcome::into_result()` when `ConditionNotMet` should become
+  `Ok(None)` in a `Result<Option<R>, E>` pipeline.
 - `LifecycleDclExecutor` for workflows that prepare a
   per-invocation token, then commit or roll it back after locked execution.
 - `LifecycleOutcome`, `FinalizationOutcome`, `RollbackCause`, `PanicInfo`,

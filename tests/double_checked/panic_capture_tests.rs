@@ -7,26 +7,21 @@
 // =============================================================================
 //! Public regression tests for internal panic capture.
 
-use std::{
-    io,
-    sync::Mutex,
-};
+use std::sync::Mutex;
 
 use qubit_dcl::{
     DclExecutor,
-    ExecutionOutcome,
     PanicPhase,
 };
 
 /// Verifies a captured task panic retains its phase and message.
 #[test]
 fn test_panic_capture_retains_task_context() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        
-        .build();
+    let executor = DclExecutor::new(|| true);
     let panic = executor
-        .run_catching(&Mutex::new(()), || panic!("captured"))
+        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
+            panic!("captured")
+        })
         .unwrap_err();
 
     assert_eq!(panic.phase(), PanicPhase::Task);

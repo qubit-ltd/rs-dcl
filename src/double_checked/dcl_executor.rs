@@ -2,13 +2,14 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Reusable basic double-checked lock executor.
 
 use qubit_lock::Lock;
 
 use crate::double_checked::{
-    DclExecutorBuilder,
     ExecutionOutcome,
     PanicInfo,
     internal::DclCore,
@@ -38,28 +39,29 @@ pub struct DclExecutor {
 }
 
 impl DclExecutor {
-    /// Starts building an executor.
+    /// Creates a reusable executor from a lock-free condition predicate.
     ///
-    /// # Returns
-    ///
-    /// A typestate builder that requires a predicate before it can build.
-    #[inline]
-    pub fn builder() -> DclExecutorBuilder {
-        DclExecutorBuilder::new()
-    }
-
-    /// Creates a built executor from its configured core.
+    /// The predicate is stored behind shared ownership so cloned executors can
+    /// invoke it concurrently. It must perform an atomic or equivalently
+    /// synchronized read and must not acquire the lock supplied to
+    /// [`Self::run`].
     ///
     /// # Parameters
     ///
-    /// * `core` - Complete predicate configuration.
+    /// * `predicate` - Thread-safe condition evaluated before and after
+    ///   locking.
     ///
     /// # Returns
     ///
-    /// A reusable executor.
+    /// A reusable executor sharing the configured predicate across clones.
     #[inline]
-    pub(crate) fn from_core(core: DclCore) -> Self {
-        Self { core }
+    pub fn new<F>(predicate: F) -> Self
+    where
+        F: Fn() -> bool + Send + Sync + 'static,
+    {
+        Self {
+            core: DclCore::new(predicate),
+        }
     }
     /// Runs `task` only when both condition checks succeed.
     ///
@@ -169,10 +171,10 @@ impl DclExecutor {
             Err(panic) => return Err(panic),
         }
 
-        self.core
-            .execute_locked_catching(lock, task)
-            .map(|locked| locked.into_outcome())
-            .map_err(|panic| panic)
+        match self.core.execute_locked_catching(lock, task) {
+            Ok(locked) => Ok(locked.into_outcome()),
+            Err(panic) => Err(panic),
+        }
     }
 }
 
