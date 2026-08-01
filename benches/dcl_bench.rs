@@ -182,9 +182,9 @@ fn benchmark_typed_dcl_backend<L>(
         let typed_predicate =
             move || typed_state.load(Ordering::Acquire) == RUNNING;
         let executor_state = Arc::clone(&state);
-        let executor = DclExecutor::builder()
-            .when(move || executor_state.load(Ordering::Acquire) == RUNNING)
-            .build();
+        let executor = DclExecutor::new(move || {
+            executor_state.load(Ordering::Acquire) == RUNNING
+        });
         let submitted = AtomicUsize::new(0);
 
         group.bench_function(
@@ -236,14 +236,13 @@ fn benchmark_submission_backend<L>(
     let state = Arc::new(AtomicU8::new(RUNNING));
     let submitted = AtomicUsize::new(0);
     let predicate_state = Arc::clone(&state);
-    let executor = DclExecutor::builder()
-        .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
-        .build();
+    let executor = DclExecutor::new(move || {
+        predicate_state.load(Ordering::Acquire) == RUNNING
+    });
     let panic_predicate_state = Arc::clone(&state);
-    let catching_executor = DclExecutor::builder()
-        .when(move || panic_predicate_state.load(Ordering::Acquire) == RUNNING)
-        
-        .build();
+    let catching_executor = DclExecutor::new(move || {
+        panic_predicate_state.load(Ordering::Acquire) == RUNNING
+    });
 
     group.bench_function(format!("{backend}/running/lock_first"), |bencher| {
         bencher.iter(|| black_box(submit_lock_first(&state, lock, &submitted)));
@@ -268,7 +267,7 @@ fn benchmark_submission_backend<L>(
         format!("{backend}/running/qubit_dcl_catching"),
         |bencher| {
             bencher.iter(|| {
-                black_box(catching_executor.run(lock, || {
+                black_box(catching_executor.run_catching(lock, || {
                     submitted.fetch_add(1, Ordering::Relaxed);
                     Ok::<(), Infallible>(())
                 }))
@@ -306,11 +305,11 @@ fn benchmark_submission_backend<L>(
         format!("{backend}/shut_down/qubit_dcl_catching"),
         |bencher| {
             bencher.iter(|| {
-                let outcome = catching_executor.run(lock, || {
+                let outcome = catching_executor.run_catching(lock, || {
                     submitted.fetch_add(1, Ordering::Relaxed);
                     Ok::<(), Infallible>(())
                 });
-                black_box(matches!(outcome, ExecutionOutcome::Success(())))
+                black_box(matches!(outcome, Ok(ExecutionOutcome::Success(()))))
             });
         },
     );
@@ -372,11 +371,9 @@ where
         for _ in 0..worker_count {
             let state = Arc::new(AtomicU8::new(RUNNING));
             let predicate_state = Arc::clone(&state);
-            let executor = DclExecutor::builder()
-                .when(move || {
-                    predicate_state.load(Ordering::Acquire) == RUNNING
-                })
-                .build();
+            let executor = DclExecutor::new(move || {
+                predicate_state.load(Ordering::Acquire) == RUNNING
+            });
             let barrier = &start_barrier;
             scope.spawn(move || {
                 barrier.wait();
@@ -420,11 +417,9 @@ fn benchmark_contention_backend<L>(
         {
             let state = Arc::new(AtomicU8::new(state_value));
             let predicate_state = Arc::clone(&state);
-            let executor = DclExecutor::builder()
-                .when(move || {
-                    predicate_state.load(Ordering::Acquire) == RUNNING
-                })
-                .build();
+            let executor = DclExecutor::new(move || {
+                predicate_state.load(Ordering::Acquire) == RUNNING
+            });
             let submitted = AtomicUsize::new(0);
             let mut group = criterion.benchmark_group(format!(
                 "dcl_contention/{backend}/{state_name}/{worker_count}_workers"
