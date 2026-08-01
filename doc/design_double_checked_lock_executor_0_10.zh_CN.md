@@ -2,6 +2,11 @@
 
 日期：2026-07-18
 
+> 该文档为 `qubit-dcl 0.10` 及更早版本的历史设计草案。
+> 当前 `0.12` 已移除基于 `catch_panics` 的配置入口，改为
+> 通过 `run` 与 `run_catching` 显式区分 panic 行为；现行可用 API 请以
+> `README` 与 `doc/user_guide.md` 为准。
+
 状态：已批准并实现；完整发布验证等待 `qubit-lock 0.10.0` 发布
 
 目标版本：0.10.0
