@@ -7,6 +7,8 @@
 // =============================================================================
 //! Private unsuccessful execution state used to drive lifecycle rollback.
 
+use std::error::Error;
+
 use crate::double_checked::{
     FinalizationOutcome,
     LifecycleOutcome,
@@ -21,7 +23,10 @@ pub(crate) enum RollbackExecution<E> {
     TaskFailed(E),
 }
 
-impl<E> RollbackExecution<E> {
+impl<E> RollbackExecution<E>
+where
+    E: Error + Send + Sync + 'static,
+{
     /// Creates the borrowed cause passed to the rollback callback.
     ///
     /// # Returns

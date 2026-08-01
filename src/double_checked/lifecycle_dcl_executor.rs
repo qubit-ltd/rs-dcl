@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Reusable lifecycle-aware double-checked lock executor.
 
@@ -17,17 +19,15 @@ use std::{
 use qubit_lock::Lock;
 
 use crate::double_checked::{
-    CapturedFinalizationOutcome,
     CapturedLifecycleOutcome,
-    FinalizationOutcome,
     LifecycleDclExecutorBuilder,
     LifecycleOutcome,
     PanicInfo,
     PanicPhase,
     RollbackCause,
     internal::{
-        DclCore,
         CapturedRollbackExecution,
+        DclCore,
         LockedExecution,
         RollbackExecution,
         catch_phase,
@@ -128,7 +128,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// The single terminal lifecycle outcome.
     #[inline(always)]
-    pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> LifecycleOutcome<R, E, C>
+    pub fn run<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -180,9 +184,8 @@ impl<P, C> LifecycleDclExecutor<P, C> {
             Ok(LockedExecution::Task(Ok(value))) => {
                 self.finish_commit(token, value)
             }
-            Ok(LockedExecution::Task(Err(error))) => {
-                self.finish_rollback(token, RollbackExecution::TaskFailed(error))
-            }
+            Ok(LockedExecution::Task(Err(error))) => self
+                .finish_rollback(token, RollbackExecution::TaskFailed(error)),
             Err(panic) => self.rollback_then_resume(token, panic),
         }
     }
@@ -197,7 +200,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// # Returns
     ///
     /// Captured lifecycle outcome when execution crosses panic boundaries.
-    pub fn run_catching<L, R, E, F>(&self, lock: &L, task: F) -> CapturedLifecycleOutcome<R, E, C>
+    pub fn run_catching<L, R, E, F>(
+        &self,
+        lock: &L,
+        task: F,
+    ) -> CapturedLifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
         E: Error + Send + Sync + 'static,
@@ -232,34 +239,37 @@ impl<P, C> LifecycleDclExecutor<P, C> {
                 return CapturedLifecycleOutcome::InitialConditionNotMet;
             }
             Err(panic) => {
-                return CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic);
+                return CapturedLifecycleOutcome::InitialConditionCheckPanicked(
+                    panic,
+                );
             }
         }
 
-        let mut token = match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
-            Ok(Ok(token)) => token,
-            Ok(Err(error)) => {
-                return CapturedLifecycleOutcome::PrepareFailed(error);
-            }
-            Err(panic) => {
-                return CapturedLifecycleOutcome::PreparePanicked(panic);
-            }
-        };
+        let mut token =
+            match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
+                Ok(Ok(token)) => token,
+                Ok(Err(error)) => {
+                    return CapturedLifecycleOutcome::PrepareFailed(error);
+                }
+                Err(panic) => {
+                    return CapturedLifecycleOutcome::PreparePanicked(panic);
+                }
+            };
 
         match self.core.execute_locked_catching(lock, || task(&mut token)) {
-            Ok(LockedExecution::ConditionNotMet) => {
-                self.finish_rollback_catching(
+            Ok(LockedExecution::ConditionNotMet) => self
+                .finish_rollback_catching(
                     token,
                     CapturedRollbackExecution::ConditionNotMet,
-                )
-            }
+                ),
             Ok(LockedExecution::Task(Ok(value))) => {
                 self.finish_commit_catching(token, value)
             }
-            Ok(LockedExecution::Task(Err(error))) => self.finish_rollback_catching(
-                token,
-                CapturedRollbackExecution::TaskFailed(error),
-            ),
+            Ok(LockedExecution::Task(Err(error))) => self
+                .finish_rollback_catching(
+                    token,
+                    CapturedRollbackExecution::TaskFailed(error),
+                ),
             Err(panic) => self.finish_rollback_catching(
                 token,
                 CapturedRollbackExecution::Panicked(panic),
@@ -269,7 +279,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Finalizes a successful task without holding the executor lock.
     #[inline]
-    fn finish_commit<R, E>(&self, token: P, value: R) -> LifecycleOutcome<R, E, C> {
+    fn finish_commit<R, E>(
+        &self,
+        token: P,
+        value: R,
+    ) -> LifecycleOutcome<R, E, C> {
         let commit = finalize_commit(self.commit.as_deref(), token);
         LifecycleOutcome::TaskSucceeded { value, commit }
     }
@@ -295,7 +309,8 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         E: Error + Send + Sync + 'static,
     {
         let cause = execution.cause();
-        let rollback = finalize_rollback(self.rollback.as_deref(), token, cause);
+        let rollback =
+            finalize_rollback(self.rollback.as_deref(), token, cause);
         execution.into_outcome(rollback)
     }
 
@@ -304,9 +319,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         &self,
         token: P,
         execution: CapturedRollbackExecution<E>,
-    ) -> CapturedLifecycleOutcome<R, E, C> {
+    ) -> CapturedLifecycleOutcome<R, E, C>
+    where
+        E: Error + Send + Sync + 'static,
+    {
         let cause = execution.cause();
-        let rollback = finalize_rollback_catching(self.rollback.as_deref(), token, cause);
+        let rollback =
+            finalize_rollback_catching(self.rollback.as_deref(), token, cause);
         execution.into_outcome(rollback)
     }
 
