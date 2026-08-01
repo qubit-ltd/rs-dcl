@@ -2,8 +2,6 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Predicate-configured lifecycle builder stage.
 
@@ -19,7 +17,7 @@ use crate::double_checked::{
 #[doc(hidden)]
 #[must_use = "the predicate stage must be completed with prepare"]
 pub struct LifecyclePredicateBuilder {
-    /// DCL predicate and panic configuration.
+    /// Shared DCL predicate.
     core: DclCore,
 }
 
@@ -28,7 +26,7 @@ impl LifecyclePredicateBuilder {
     ///
     /// # Parameters
     ///
-    /// * `core` - Predicate and panic configuration.
+    /// * `core` - Predicate configuration.
     ///
     /// # Returns
     ///
@@ -36,27 +34,6 @@ impl LifecyclePredicateBuilder {
     #[inline]
     pub(crate) fn new(core: DclCore) -> Self {
         Self { core }
-    }
-
-    /// Configures whether all lifecycle phases convert panics into report
-    /// outcomes.
-    ///
-    /// Capture works only with an unwinding panic strategy. It classifies
-    /// panics but does not make the lifecycle transactional or prove that
-    /// rollback restored application invariants.
-    ///
-    /// # Parameters
-    ///
-    /// * `catch_panics` - `true` to capture panics, or `false` to propagate
-    ///   them subject to locked-phase rollback.
-    ///
-    /// # Returns
-    ///
-    /// The reconfigured predicate stage.
-    #[inline(always)]
-    pub fn catch_panics(mut self, catch_panics: bool) -> Self {
-        self.core = self.core.with_catch_panics(catch_panics);
-        self
     }
 
     /// Sets the callback that creates one token per prepared invocation.
@@ -67,7 +44,7 @@ impl LifecyclePredicateBuilder {
     ///
     /// # Returns
     ///
-    /// A builder requiring a commit/no-commit choice.
+    /// A builder requiring `commit` or `no_commit`.
     ///
     /// # Errors
     ///
@@ -77,7 +54,7 @@ impl LifecyclePredicateBuilder {
     /// # Panics
     ///
     /// This method does not invoke `prepare`. Its panic behavior is determined
-    /// by the built executor's panic-capture setting.
+    /// during invocation of the built executor.
     ///
     /// # Synchronization
     ///

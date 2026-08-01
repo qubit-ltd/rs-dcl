@@ -23,15 +23,12 @@ use qubit_dcl::{
 fn test_panic_capture_retains_task_context() {
     let executor = DclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .build();
-    let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&Mutex::new(()), || panic!("captured"));
+    let panic = executor
+        .run_catching(&Mutex::new(()), || panic!("captured"))
+        .unwrap_err();
 
-    assert!(matches!(
-        outcome,
-        ExecutionOutcome::Panicked(panic)
-            if panic.phase() == PanicPhase::Task
-                && panic.message() == Some("captured")
-    ));
+    assert_eq!(panic.phase(), PanicPhase::Task);
+    assert_eq!(panic.message(), Some("captured"));
 }

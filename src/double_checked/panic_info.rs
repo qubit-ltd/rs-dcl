@@ -12,6 +12,7 @@ use std::{
     fmt,
     panic::{
         AssertUnwindSafe,
+        resume_unwind,
         catch_unwind,
     },
 };
@@ -103,6 +104,14 @@ impl PanicInfo {
         self.payload
             .take()
             .expect("PanicInfo payload must exist before it is consumed")
+    }
+
+    /// Resumes panicking with the captured payload.
+    ///
+    /// This does not rebuild or adapt the payload.
+    #[inline]
+    pub fn resume_unwind(self) -> ! {
+        resume_unwind(self.into_payload())
     }
 }
 

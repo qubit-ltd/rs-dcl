@@ -34,6 +34,8 @@ mod parking_lot {
 
 use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::{
+    CapturedFinalizationOutcome,
+    CapturedLifecycleOutcome,
     FinalizationOutcome,
     LifecycleDclExecutor,
     LifecycleOutcome,
@@ -195,52 +197,52 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
 
     let initial_false = LifecycleDclExecutor::builder()
         .when(|| false)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        initial_false.run_with_token(&lock, successful_task),
-        LifecycleOutcome::InitialConditionNotMet
+        initial_false.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::InitialConditionNotMet
     ));
 
     let initial_panic = LifecycleDclExecutor::builder()
         .when(|| panic!("coverage initial panic"))
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        initial_panic.run_with_token(&lock, successful_task),
-        LifecycleOutcome::InitialConditionCheckPanicked(panic)
+        initial_panic.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic)
             if panic.phase() == PanicPhase::InitialConditionCheck
     ));
 
     let prepare_error = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(fail_coverage_prepare)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        prepare_error.run_with_token(&lock, successful_task),
-        LifecycleOutcome::PrepareFailed(error)
+        prepare_error.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::PrepareFailed(error)
             if error.to_string() == "coverage prepare failed"
     ));
 
     let prepare_panic = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(panic_coverage_prepare)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        prepare_panic.run_with_token(&lock, successful_task),
-        LifecycleOutcome::PreparePanicked(panic)
+        prepare_panic.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::PreparePanicked(panic)
             if panic.phase() == PanicPhase::Prepare
     ));
 
@@ -250,80 +252,80 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
         })
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        second_false.run_with_token(&lock, successful_task),
-        LifecycleOutcome::SecondConditionNotMet {
-            rollback: FinalizationOutcome::Succeeded,
+        second_false.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::SecondConditionNotMet {
+            rollback: CapturedFinalizationOutcome::Succeeded,
         }
     ));
 
     let task_paths = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        task_paths.run_with_token(&lock, successful_task),
-        LifecycleOutcome::TaskSucceeded {
+        task_paths.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::NotRequired,
+            commit: CapturedFinalizationOutcome::NotRequired,
         }
     ));
     assert!(matches!(
-        task_paths.run_with_token(&lock, failing_task),
-        LifecycleOutcome::TaskFailed {
+        task_paths.run_with_token_catching(&lock, failing_task),
+        CapturedLifecycleOutcome::TaskFailed {
             error,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         } if error.to_string() == "coverage task failed"
     ));
     assert!(matches!(
-        task_paths.run_with_token(&lock, panicking_task),
-        LifecycleOutcome::ExecutionPanicked {
+        task_paths.run_with_token_catching(&lock, panicking_task),
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         } if panic.phase() == PanicPhase::Task
     ));
 
     let successful_commit = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
     assert!(matches!(
-        successful_commit.run_with_token(&lock, successful_task),
-        LifecycleOutcome::TaskSucceeded {
+        successful_commit.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Succeeded,
+            commit: CapturedFinalizationOutcome::Succeeded,
         }
     ));
 
     let failing_commit = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Err::<(), _>(io::Error::other("coverage commit failed")))
         .no_rollback()
         .build();
     assert!(matches!(
-        failing_commit.run_with_token(&lock, successful_task),
-        LifecycleOutcome::TaskSucceeded {
+        failing_commit.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Failed(error),
+            commit: CapturedFinalizationOutcome::Failed(error),
         } if error.to_string() == "coverage commit failed"
     ));
 
     let panicking_commit = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| -> Result<(), io::Error> {
             panic!("coverage commit panic")
@@ -331,16 +333,16 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         .no_rollback()
         .build();
     assert!(matches!(
-        panicking_commit.run_with_token(&lock, successful_task),
-        LifecycleOutcome::TaskSucceeded {
+        panicking_commit.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Panicked(panic),
+            commit: CapturedFinalizationOutcome::Panicked(panic),
         } if panic.phase() == PanicPhase::Commit
     ));
 
     let failing_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| {
@@ -348,17 +350,17 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         })
         .build();
     assert!(matches!(
-        failing_rollback.run_with_token(&lock, failing_task),
-        LifecycleOutcome::TaskFailed {
+        failing_rollback.run_with_token_catching(&lock, failing_task),
+        CapturedLifecycleOutcome::TaskFailed {
             error,
-            rollback: FinalizationOutcome::Failed(rollback_error),
+            rollback: CapturedFinalizationOutcome::Failed(rollback_error),
         } if error.to_string() == "coverage task failed"
             && rollback_error.to_string() == "coverage rollback failed"
     ));
 
     let panicking_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
         .rollback(|_, _| -> Result<(), io::Error> {
@@ -366,54 +368,54 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         })
         .build();
     assert!(matches!(
-        panicking_rollback.run_with_token(&lock, failing_task),
-        LifecycleOutcome::TaskFailed {
-            rollback: FinalizationOutcome::Panicked(panic),
+        panicking_rollback.run_with_token_catching(&lock, failing_task),
+        CapturedLifecycleOutcome::TaskFailed {
+            rollback: CapturedFinalizationOutcome::Panicked(panic),
             ..
         } if panic.phase() == PanicPhase::Rollback
     ));
 
     let no_rollback = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_quiet_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
     assert!(matches!(
-        no_rollback.run_with_token(&lock, failing_task),
-        LifecycleOutcome::TaskFailed {
-            rollback: FinalizationOutcome::NotRequired,
+        no_rollback.run_with_token_catching(&lock, failing_task),
+        CapturedLifecycleOutcome::TaskFailed {
+            rollback: CapturedFinalizationOutcome::NotRequired,
             ..
         }
     ));
 
     let panicking_commit_drop = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_panicking_coverage_token)
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
     assert!(matches!(
-        panicking_commit_drop.run_with_token(&lock, successful_task),
-        LifecycleOutcome::TaskSucceeded {
+        panicking_commit_drop.run_with_token_catching(&lock, successful_task),
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Panicked(panic),
+            commit: CapturedFinalizationOutcome::Panicked(panic),
         } if panic.phase() == PanicPhase::Commit
     ));
 
     let panicking_rollback_drop = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(prepare_panicking_coverage_token)
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
     assert!(matches!(
-        panicking_rollback_drop.run_with_token(&lock, failing_task),
-        LifecycleOutcome::TaskFailed {
-            rollback: FinalizationOutcome::Panicked(panic),
+        panicking_rollback_drop.run_with_token_catching(&lock, failing_task),
+        CapturedLifecycleOutcome::TaskFailed {
+            rollback: CapturedFinalizationOutcome::Panicked(panic),
             ..
         } if panic.phase() == PanicPhase::Rollback
     ));
@@ -607,9 +609,9 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
-    assert!(matches!(outcome, LifecycleOutcome::InitialConditionNotMet));
+    assert!(matches!(outcome, CapturedLifecycleOutcome::InitialConditionNotMet));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
     assert_eq!(commit_calls.load(Ordering::Relaxed), 0);
     assert_eq!(rollback_calls.load(Ordering::Relaxed), 0);
@@ -633,10 +635,10 @@ fn test_run_prepare_error_does_not_rollback_without_token() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
-        LifecycleOutcome::PrepareFailed(error) => {
+        CapturedLifecycleOutcome::PrepareFailed(error) => {
             assert_eq!(error.to_string(), "prepare failed");
         }
         _ => panic!("expected prepare failure"),
@@ -650,7 +652,7 @@ fn test_run_captures_initial_predicate_panic_before_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| panic!("initial predicate panic"))
-        .catch_panics(true)
+        
         .prepare({
             let prepare_calls = Arc::clone(&prepare_calls);
             move || {
@@ -663,11 +665,11 @@ fn test_run_captures_initial_predicate_panic_before_prepare() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::InitialConditionCheckPanicked(panic)
+        CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic)
             if panic.phase() == PanicPhase::InitialConditionCheck
     ));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
@@ -680,7 +682,7 @@ fn test_run_captures_prepare_panic_without_rollback() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| -> Result<(), io::Error> { panic!("prepare panic") })
         .no_commit()
         .rollback({
@@ -693,11 +695,11 @@ fn test_run_captures_prepare_panic_without_rollback() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::PreparePanicked(panic)
+        CapturedLifecycleOutcome::PreparePanicked(panic)
             if panic.phase() == PanicPhase::Prepare
     ));
     assert_eq!(rollback_calls.load(Ordering::Relaxed), 0);
@@ -709,7 +711,7 @@ fn test_run_catching_initial_false_does_not_prepare() {
     let prepare_calls = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| false)
-        .catch_panics(true)
+        
         .prepare({
             let prepare_calls = Arc::clone(&prepare_calls);
             move || {
@@ -722,9 +724,9 @@ fn test_run_catching_initial_false_does_not_prepare() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
-    assert!(matches!(outcome, LifecycleOutcome::InitialConditionNotMet));
+    assert!(matches!(outcome, CapturedLifecycleOutcome::InitialConditionNotMet));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
 }
 
@@ -733,18 +735,18 @@ fn test_run_catching_initial_false_does_not_prepare() {
 fn test_run_catching_prepare_error_preserves_lifecycle_error() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Err::<(), _>(io::Error::other("prepare failed")))
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::PrepareFailed(error)
+        CapturedLifecycleOutcome::PrepareFailed(error)
             if error.to_string() == "prepare failed"
     ));
 }
@@ -807,7 +809,7 @@ fn test_run_catching_second_false_rolls_back() {
             let checks = Arc::clone(&checks);
             move || checks.fetch_add(1, Ordering::Relaxed) == 0
         })
-        .catch_panics(true)
+        
         .prepare(|| Ok::<usize, io::Error>(17))
         .no_commit()
         .rollback({
@@ -825,12 +827,12 @@ fn test_run_catching_second_false_rolls_back() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::SecondConditionNotMet {
-            rollback: FinalizationOutcome::Succeeded,
+        CapturedLifecycleOutcome::SecondConditionNotMet {
+            rollback: CapturedFinalizationOutcome::Succeeded,
         }
     ));
     assert_eq!(rolled_back_token.load(Ordering::Relaxed), 17);
@@ -854,7 +856,7 @@ fn test_run_captures_second_predicate_panic_then_rolls_back() {
                 }
             }
         })
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback({
@@ -873,13 +875,13 @@ fn test_run_captures_second_predicate_panic_then_rolls_back() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::ExecutionPanicked {
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         }
             if panic.phase() == PanicPhase::SecondConditionCheck
     ));
@@ -907,7 +909,7 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback({
@@ -925,13 +927,13 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
         })
         .build();
 
-    let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&lock, || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::ExecutionPanicked {
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         }
             if panic.phase() == PanicPhase::LockAcquisition
     ));
@@ -950,7 +952,7 @@ fn test_run_captures_lock_release_panic_then_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback({
@@ -969,13 +971,13 @@ fn test_run_captures_lock_release_panic_then_rolls_back() {
         .build();
 
     let outcome =
-        executor.run(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+        executor.run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::ExecutionPanicked {
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         } if panic.phase() == PanicPhase::LockRelease
     ));
     assert_eq!(
@@ -1125,12 +1127,12 @@ fn test_run_commit_failure_preserves_success() {
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     match outcome {
-        LifecycleOutcome::TaskSucceeded {
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Failed(error),
+            commit: CapturedFinalizationOutcome::Failed(error),
         } => {
             assert_eq!(error.to_string(), "commit failed");
         }
@@ -1143,20 +1145,20 @@ fn test_run_commit_failure_preserves_success() {
 fn test_run_captures_commit_panic_without_overwriting_success() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .commit(|_| -> Result<(), io::Error> { panic!("commit panic") })
         .no_rollback()
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskSucceeded {
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Panicked(panic),
+            commit: CapturedFinalizationOutcome::Panicked(panic),
         }
             if panic.phase() == PanicPhase::Commit
     ));
@@ -1168,20 +1170,20 @@ fn test_run_captures_commit_panic_without_overwriting_success() {
 fn test_run_captures_token_drop_panic_without_commit() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
     let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+        executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskSucceeded {
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Panicked(panic),
+            commit: CapturedFinalizationOutcome::Panicked(panic),
         }
             if panic.phase() == PanicPhase::Commit
                 && panic.message() == Some("secondary token drop panic")
@@ -1194,21 +1196,21 @@ fn test_run_captures_token_drop_panic_without_commit() {
 fn test_run_catching_task_and_rollback_errors_preserves_both() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback(|_, _| Err::<(), _>(io::Error::other("rollback failed")))
         .build();
 
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task failed"))
     });
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskFailed {
+        CapturedLifecycleOutcome::TaskFailed {
             error,
-            rollback: FinalizationOutcome::Failed(rollback_error),
+            rollback: CapturedFinalizationOutcome::Failed(rollback_error),
         } if error.to_string() == "task failed"
             && rollback_error.to_string() == "rollback failed"
     ));
@@ -1221,7 +1223,7 @@ fn test_clone_shares_lifecycle_callbacks() {
     let commit_calls = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<u32, io::Error>(17))
         .commit({
             let commit_calls = Arc::clone(&commit_calls);
@@ -1277,7 +1279,7 @@ fn test_run_captured_task_panic_rolls_back() {
     let rollback_phase = Arc::new(Mutex::new(None));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback({
@@ -1295,14 +1297,14 @@ fn test_run_captured_task_panic_rolls_back() {
         })
         .build();
 
-    let outcome: LifecycleOutcome<(), io::Error, io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> =
+        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::ExecutionPanicked {
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Succeeded,
+            rollback: CapturedFinalizationOutcome::Succeeded,
         } if panic.phase() == PanicPhase::Task
     ));
     assert_eq!(
@@ -1318,20 +1320,20 @@ fn test_run_captured_task_panic_rolls_back() {
 fn test_run_captured_task_and_rollback_panics_preserves_both() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback(|_, _| panic!("rollback panic"))
         .build();
 
-    let outcome: LifecycleOutcome<(), io::Error, io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> =
+        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::ExecutionPanicked {
+        CapturedLifecycleOutcome::ExecutionPanicked {
             panic,
-            rollback: FinalizationOutcome::Panicked(rollback_panic),
+            rollback: CapturedFinalizationOutcome::Panicked(rollback_panic),
         } if panic.phase() == PanicPhase::Task
             && rollback_panic.phase() == PanicPhase::Rollback
     ));
@@ -1343,21 +1345,21 @@ fn test_run_captured_task_and_rollback_panics_preserves_both() {
 fn test_run_captures_token_drop_panic_without_rollback() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
 
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
         Err::<(), _>(io::Error::other("task failed"))
     });
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskFailed {
+        CapturedLifecycleOutcome::TaskFailed {
             error,
-            rollback: FinalizationOutcome::Panicked(panic),
+            rollback: CapturedFinalizationOutcome::Panicked(panic),
         } if error.to_string() == "task failed"
             && panic.phase() == PanicPhase::Rollback
                 && panic.message() == Some("secondary token drop panic")
@@ -1371,7 +1373,7 @@ fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
     let rollback_calls = Arc::new(AtomicUsize::new(0));
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback({
@@ -1401,7 +1403,7 @@ fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
 fn test_run_uncaptured_task_panic_outranks_rollback_error() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback(|_, _| {
@@ -1448,7 +1450,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
 fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<(), PanicOnDropRollbackError>(()))
         .no_commit()
         .rollback(|_, _| Err::<(), _>(PanicOnDropRollbackError))
@@ -1471,7 +1473,7 @@ fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
 fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback(|_, _| -> Result<(), io::Error> {
@@ -1496,7 +1498,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
 fn test_run_uncaptured_task_panic_outranks_panicking_rollback_payload_drop() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
         .rollback(|_, _| -> Result<(), io::Error> {
@@ -1643,7 +1645,7 @@ fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
 fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(false)
+        
         .prepare(|| Ok::<PanicOnDrop, io::Error>(PanicOnDrop))
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()

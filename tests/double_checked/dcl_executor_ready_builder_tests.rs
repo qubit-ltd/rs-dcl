@@ -11,7 +11,7 @@ use std::io;
 
 use qubit_dcl::{
     DclExecutor,
-    ExecutionOutcome,
+    PanicPhase,
 };
 
 /// Verifies the ready builder applies panic-capture configuration.
@@ -19,10 +19,10 @@ use qubit_dcl::{
 fn test_ready_builder_enables_panic_capture() {
     let executor = DclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .build();
-    let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&std::sync::Mutex::new(()), || panic!("task"));
-
-    assert!(matches!(outcome, ExecutionOutcome::Panicked(_)));
+    let panic = executor
+        .run_catching(&std::sync::Mutex::new(()), || panic!("task"))
+        .unwrap_err();
+    assert_eq!(panic.phase(), PanicPhase::Task);
 }

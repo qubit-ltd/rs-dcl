@@ -32,8 +32,6 @@ use crate::double_checked::{
 pub(crate) struct DclCore {
     /// Lock-free predicate invoked before and after lock acquisition.
     predicate: Arc<dyn Fn() -> bool + Send + Sync + 'static>,
-    /// Whether public calls convert panics into structured outcomes.
-    catch_panics: bool,
 }
 
 impl DclCore {
@@ -53,33 +51,7 @@ impl DclCore {
     {
         Self {
             predicate: Arc::new(predicate),
-            catch_panics: false,
         }
-    }
-
-    /// Returns whether public calls should convert panics into outcomes.
-    ///
-    /// # Returns
-    ///
-    /// `true` when panic capture is enabled.
-    #[inline(always)]
-    pub(crate) fn catch_panics(&self) -> bool {
-        self.catch_panics
-    }
-
-    /// Reconfigures panic capture while preserving the predicate.
-    ///
-    /// # Parameters
-    ///
-    /// * `catch_panics` - Whether public calls should capture panics.
-    ///
-    /// # Returns
-    ///
-    /// The reconfigured core.
-    #[inline(always)]
-    pub(crate) fn with_catch_panics(mut self, catch_panics: bool) -> Self {
-        self.catch_panics = catch_panics;
-        self
     }
 
     /// Performs the initial lock-free condition check.
@@ -182,12 +154,11 @@ impl DclCore {
 }
 
 impl Clone for DclCore {
-    /// Shares the erased predicate and copies panic configuration.
+    /// Shares the erased predicate.
     #[inline]
     fn clone(&self) -> Self {
         Self {
             predicate: self.predicate.clone(),
-            catch_panics: self.catch_panics,
         }
     }
 }

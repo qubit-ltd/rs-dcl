@@ -19,7 +19,6 @@ use std::{
 
 use qubit_dcl::{
     DclExecutor,
-    ExecutionOutcome,
     PanicPhase,
 };
 
@@ -38,14 +37,11 @@ impl Drop for PanicOnDrop {
 fn test_panic_info_preserves_string_payload() {
     let executor = DclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .build();
-    let outcome: ExecutionOutcome<(), io::Error> = executor
-        .run(&Mutex::new(()), || panic_any(String::from("owned panic")));
-
-    let ExecutionOutcome::Panicked(panic) = outcome else {
-        panic!("expected captured task panic");
-    };
+    let panic = executor
+        .run_catching(&Mutex::new(()), || panic_any(String::from("owned panic")))
+        .unwrap_err();
     assert_eq!(panic.phase(), PanicPhase::Task);
     assert_eq!(panic.message(), Some("owned panic"));
     assert_eq!(
@@ -65,14 +61,11 @@ fn test_panic_info_preserves_string_payload() {
 fn test_panic_info_preserves_non_string_payload_without_message() {
     let executor = DclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .build();
-    let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&Mutex::new(()), || panic_any(123_u32));
-
-    let ExecutionOutcome::Panicked(panic) = outcome else {
-        panic!("expected captured task panic");
-    };
+    let panic = executor
+        .run_catching(&Mutex::new(()), || panic_any(123_u32))
+        .unwrap_err();
     assert_eq!(panic.message(), None);
     assert_eq!(panic.payload().downcast_ref::<u32>(), Some(&123));
     assert!(format!("{panic:?}").contains("PanicInfo"));
@@ -84,15 +77,13 @@ fn test_panic_info_preserves_non_string_payload_without_message() {
 fn test_panic_info_drop_discards_panicking_payload() {
     let executor = DclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .build();
 
     let drop_result = catch_unwind(AssertUnwindSafe(|| {
-        let outcome: ExecutionOutcome<(), io::Error> =
-            executor.run(&Mutex::new(()), || panic_any(PanicOnDrop));
-        let ExecutionOutcome::Panicked(panic) = outcome else {
-            panic!("expected captured task panic");
-        };
+        let panic = executor
+            .run_catching(&Mutex::new(()), || panic_any(PanicOnDrop))
+            .unwrap_err();
         assert_eq!(panic.phase(), PanicPhase::Task);
         drop(panic);
     }));

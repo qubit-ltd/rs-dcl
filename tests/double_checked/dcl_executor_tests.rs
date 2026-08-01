@@ -2,8 +2,6 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Tests for the basic double-checked lock executor.
 
@@ -50,55 +48,38 @@ fn panicking_coverage_task() -> Result<(), io::Error> {
     panic!("coverage task panic")
 }
 
-/// Exercises every panic-configuration branch through one `run`
-/// monomorphization.
+/// Exercises capturing and non-capturing paths through one `run` closure type.
 #[test]
 fn test_run_covers_both_panic_configurations_with_one_task_type() {
     let lock = NoopLock;
     let successful_task = successful_coverage_task as CoverageTask;
     let panicking_task = panicking_coverage_task as CoverageTask;
 
-    let catching_false = DclExecutor::builder()
-        .when(|| false)
-        .catch_panics(true)
-        .build();
+    let propagate_false = DclExecutor::builder().when(|| false).build();
     assert!(matches!(
-        catching_false.run(&lock, successful_task),
+        propagate_false.run(&lock, successful_task),
         ExecutionOutcome::ConditionNotMet
     ));
 
-    let catching_initial_panic = DclExecutor::builder()
-        .when(|| panic!("coverage initial panic"))
-        .catch_panics(true)
-        .build();
+    let catch_initial_panic = DclExecutor::builder().when(|| panic!("coverage initial panic")).build();
     assert!(matches!(
-        catching_initial_panic.run(&lock, successful_task),
-        ExecutionOutcome::Panicked(panic)
-            if panic.phase() == PanicPhase::InitialConditionCheck
+        catch_initial_panic.run_catching(&lock, successful_task),
+        Err(panic) if panic.phase() == PanicPhase::InitialConditionCheck
     ));
 
-    let catching_true = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let catch_task = DclExecutor::builder().when(|| true).build();
     assert!(matches!(
-        catching_true.run(&lock, successful_task),
+        catch_task.run(&lock, successful_task),
         ExecutionOutcome::Success(())
     ));
     assert!(matches!(
-        catching_true.run(&lock, panicking_task),
-        ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
+        catch_task.run_catching(&lock, panicking_task),
+        Err(panic) if panic.phase() == PanicPhase::Task
     ));
 
-    let propagating_false = DclExecutor::builder().when(|| false).build();
+    let propagate_true = DclExecutor::builder().when(|| true).build();
     assert!(matches!(
-        propagating_false.run(&lock, successful_task),
-        ExecutionOutcome::ConditionNotMet
-    ));
-
-    let propagating_true = DclExecutor::builder().when(|| true).build();
-    assert!(matches!(
-        propagating_true.run(&lock, successful_task),
+        propagate_true.run(&lock, successful_task),
         ExecutionOutcome::Success(())
     ));
 }
@@ -120,22 +101,20 @@ fn test_run_initial_false_skips_lock_and_task() {
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
 }
 
-/// Verifies panic capture preserves the initial-false fast path.
+/// Verifies a captured initial-false fast path stays non-destructive.
 #[test]
 fn test_run_catching_initial_false_skips_lock_and_task() {
     let lock = CountingLock::new();
     let task_calls = AtomicUsize::new(0);
-    let executor = DclExecutor::builder()
-        .when(|| false)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| false).build();
 
-    let outcome = executor.run(&lock, || {
-        task_calls.fetch_add(1, Ordering::Relaxed);
-        Ok::<(), io::Error>(())
-    });
-
-    assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
+    assert!(matches!(
+        executor.run_catching(&lock, || {
+            task_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<(), io::Error>(())
+        }),
+        Ok(ExecutionOutcome::ConditionNotMet)
+    ));
     assert_eq!(lock.calls(), 0);
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
 }
@@ -212,21 +191,17 @@ fn test_run_preserves_task_error() {
 /// Verifies panic capture classifies the initial condition check.
 #[test]
 fn test_run_captures_initial_condition_panic() {
-    let executor = DclExecutor::builder()
-        .when(|| panic!("initial check"))
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| panic!("initial check")).build();
 
-    let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
+        Ok::<(), io::Error>(())
+    });
 
-    match outcome {
-        ExecutionOutcome::Panicked(panic) => {
-            assert_eq!(panic.phase(), PanicPhase::InitialConditionCheck);
-            assert_eq!(panic.message(), Some("initial check"));
-        }
-        _ => panic!("expected captured initial-condition panic"),
-    }
+    assert!(matches!(
+        outcome,
+        Err(panic) if panic.phase() == PanicPhase::InitialConditionCheck
+            && panic.message() == Some("initial check")
+    ));
 }
 
 /// Verifies panic capture classifies the second condition check.
@@ -244,39 +219,32 @@ fn test_run_captures_second_condition_panic() {
                 }
             }
         })
-        .catch_panics(true)
         .build();
 
-    let outcome =
-        executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
+        Ok::<(), io::Error>(())
+    });
 
-    match outcome {
-        ExecutionOutcome::Panicked(panic) => {
-            assert_eq!(panic.phase(), PanicPhase::SecondConditionCheck);
-            assert_eq!(panic.message(), Some("second check"));
-        }
-        _ => panic!("expected captured second-condition panic"),
-    }
+    assert!(matches!(
+        outcome,
+        Err(panic) if panic.phase() == PanicPhase::SecondConditionCheck
+            && panic.message() == Some("second check")
+    ));
 }
 
 /// Verifies panic capture classifies a task panic after the second check.
 #[test]
 fn test_run_captures_task_panic() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
-    let outcome: ExecutionOutcome<(), io::Error> =
-        executor.run(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
+        panic!("task panic")
+    });
 
-    match outcome {
-        ExecutionOutcome::Panicked(panic) => {
-            assert_eq!(panic.phase(), PanicPhase::Task);
-            assert_eq!(panic.message(), Some("task panic"));
-        }
-        _ => panic!("expected captured task panic"),
-    }
+    assert!(matches!(
+        outcome,
+        Err(panic) if panic.phase() == PanicPhase::Task && panic.message() == Some("task panic")
+    ));
 }
 
 /// Verifies a captured task unwind still poisons the underlying standard
@@ -284,23 +252,18 @@ fn test_run_captures_task_panic() {
 #[test]
 fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
     let lock = std::sync::Mutex::new(());
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
-    let first: ExecutionOutcome<(), io::Error> =
-        executor.run(&lock, || panic!("poison standard mutex"));
+    let first = executor.run_catching(&lock, || panic!("poison standard mutex"));
     assert!(matches!(
         first,
-        ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
+        Err(panic) if panic.phase() == PanicPhase::Task
     ));
 
-    let second = executor.run(&lock, || Ok::<u32, io::Error>(7));
+    let second = executor.run_catching(&lock, || Ok::<u32, io::Error>(7));
     assert!(matches!(
         second,
-        ExecutionOutcome::Panicked(panic)
-            if panic.phase() == PanicPhase::LockAcquisition
+        Err(panic) if panic.phase() == PanicPhase::LockAcquisition
     ));
 }
 
@@ -310,24 +273,20 @@ fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
 #[test]
 fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
     let lock = ::parking_lot::Mutex::new(());
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
-    let first: ExecutionOutcome<(), io::Error> =
-        executor.run(&lock, || panic!("parking-lot task panic"));
+    let first = executor.run_catching(&lock, || panic!("parking-lot task panic"));
     assert!(matches!(
         first,
-        ExecutionOutcome::Panicked(panic) if panic.phase() == PanicPhase::Task
+        Err(panic) if panic.phase() == PanicPhase::Task
     ));
 
     let second = executor.run(&lock, || Ok::<u32, io::Error>(7));
     assert!(matches!(second, ExecutionOutcome::Success(7)));
 }
 
-/// Verifies a poisoned standard lock is classified as a lock-acquisition
-/// panic.
+/// Verifies a poisoned lock is classified as a lock-acquisition panic when
+/// captured.
 #[test]
 fn test_run_captures_lock_acquisition_panic() {
     let lock = std::sync::Mutex::new(());
@@ -336,49 +295,35 @@ fn test_run_captures_lock_acquisition_panic() {
         panic!("poison lock");
     }));
     assert!(poison_result.is_err());
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
-    let outcome = executor.run(&lock, || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&lock, || Ok::<(), io::Error>(()));
 
-    match outcome {
-        ExecutionOutcome::Panicked(panic) => {
-            assert_eq!(panic.phase(), PanicPhase::LockAcquisition);
-        }
-        _ => panic!("expected captured lock-acquisition panic"),
-    }
+    assert!(matches!(
+        outcome,
+        Err(panic) if panic.phase() == PanicPhase::LockAcquisition
+    ));
 }
 
 /// Verifies a guard-drop panic is classified as lock release rather than task
 /// execution.
 #[test]
 fn test_run_captures_lock_release_panic() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(true)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
-    let outcome =
-        executor.run(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+    let outcome = executor.run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
 
-    match outcome {
-        ExecutionOutcome::Panicked(panic) => {
-            assert_eq!(panic.phase(), PanicPhase::LockRelease);
-            assert_eq!(panic.message(), Some("lock release panic"));
-        }
-        _ => panic!("expected captured lock-release panic"),
-    }
+    assert!(matches!(
+        outcome,
+        Err(panic) if panic.phase() == PanicPhase::LockRelease
+            && panic.message() == Some("lock release panic")
+    ));
 }
 
 /// Verifies disabling panic capture resumes unwinding through the caller.
 #[test]
 fn test_run_propagates_task_panic_when_capture_is_disabled() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        .catch_panics(false)
-        .build();
+    let executor = DclExecutor::builder().when(|| true).build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
         let _: ExecutionOutcome<(), io::Error> = executor
@@ -396,8 +341,7 @@ fn test_clone_shares_configuration_without_owning_lock() {
     let executor = DclExecutor::builder().when(|| true).build();
     let cloned = executor.clone();
 
-    let outcome =
-        cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }

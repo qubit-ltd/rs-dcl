@@ -19,7 +19,7 @@ use qubit_dcl::{
 fn test_predicate_builder_configures_prepare() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
-        .catch_panics(true)
+        
         .prepare(|| Err::<(), _>(io::Error::other("prepare")))
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
