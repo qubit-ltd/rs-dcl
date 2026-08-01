@@ -18,3 +18,23 @@ pub enum ExecutionOutcome<R, E> {
     /// The task ran and returned its original error value.
     TaskFailed(E),
 }
+
+impl<R, E> ExecutionOutcome<R, E> {
+    /// Converts the outcome to a result whose success value is optional.
+    ///
+    /// `Success(value)` becomes `Ok(Some(value))`, `ConditionNotMet` becomes
+    /// `Ok(None)`, and `TaskFailed(error)` becomes `Err(error)`.
+    ///
+    /// # Returns
+    ///
+    /// A result preserving the task error and distinguishing a rejected
+    /// condition from a successful task.
+    #[inline]
+    pub fn into_result(self) -> Result<Option<R>, E> {
+        match self {
+            Self::Success(value) => Ok(Some(value)),
+            Self::ConditionNotMet => Ok(None),
+            Self::TaskFailed(error) => Err(error),
+        }
+    }
+}

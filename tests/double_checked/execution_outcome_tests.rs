@@ -44,3 +44,36 @@ fn test_execution_outcome_task_failed_preserves_error() {
         _ => panic!("expected a task failure"),
     }
 }
+
+/// Verifies that a successful outcome converts to an optional success value.
+#[test]
+fn test_execution_outcome_into_result_preserves_success() {
+    let outcome: ExecutionOutcome<u32, io::Error> =
+        ExecutionOutcome::Success(42);
+
+    let result = outcome.into_result();
+
+    assert!(matches!(result, Ok(Some(42))));
+}
+
+/// Verifies that a rejected condition converts to an empty successful result.
+#[test]
+fn test_execution_outcome_into_result_maps_condition_to_none() {
+    let outcome: ExecutionOutcome<(), io::Error> =
+        ExecutionOutcome::ConditionNotMet;
+
+    let result = outcome.into_result();
+
+    assert!(matches!(result, Ok(None)));
+}
+
+/// Verifies that a task error remains unchanged during conversion.
+#[test]
+fn test_execution_outcome_into_result_preserves_task_error() {
+    let outcome: ExecutionOutcome<(), io::Error> =
+        ExecutionOutcome::TaskFailed(io::Error::other("task failed"));
+
+    let result = outcome.into_result();
+
+    assert!(matches!(result, Err(error) if error.to_string() == "task failed"));
+}
