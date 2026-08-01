@@ -18,7 +18,7 @@ that mode, then runs the task only when both checks succeed.
 
 ```toml
 [dependencies]
-qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-dcl = { version = "0.12", features = ["parking-lot"] }
 qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
@@ -28,7 +28,7 @@ feature when using that backend. Applications using only standard-library locks
 need no DCL feature:
 
 ```toml
-qubit-dcl = "0.11"
+qubit-dcl = "0.12"
 qubit-lock = { version = "0.13", default-features = false }
 ```
 
@@ -102,8 +102,8 @@ RWLock when their tasks follow the same gate protocol.
   per-invocation token, then commit or roll it back after locked execution.
 - `LifecycleOutcome`, `FinalizationOutcome`, `RollbackCause`, `PanicInfo`,
   and `PanicPhase` for inspecting every terminal lifecycle path.
-- Optional `catch_panics(true)` support when a caller needs structured panic
-  metadata instead of propagation.
+- `run` for panic propagation and `run_catching` for panic capture when callers
+  need explicit `PanicInfo`.
 
 It does not own a lock, expose protected data, cache task results, choose the
 application's memory ordering, or make a shared lock mode exclusive. A gate

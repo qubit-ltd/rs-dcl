@@ -3,7 +3,7 @@
 [English](user_guide.md) · [README](../README.zh_CN.md) ·
 [API 文档](https://docs.rs/qubit-dcl)
 
-本手册说明如何使用 `qubit-dcl` 0.11，在保持同步协议正确性的同时避免不必要的串行
+本手册说明如何使用 `qubit-dcl` 0.12，在保持同步协议正确性的同时避免不必要的串行
 工作。它面向已经拥有 atomic 或等价同步 gate，并需要复用双重检查执行策略的 Rust
 开发者。
 
@@ -36,7 +36,7 @@ Release store。predicate 不得获取同一个底层锁，也不应阻塞。
 
 ```toml
 [dependencies]
-qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-dcl = { version = "0.12", features = ["parking-lot"] }
 qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
@@ -45,7 +45,7 @@ parking_lot = "0.12"
 支持。只使用标准库锁时不需要启用 DCL feature：
 
 ```toml
-qubit-dcl = "0.11"
+qubit-dcl = "0.12"
 qubit-lock = { version = "0.13", default-features = false }
 ```
 
@@ -229,26 +229,21 @@ task 不需要直接访问 token 时使用 `run`；只有 task 需要修改 toke
 
 ## 结果与 panic 处理
 
-基础 executor 返回 `ExecutionOutcome<R, E>`：
+`run` 返回 `ExecutionOutcome<R, E>`：
 
 | Variant | 含义 |
 | --- | --- |
 | `Success(R)` | task 在选定 guard 内运行并返回值。 |
 | `ConditionNotMet` | 任一次条件检查返回 false。 |
 | `TaskFailed(E)` | task 返回未被改变的 error。 |
-| `Panicked(PanicInfo)` | 配置的 panic 边界捕获了 panic。 |
+生命周期 `run`/`run_with_token` 返回穷尽的 `LifecycleOutcome<R, E, C>`。
 
-生命周期 executor 返回一个穷尽的 `LifecycleOutcome<R, E, C>`，区分第一次检查、
-prepare、第二次检查、task failure、task success 与 panic 路径。收尾字段使用
-`FinalizationOutcome<C>`：`NotRequired`、`Succeeded`、`Failed(C)` 或
-`Panicked(PanicInfo)`。commit failure 不会覆盖 task success；rollback failure 不会
-覆盖原始 task error 或 panic。
+捕获形式（`run_catching`、`run_with_token_catching`）返回
+`CapturedLifecycleOutcome<R, E, C>`，同时保留 `PanicInfo` 和对应的
+`CapturedFinalizationOutcome<C>`。
 
-默认不捕获 panic，predicate、锁、callback 和 task 的 panic 会正常传播。启用
-`catch_panics(true)` 后会得到包含 `PanicPhase` 的 `PanicInfo`。捕获边界位于 RAII
-guard 作用域外：标准库锁保持正常 poisoning 语义，parking-lot 保持其正常的不 poisoning
-语义。正常完成锁内工作后，显式释放 guard 时发生的 panic 会归类为
-`PanicPhase::LockRelease`。
+默认不捕获 panic，predicate、锁、callback 和 task 的 panic 会正常传播。捕获 API 保留相同
+锁边界语义：标准库锁保留 poisoning，parking-lot 保持无 poisoning。
 
 只有使用 unwind panic 策略时才能捕获 panic。使用 `panic = "abort"` 时，进程会在返回
 outcome 或执行基于 unwind 的 rollback 之前终止。`PanicInfo` 只负责分类和传递 payload，

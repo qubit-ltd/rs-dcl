@@ -240,9 +240,9 @@ fn benchmark_submission_backend<L>(
         .when(move || predicate_state.load(Ordering::Acquire) == RUNNING)
         .build();
     let panic_predicate_state = Arc::clone(&state);
-    let panic_executor = DclExecutor::builder()
+    let catching_executor = DclExecutor::builder()
         .when(move || panic_predicate_state.load(Ordering::Acquire) == RUNNING)
-        .catch_panics(true)
+        
         .build();
 
     group.bench_function(format!("{backend}/running/lock_first"), |bencher| {
@@ -265,10 +265,10 @@ fn benchmark_submission_backend<L>(
         });
     });
     group.bench_function(
-        format!("{backend}/running/qubit_dcl_catch_panics"),
+        format!("{backend}/running/qubit_dcl_catching"),
         |bencher| {
             bencher.iter(|| {
-                black_box(panic_executor.run(lock, || {
+                black_box(catching_executor.run(lock, || {
                     submitted.fetch_add(1, Ordering::Relaxed);
                     Ok::<(), Infallible>(())
                 }))
@@ -303,10 +303,10 @@ fn benchmark_submission_backend<L>(
         });
     });
     group.bench_function(
-        format!("{backend}/shut_down/qubit_dcl_catch_panics"),
+        format!("{backend}/shut_down/qubit_dcl_catching"),
         |bencher| {
             bencher.iter(|| {
-                let outcome = panic_executor.run(lock, || {
+                let outcome = catching_executor.run(lock, || {
                     submitted.fetch_add(1, Ordering::Relaxed);
                     Ok::<(), Infallible>(())
                 });

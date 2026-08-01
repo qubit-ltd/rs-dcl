@@ -16,7 +16,7 @@ Qubit DCL 为 Rust 提供可复用的双重检查锁 executor。它帮助并发�
 
 ```toml
 [dependencies]
-qubit-dcl = { version = "0.11", features = ["parking-lot"] }
+qubit-dcl = { version = "0.12", features = ["parking-lot"] }
 qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
@@ -25,7 +25,7 @@ Qubit DCL 要求 Rust 1.94 或更高版本。使用该后端时，请显式启�
 `parking-lot` feature。只使用标准库锁时不需要启用 DCL feature：
 
 ```toml
-qubit-dcl = "0.11"
+qubit-dcl = "0.12"
 qubit-lock = { version = "0.13", default-features = false }
 ```
 
@@ -95,7 +95,7 @@ gate 协议，读者与 writer 可以使用同一个 executor，并传入同一 
   锁内执行后 commit 或 rollback 的工作流。
 - `LifecycleOutcome`、`FinalizationOutcome`、`RollbackCause`、`PanicInfo` 和
   `PanicPhase`：用于检查全部生命周期终态。
-- 可选 `catch_panics(true)`：调用方需要结构化 panic 元数据而不是传播时使用。
+- `run` 用于 panic 直接传播，`run_catching` 用于捕获 panic 返回 `PanicInfo`。
 
 它不拥有锁、不暴露受保护数据、不缓存 task 结果、不替应用选择 memory ordering，也不会
 把共享锁模式变成排他执行。修改 gate 或受保护状态，或要求 task 至多执行一次时，必须

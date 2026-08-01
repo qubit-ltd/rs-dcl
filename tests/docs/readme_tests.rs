@@ -123,10 +123,10 @@ fn test_manifest_uses_only_required_qubit_dependencies() {
 fn test_readmes_align_lock_feature_and_dependency_versions() {
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains(
-            "qubit-dcl = { version = \"0.11\", features = [\"parking-lot\"] }"
+            "qubit-dcl = { version = \"0.12\", features = [\"parking-lot\"] }"
         ));
         assert!(readme.contains("qubit-lock = \"0.13\""));
-        assert!(readme.contains("qubit-dcl = \"0.11\""));
+        assert!(readme.contains("qubit-dcl = \"0.12\""));
         assert!(readme.contains(
             "qubit-lock = { version = \"0.13\", default-features = false }"
         ));
