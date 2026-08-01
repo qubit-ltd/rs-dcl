@@ -19,7 +19,7 @@ use crate::double_checked::{
 #[doc(hidden)]
 #[must_use = "the ready builder must be consumed by build"]
 pub struct LifecycleReadyBuilder<P, C> {
-    /// DCL predicate and panic configuration.
+    /// DCL predicate configuration.
     core: DclCore,
     /// Per-invocation token producer.
     prepare: PrepareCallback<P, C>,
@@ -34,7 +34,7 @@ impl<P, C> LifecycleReadyBuilder<P, C> {
     ///
     /// # Parameters
     ///
-    /// * `core` - DCL predicate and panic configuration.
+    /// * `core` - DCL predicate configuration.
     /// * `prepare` - Erased prepare callback.
     /// * `commit` - Selected commit callback, if required.
     /// * `rollback` - Selected rollback callback, if required.

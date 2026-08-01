@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 //! Private commit and rollback finalization policy.
 
@@ -68,19 +70,16 @@ where
     F: Fn(P) -> Result<(), C> + ?Sized,
 {
     match commit {
-        Some(commit) => {
-            match catch_phase(PanicPhase::Commit, || commit(token)) {
-                Ok(Ok(())) => CapturedFinalizationOutcome::Succeeded,
-                Ok(Err(error)) => CapturedFinalizationOutcome::Failed(error),
-                Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
-            }
-        }
-        None => {
-            match catch_phase(PanicPhase::Commit, || drop(token)) {
-                Ok(()) => CapturedFinalizationOutcome::NotRequired,
-                Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
-            }
-        }
+        Some(commit) => match catch_phase(PanicPhase::Commit, || commit(token))
+        {
+            Ok(Ok(())) => CapturedFinalizationOutcome::Succeeded,
+            Ok(Err(error)) => CapturedFinalizationOutcome::Failed(error),
+            Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
+        },
+        None => match catch_phase(PanicPhase::Commit, || drop(token)) {
+            Ok(()) => CapturedFinalizationOutcome::NotRequired,
+            Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
+        },
     }
 }
 
@@ -152,11 +151,9 @@ where
                 Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
             }
         }
-        None => {
-            match catch_phase(PanicPhase::Rollback, || drop(token)) {
-                Ok(()) => CapturedFinalizationOutcome::NotRequired,
-                Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
-            }
-        }
+        None => match catch_phase(PanicPhase::Rollback, || drop(token)) {
+            Ok(()) => CapturedFinalizationOutcome::NotRequired,
+            Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
+        },
     }
 }

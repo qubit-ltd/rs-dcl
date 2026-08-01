@@ -31,15 +31,13 @@ mod parking_lot {
 #[test]
 fn test_core_performs_two_condition_checks() {
     let checks = Arc::new(AtomicUsize::new(0));
-    let executor = DclExecutor::builder()
-        .when({
-            let checks = Arc::clone(&checks);
-            move || {
-                checks.fetch_add(1, Ordering::Relaxed);
-                true
-            }
-        })
-        .build();
+    let executor = DclExecutor::new({
+        let checks = Arc::clone(&checks);
+        move || {
+            checks.fetch_add(1, Ordering::Relaxed);
+            true
+        }
+    });
     let outcome =
         executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 

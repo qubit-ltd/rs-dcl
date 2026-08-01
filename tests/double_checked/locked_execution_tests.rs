@@ -28,12 +28,10 @@ use qubit_dcl::{
 fn test_locked_execution_rechecks_before_task() {
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = AtomicUsize::new(0);
-    let executor = DclExecutor::builder()
-        .when({
-            let checks = Arc::clone(&checks);
-            move || checks.fetch_add(1, Ordering::Relaxed) == 0
-        })
-        .build();
+    let executor = DclExecutor::new({
+        let checks = Arc::clone(&checks);
+        move || checks.fetch_add(1, Ordering::Relaxed) == 0
+    });
     let outcome = executor.run(&std::sync::Mutex::new(()), || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<(), io::Error>(())

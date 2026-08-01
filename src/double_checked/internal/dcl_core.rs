@@ -27,15 +27,14 @@ use crate::double_checked::{
     },
 };
 
-/// Owns the predicate and panic-capture configuration shared by both public
-/// executors.
+/// Owns the predicate shared by both public executors.
 pub(crate) struct DclCore {
     /// Lock-free predicate invoked before and after lock acquisition.
     predicate: Arc<dyn Fn() -> bool + Send + Sync + 'static>,
 }
 
 impl DclCore {
-    /// Creates a DCL core with panic capture disabled.
+    /// Creates a DCL core with the configured predicate.
     ///
     /// # Parameters
     ///
