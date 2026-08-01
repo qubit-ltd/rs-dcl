@@ -8,7 +8,6 @@
 //! Tests for captured panic metadata.
 
 use std::{
-    io,
     panic::{
         AssertUnwindSafe,
         catch_unwind,
@@ -35,12 +34,11 @@ impl Drop for PanicOnDrop {
 /// Verifies a string payload remains inspectable and recoverable by value.
 #[test]
 fn test_panic_info_preserves_string_payload() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        
-        .build();
+    let executor = DclExecutor::new(|| true);
     let panic = executor
-        .run_catching(&Mutex::new(()), || panic_any(String::from("owned panic")))
+        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
+            panic_any(String::from("owned panic"))
+        })
         .unwrap_err();
     assert_eq!(panic.phase(), PanicPhase::Task);
     assert_eq!(panic.message(), Some("owned panic"));
@@ -59,12 +57,11 @@ fn test_panic_info_preserves_string_payload() {
 /// Verifies unknown payloads are retained without fabricating a message.
 #[test]
 fn test_panic_info_preserves_non_string_payload_without_message() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        
-        .build();
+    let executor = DclExecutor::new(|| true);
     let panic = executor
-        .run_catching(&Mutex::new(()), || panic_any(123_u32))
+        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
+            panic_any(123_u32)
+        })
         .unwrap_err();
     assert_eq!(panic.message(), None);
     assert_eq!(panic.payload().downcast_ref::<u32>(), Some(&123));
@@ -75,14 +72,13 @@ fn test_panic_info_preserves_non_string_payload_without_message() {
 /// destructor panic.
 #[test]
 fn test_panic_info_drop_discards_panicking_payload() {
-    let executor = DclExecutor::builder()
-        .when(|| true)
-        
-        .build();
+    let executor = DclExecutor::new(|| true);
 
     let drop_result = catch_unwind(AssertUnwindSafe(|| {
         let panic = executor
-            .run_catching(&Mutex::new(()), || panic_any(PanicOnDrop))
+            .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
+                panic_any(PanicOnDrop)
+            })
             .unwrap_err();
         assert_eq!(panic.phase(), PanicPhase::Task);
         drop(panic);

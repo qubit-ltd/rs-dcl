@@ -23,12 +23,10 @@
 //!
 //! let gate = Arc::new(AtomicBool::new(true));
 //! let lock = Mutex::new(());
-//! let executor = DclExecutor::builder()
-//!     .when({
-//!         let gate = Arc::clone(&gate);
-//!         move || gate.load(Ordering::Acquire)
-//!     })
-//!     .build();
+//! let executor = DclExecutor::new({
+//!     let gate = Arc::clone(&gate);
+//!     move || gate.load(Ordering::Acquire)
+//! });
 //!
 //! let outcome = executor.run(&lock, {
 //!     let gate = Arc::clone(&gate);

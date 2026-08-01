@@ -6,11 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 mod builder_typestate_tests;
+mod captured_finalization_outcome_tests;
+mod captured_lifecycle_outcome_tests;
 #[cfg(feature = "parking-lot")]
 mod concurrency_tests;
 mod dcl_core_tests;
-mod dcl_executor_builder_tests;
-mod dcl_executor_ready_builder_tests;
 mod dcl_executor_tests;
 mod execution_outcome_tests;
 mod finalization_outcome_tests;

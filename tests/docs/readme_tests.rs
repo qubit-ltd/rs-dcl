@@ -19,7 +19,8 @@ const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 #[test]
 fn test_readmes_document_final_public_api() {
     for readme in [README_EN, README_ZH] {
-        assert!(readme.contains("DclExecutor::builder()"));
+        assert!(readme.contains("DclExecutor::new"));
+        assert!(!readme.contains("let executor = DclExecutor::builder"));
         assert!(readme.contains("executor.run(&lock"));
         assert!(readme.contains("LifecycleDclExecutor"));
         assert!(readme.contains("doc/user_guide"));

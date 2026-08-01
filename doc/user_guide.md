@@ -70,12 +70,10 @@ use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DclExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
+let executor = DclExecutor::new({
+    let gate = Arc::clone(&gate);
+    move || gate.load(Ordering::Acquire)
+});
 
 let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
@@ -140,12 +138,10 @@ let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
 let read_value = Arc::new(AtomicUsize::new(42));
 let write_value = Arc::new(AtomicUsize::new(0));
-let executor = DclExecutor::builder()
-    .when({
+let executor = DclExecutor::new({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
-    })
-    .build();
+    });
 
 let read_mode = lock.read_lock();
 assert!(matches!(
@@ -253,6 +249,10 @@ needs its own synchronization.
 | `ConditionNotMet` | Either condition check returned false. |
 | `TaskFailed(E)` | The task returned its unchanged error. |
 
+`ExecutionOutcome::into_result()` converts these variants to
+`Result<Option<R>, E>`: success becomes `Ok(Some(value))`, condition rejection
+becomes `Ok(None)`, and task failure becomes `Err(error)`.
+
 The captured form (`run_catching`) returns `Result<ExecutionOutcome<R, E>, PanicInfo>`.
 
 Lifecycle methods return exhaustive `LifecycleOutcome<R, E, C>` from
@@ -262,6 +262,8 @@ The captured lifecycle methods (`run_catching`/`run_with_token_catching`) return
 `CapturedLifecycleOutcome<R, E, C>` for panic-aware paths. A captured panic
 keeps the original panic phase and returns captured finalization outcomes from
 `CapturedFinalizationOutcome<C>`.
+Use `PanicPhase` to distinguish whether capture occurred during predicate,
+preparation, locking, task execution, or finalization.
 
 Panic capture is disabled by default. `run` and `run_with_token` propagate panic
 from predicate, lock, callbacks, and task directly. Captured methods keep panic

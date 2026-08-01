@@ -65,12 +65,10 @@ use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DclExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
+let executor = DclExecutor::new({
+    let gate = Arc::clone(&gate);
+    move || gate.load(Ordering::Acquire)
+});
 
 let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
@@ -128,12 +126,10 @@ let lock = RwLock::new(());
 let gate = Arc::new(AtomicBool::new(true));
 let read_value = Arc::new(AtomicUsize::new(42));
 let write_value = Arc::new(AtomicUsize::new(0));
-let executor = DclExecutor::builder()
-    .when({
+let executor = DclExecutor::new({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
-    })
-    .build();
+    });
 
 let read_mode = lock.read_lock();
 assert!(matches!(
@@ -236,11 +232,16 @@ task 不需要直接访问 token 时使用 `run`；只有 task 需要修改 toke
 | `Success(R)` | task 在选定 guard 内运行并返回值。 |
 | `ConditionNotMet` | 任一次条件检查返回 false。 |
 | `TaskFailed(E)` | task 返回未被改变的 error。 |
+
+`ExecutionOutcome::into_result()` 将结果转换为 `Result<Option<R>, E>`：成功为
+`Ok(Some(value))`，条件不满足为 `Ok(None)`，task 失败为 `Err(error)`。
+
 生命周期 `run`/`run_with_token` 返回穷尽的 `LifecycleOutcome<R, E, C>`。
 
 捕获形式（`run_catching`、`run_with_token_catching`）返回
 `CapturedLifecycleOutcome<R, E, C>`，同时保留 `PanicInfo` 和对应的
 `CapturedFinalizationOutcome<C>`。
+可使用 `PanicPhase` 区分 panic 发生在 predicate、prepare、加锁、task 还是终结阶段。
 
 默认不捕获 panic，predicate、锁、callback 和 task 的 panic 会正常传播。捕获 API 保留相同
 锁边界语义：标准库锁保留 poisoning，parking-lot 保持无 poisoning。

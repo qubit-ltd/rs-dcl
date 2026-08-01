@@ -51,12 +51,10 @@ use qubit_dcl::{DclExecutor, ExecutionOutcome};
 
 let lock = Mutex::new(());
 let gate = Arc::new(AtomicBool::new(true));
-let executor = DclExecutor::builder()
-    .when({
-        let gate = Arc::clone(&gate);
-        move || gate.load(Ordering::Acquire)
-    })
-    .build();
+let executor = DclExecutor::new({
+    let gate = Arc::clone(&gate);
+    move || gate.load(Ordering::Acquire)
+});
 
 let outcome = executor.run(&lock, {
     let gate = Arc::clone(&gate);
@@ -90,7 +88,10 @@ gate 协议，读者与 writer 可以使用同一个 executor，并传入同一 
 ## 它提供什么
 
 - `DclExecutor`：复用 predicate、调用方选择
-  `qubit_lock::Lock`，并获得结构化 `ExecutionOutcome`。
+  `qubit_lock::Lock`，并获得结构化 `ExecutionOutcome`。直接使用
+  `DclExecutor::new(predicate)` 构造；如果需要组合为
+  `Result<Option<R>, E>`，可使用 `ExecutionOutcome::into_result()` 将
+  `ConditionNotMet` 映射为 `Ok(None)`。
 - `LifecycleDclExecutor`：适用于先准备每次调用独有的 token，再在
   锁内执行后 commit 或 rollback 的工作流。
 - `LifecycleOutcome`、`FinalizationOutcome`、`RollbackCause`、`PanicInfo` 和
