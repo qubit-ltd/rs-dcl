@@ -99,14 +99,25 @@ assert_eq!(
 
 ## 工作原理
 
-每次调用都遵循相同顺序：
-
 ```text
-initial predicate -> acquire caller-supplied lock -> second predicate -> task
+如果第一次条件检查不通过：
+    直接返回 ConditionNotMet，不获取锁
+
+获取调用方传入的锁
+
+如果锁内的第二次条件检查不通过：
+    返回 ConditionNotMet，不执行 task
+
+在同一个锁保护范围内执行 task
+
+如果 task 成功：
+    返回 Success
+否则：
+    返回 TaskFailed
 ```
 
 第一次检查让无需工作的调用避免获取锁；第二次检查关闭首次观察与成功获取锁之间的
-竞争窗口。第二次检查和 task 在同一个 guard 下执行。
+竞争窗口。从任一锁内分支返回时，guard 都会按 RAII 自动释放。
 
 ## 选择执行器
 
