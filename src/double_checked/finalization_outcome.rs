@@ -11,6 +11,10 @@
 ///
 /// The enclosing [`crate::LifecycleOutcome`] field identifies whether this
 /// outcome belongs to commit or rollback.
+///
+/// # Type Parameters
+///
+/// * `C` - Error type returned by the commit or rollback callback.
 #[derive(Debug)]
 #[must_use = "the finalization outcome must be inspected"]
 pub enum FinalizationOutcome<C> {

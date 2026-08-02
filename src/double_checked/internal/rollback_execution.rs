@@ -16,6 +16,10 @@ use crate::double_checked::{
 };
 
 /// Represents the locked execution state that requires lifecycle rollback.
+///
+/// # Type Parameters
+///
+/// * `E` - Task error type.
 pub(crate) enum RollbackExecution<E> {
     /// The second condition check returned `false`.
     ConditionNotMet,
@@ -32,6 +36,10 @@ where
     /// # Returns
     ///
     /// A cause borrowing any task error or panic metadata from this state.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `E` - Task error type stored in the unsuccessful execution state.
     #[inline]
     pub(crate) fn cause(&self) -> RollbackCause<'_> {
         match self {
@@ -50,6 +58,11 @@ where
     /// # Returns
     ///
     /// The terminal lifecycle outcome preserving the original execution state.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `C` - Lifecycle callback error type.
     #[inline]
     pub(crate) fn into_outcome<R, C>(
         self,

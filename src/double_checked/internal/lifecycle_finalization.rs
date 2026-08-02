@@ -22,6 +22,12 @@ use crate::double_checked::{
 /// * `commit` - Optional callback that consumes the prepared token.
 /// * `token` - Token to commit or drop.
 ///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Commit callback error type.
+/// * `F` - Commit callback type.
+///
 /// # Returns
 ///
 /// The finalization outcome preserving callback errors.
@@ -54,6 +60,12 @@ where
 ///
 /// * `commit` - Optional callback that consumes the prepared token.
 /// * `token` - Token to commit or drop.
+///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Commit callback error type.
+/// * `F` - Commit callback type.
 ///
 /// # Returns
 ///
@@ -92,6 +104,12 @@ where
 /// * `token` - Token to roll back or drop.
 /// * `cause` - Borrowed reason that selected rollback.
 ///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Rollback callback error type.
+/// * `F` - Rollback callback type.
+///
 /// # Returns
 ///
 /// The finalization outcome preserving callback errors.
@@ -127,6 +145,12 @@ where
 /// * `rollback` - Optional callback that consumes the prepared token.
 /// * `token` - Token to roll back or drop.
 /// * `cause` - Borrowed reason that selected rollback.
+///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Rollback callback error type.
+/// * `F` - Rollback callback type.
 ///
 /// # Returns
 ///

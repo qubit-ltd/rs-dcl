@@ -10,6 +10,11 @@
 use crate::double_checked::ExecutionOutcome;
 
 /// Distinguishes a failed second check from an executed task result.
+///
+/// # Type Parameters
+///
+/// * `R` - Successful task result type.
+/// * `E` - Task error type.
 #[must_use = "the locked execution result must be converted into an outcome"]
 pub(crate) enum LockedExecution<R, E> {
     /// The condition was no longer satisfied after the lock was acquired.
@@ -24,6 +29,11 @@ impl<R, E> LockedExecution<R, E> {
     /// # Returns
     ///
     /// The corresponding condition, success, or task-failure outcome.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
     #[inline]
     pub(crate) fn into_outcome(self) -> ExecutionOutcome<R, E> {
         match self {

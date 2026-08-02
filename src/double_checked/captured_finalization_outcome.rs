@@ -12,6 +12,10 @@ use crate::double_checked::PanicInfo;
 
 /// Describes how a lifecycle token was finalized after locked execution when
 /// panic capture is enabled.
+///
+/// # Type Parameters
+///
+/// * `C` - Error type returned by the commit or rollback callback.
 #[derive(Debug)]
 #[must_use = "the captured finalization outcome must be inspected"]
 pub enum CapturedFinalizationOutcome<C> {

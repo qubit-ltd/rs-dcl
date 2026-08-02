@@ -17,6 +17,11 @@ use crate::double_checked::{
 };
 
 /// Builder stage representing `no_commit` and requiring rollback.
+///
+/// # Type Parameters
+///
+/// * `P` - Per-invocation token type produced by `prepare`.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[doc(hidden)]
 #[must_use = "the no-commit stage requires rollback"]
 pub struct LifecycleRollbackBuilder<P, C> {
@@ -34,6 +39,11 @@ impl<P, C> LifecycleRollbackBuilder<P, C> {
     /// * `core` - DCL predicate configuration.
     /// * `prepare` - Erased prepare callback.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Per-invocation token type.
+    /// * `C` - Lifecycle callback error type.
+    ///
     /// # Returns
     ///
     /// A builder requiring rollback.
@@ -48,6 +58,10 @@ impl<P, C> LifecycleRollbackBuilder<P, C> {
     ///
     /// * `rollback` - Callback receiving the token and structured failure cause
     ///   after lock release.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Rollback callback type.
     ///
     /// # Returns
     ///

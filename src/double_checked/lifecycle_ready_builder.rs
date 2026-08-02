@@ -16,6 +16,11 @@ use crate::double_checked::{
 };
 
 /// Typestate-validated lifecycle builder ready to build.
+///
+/// # Type Parameters
+///
+/// * `P` - Per-invocation token type produced by `prepare`.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[doc(hidden)]
 #[must_use = "the ready builder must be consumed by build"]
 pub struct LifecycleReadyBuilder<P, C> {
@@ -38,6 +43,11 @@ impl<P, C> LifecycleReadyBuilder<P, C> {
     /// * `prepare` - Erased prepare callback.
     /// * `commit` - Selected commit callback, if required.
     /// * `rollback` - Selected rollback callback, if required.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Per-invocation token type.
+    /// * `C` - Lifecycle callback error type.
     ///
     /// # Returns
     ///

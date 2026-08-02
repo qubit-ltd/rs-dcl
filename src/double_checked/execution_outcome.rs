@@ -8,6 +8,11 @@
 //! Task execution outcomes for double-checked execution.
 
 /// Describes whether and how the guarded task was executed.
+///
+/// # Type Parameters
+///
+/// * `R` - Value type returned by the guarded task.
+/// * `E` - Error type returned by the guarded task.
 #[derive(Debug)]
 #[must_use = "the execution outcome must be inspected"]
 pub enum ExecutionOutcome<R, E> {
@@ -24,6 +29,11 @@ impl<R, E> ExecutionOutcome<R, E> {
     ///
     /// `Success(value)` becomes `Ok(Some(value))`, `ConditionNotMet` becomes
     /// `Ok(None)`, and `TaskFailed(error)` becomes `Err(error)`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
     ///
     /// # Returns
     ///

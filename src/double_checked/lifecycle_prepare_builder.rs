@@ -18,6 +18,11 @@ use crate::double_checked::{
 };
 
 /// Builder stage requiring a successful-path finalizer choice.
+///
+/// # Type Parameters
+///
+/// * `P` - Per-invocation token type produced by `prepare`.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[doc(hidden)]
 #[must_use = "the prepare stage requires commit or no_commit"]
 pub struct LifecyclePrepareBuilder<P, C> {
@@ -35,6 +40,11 @@ impl<P, C> LifecyclePrepareBuilder<P, C> {
     /// * `core` - DCL predicate configuration.
     /// * `prepare` - Erased prepare callback.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Per-invocation token type.
+    /// * `C` - Lifecycle callback error type.
+    ///
     /// # Returns
     ///
     /// A builder requiring `commit` or `no_commit`.
@@ -48,6 +58,10 @@ impl<P, C> LifecyclePrepareBuilder<P, C> {
     /// # Parameters
     ///
     /// * `commit` - Callback invoked after a successful task and lock release.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Commit callback type.
     ///
     /// # Returns
     ///
