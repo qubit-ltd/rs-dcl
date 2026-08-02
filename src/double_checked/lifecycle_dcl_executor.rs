@@ -39,14 +39,29 @@ use crate::double_checked::{
 };
 
 /// Shared prepare callback type used by lifecycle executor clones.
+///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Lifecycle callback error type.
 pub(crate) type PrepareCallback<P, C> =
     Arc<dyn Fn() -> Result<P, C> + Send + Sync + 'static>;
 
 /// Shared commit callback type used by lifecycle executor clones.
+///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Lifecycle callback error type.
 pub(crate) type CommitCallback<P, C> =
     Arc<dyn Fn(P) -> Result<(), C> + Send + Sync + 'static>;
 
 /// Shared rollback callback type used by lifecycle executor clones.
+///
+/// # Type Parameters
+///
+/// * `P` - Prepared token type.
+/// * `C` - Lifecycle callback error type.
 pub(crate) type RollbackCallback<P, C> = Arc<
     dyn for<'a> Fn(P, RollbackCause<'a>) -> Result<(), C>
         + Send
@@ -65,6 +80,11 @@ pub(crate) type RollbackCallback<P, C> = Arc<
 /// data while consulting the same atomic gate; their paired modes on the same
 /// underlying lock provide the required coordination. This is why each
 /// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
+///
+/// # Type Parameters
+///
+/// * `P` - Per-invocation token type produced by `prepare`.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[must_use = "an executor does nothing until run or run_with_token is called"]
 pub struct LifecycleDclExecutor<P, C> {
     /// Shared DCL predicate.
@@ -99,6 +119,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// * `commit` - Optional successful-path finalizer.
     /// * `rollback` - Optional unsuccessful-path finalizer.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Per-invocation token type.
+    /// * `C` - Lifecycle callback error type.
+    ///
     /// # Returns
     ///
     /// A reusable lifecycle executor.
@@ -124,9 +149,22 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// * `task` - One-shot task executed inside the lock after the second
     ///   check.
     ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
+    /// * `F` - One-shot task callback type.
+    ///
     /// # Returns
     ///
     /// The single terminal lifecycle outcome.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from the predicate, prepare callback, task, lock, and
+    /// lifecycle finalization callbacks. Panics from the locked phase are
+    /// resumed after rollback cleanup.
     #[inline(always)]
     pub fn run<L, R, E, F>(
         &self,
@@ -153,9 +191,22 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// * `task` - One-shot task receiving the invocation token by mutable
     ///   reference.
     ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
+    /// * `F` - One-shot token-aware task callback type.
+    ///
     /// # Returns
     ///
     /// The single terminal lifecycle outcome.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from the predicate, prepare callback, task, lock, and
+    /// lifecycle finalization callbacks. A locked-phase panic is resumed after
+    /// rollback cleanup.
     #[inline]
     pub fn run_with_token<L, R, E, F>(
         &self,
@@ -197,6 +248,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// * `lock` - Lock used for this invocation.
     /// * `task` - Task to run in the locked phase.
     ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
+    /// * `F` - One-shot task callback type.
+    ///
     /// # Returns
     ///
     /// Captured lifecycle outcome when execution crosses panic boundaries.
@@ -219,6 +277,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// * `lock` - Lock used for this invocation.
     /// * `task` - Token-aware task to run in the locked phase.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
+    /// * `F` - One-shot token-aware task callback type.
     ///
     /// # Returns
     ///
@@ -278,6 +343,15 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Finalizes a successful task without holding the executor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type preserved in the outcome type.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the commit callback or token destructor.
     #[inline]
     fn finish_commit<R, E>(
         &self,
@@ -289,6 +363,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Finalizes a successful task without holding the executor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type preserved in the outcome type.
     fn finish_commit_catching<R, E>(
         &self,
         token: P,
@@ -299,6 +378,15 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Finalizes an unsuccessful invocation without holding the executor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the rollback callback or token destructor.
     #[inline]
     fn finish_rollback<R, E>(
         &self,
@@ -315,6 +403,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Finalizes an unsuccessful invocation without holding the executor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type implementing `Error + Send + Sync + 'static`.
     fn finish_rollback_catching<R, E>(
         &self,
         token: P,
@@ -331,6 +424,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Attempts rollback after a locked-phase panic and then resumes the
     /// original unwind payload.
+    ///
+    /// # Panics
+    ///
+    /// Always resumes unwinding with the original locked-phase panic after
+    /// best-effort rollback cleanup.
     #[inline]
     fn rollback_then_resume(&self, token: P, panic: PanicInfo) -> ! {
         if let Some(rollback) = &self.rollback {
@@ -345,6 +443,10 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Runs and discards secondary cleanup work without allowing its result,
     /// panic payload, or destructor panic to replace an earlier panic.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Secondary cleanup callback type.
     #[inline]
     fn discard_secondary<F>(operation: F)
     where

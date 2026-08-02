@@ -24,10 +24,19 @@ use crate::double_checked::{
 /// * `phase` - Phase assigned if `operation` unwinds.
 /// * `operation` - Operation to execute.
 ///
+/// # Type Parameters
+///
+/// * `R` - Operation result type.
+/// * `F` - Operation callback type.
+///
 /// # Returns
 ///
 /// `Ok(R)` when the operation returns, or `Err(PanicInfo)` retaining the
 /// original panic payload.
+///
+/// # Errors
+///
+/// Returns [`Err`] when `operation` panics.
 #[inline]
 pub(crate) fn catch_phase<R, F>(
     phase: PanicPhase,
