@@ -95,7 +95,10 @@ assert!(matches!(
 
 `run` 有意接受 `Lock` 而不是 `ExclusiveLock`，对共享模式和排他模式采用相同的控制
 流程，因此调用方可以传入同一 RWLock 的 read mode 或 write mode。Rust 无法证明 task
-闭包只读，所以传入共享模式时，必须由调用方保证只读契约。
+闭包只读，所以传入共享模式时，必须由调用方保证只读契约。即使分别提供
+`run_shared` 和 `run_exclusive`，两个方法也无法检查闭包的实际副作用，因此不能强制
+保证这种语义差异。保留单一 `run` 入口可以让锁模式选择保持显式，同时避免暗示 Rust
+能够验证它实际上无法验证的契约。
 
 当 task 修改 gate 或受保护状态、消费工作、只允许一次初始化，或必须串行执行时，使用
 mutex 或 write-mode adapter 等排他模式。能够选出唯一执行者的独立
