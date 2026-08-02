@@ -45,27 +45,26 @@ fn test_user_guides_document_gate_and_lock_contracts() {
         .collect::<Vec<_>>()
         .join(" ");
 
-    assert!(guide_en.contains("Acquire load"));
-    assert!(guide_en.contains("must not acquire the same underlying lock"));
-    assert!(guide_en.contains(
-        "`Lock` represents an acquisition mode, not necessarily exclusivity"
-    ));
-    assert!(guide_en.contains("shared read mode"));
+    assert!(guide_en.contains("Acquire load paired with Release store"));
+    assert!(guide_en.contains("must not acquire the coordination lock"));
+    assert!(
+        guide_en.contains("`qubit_lock::Lock` represents an acquisition mode")
+    );
+    assert!(guide_en.contains("`read_lock()` adapter is shared"));
     assert!(guide_en.contains("paired write mode"));
-    assert!(guide_en.contains("same executor"));
-    assert!(guide_en.contains("different data"));
-    assert!(guide_en.contains("owns neither the lock nor its protected data"));
+    assert!(guide_en.contains("does not require at-most-once task execution"));
+    assert!(guide_en.contains("owns neither the lock nor the business data"));
     assert!(guide_en.contains("exclusive mode"));
     assert!(guide_en.contains("same underlying lock"));
 
-    assert!(guide_zh.contains("Acquire load"));
-    assert!(guide_zh.contains("不得获取同一个底层锁"));
-    assert!(guide_zh.contains("`Lock` 表示获取模式，并不必然表示排他性"));
-    assert!(guide_zh.contains("共享 read mode"));
-    assert!(guide_zh.contains("配套的 write mode"));
-    assert!(guide_zh.contains("同一个 executor"));
-    assert!(guide_zh.contains("不同的数据"));
-    assert!(guide_zh.contains("不拥有锁或锁保护的数据"));
+    assert!(guide_zh.contains("Acquire load 配对 Release store"));
+    assert!(guide_zh.contains("predicate 不得获取"));
+    assert!(guide_zh.contains("协调锁"));
+    assert!(guide_zh.contains("`qubit_lock::Lock` 表示获取模式"));
+    assert!(guide_zh.contains("`read_lock()` adapter 是共享的"));
+    assert!(guide_zh.contains("配套 write mode"));
+    assert!(guide_zh.contains("不要求 task 至多执行一次"));
+    assert!(guide_zh.contains("不拥有锁或业务数据"));
     assert!(guide_zh.contains("排他模式"));
     assert!(guide_zh.contains("同一个底层锁"));
 }
@@ -89,14 +88,13 @@ fn test_readme_dependency_versions_match_package_version() {
 /// Verifies installation snippets identify parking-lot as an optional backend.
 #[test]
 fn test_readme_installation_snippets_declare_parking_lot() {
-    for readme in [README_EN, README_ZH] {
-        assert!(readme.contains("parking_lot = \"0.12\""));
-        assert!(
-            readme.contains("optional")
-                || readme.contains("可选")
-                || readme.contains("opt-in")
-        );
-    }
+    let optional_en = h2_section(README_EN, "Optional Integrations")
+        .expect("English README should have optional integrations");
+    let optional_zh = h2_section(README_ZH, "可选集成")
+        .expect("Chinese README should have optional integrations");
+
+    assert!(optional_en.contains("parking_lot = \"0.12\""));
+    assert!(optional_zh.contains("parking_lot = \"0.12\""));
 }
 
 /// Verifies README and user guides link the related Qubit crates.
@@ -105,18 +103,32 @@ fn test_readmes_document_qubit_ecosystem_links() {
     for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(document.contains("https://github.com/qubit-ltd/rs-atomic"));
         assert!(document.contains("https://github.com/qubit-ltd/rs-lock"));
-        assert!(document.contains("https://github.com/qubit-ltd/rs-dcl"));
+    }
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains("https://github.com/qubit-ltd/rs-dcl"));
     }
 }
 
-/// Verifies README examples use the documented atomic gate and lock adapter.
+/// Verifies README installation sections stay minimal while optional
+/// integrations remain discoverable.
 #[test]
-fn test_readmes_document_atomic_and_lock_dependencies() {
-    for readme in [README_EN, README_ZH] {
-        assert!(readme.contains("qubit-atomic = \"0.16\""));
-        assert!(readme.contains("qubit-lock = \"0.13\""));
-        assert!(readme.contains("ArcAtomic<bool>"));
-        assert!(readme.contains("write_lock()"));
+fn test_readmes_separate_minimal_and_optional_dependencies() {
+    for (readme, installation, optional) in [
+        (README_EN, "Installation", "Optional Integrations"),
+        (README_ZH, "安装", "可选集成"),
+    ] {
+        let installation = h2_section(readme, installation)
+            .expect("README should have an installation section");
+        assert!(installation.contains("qubit-dcl = \"0.12\""));
+        assert!(!installation.contains("qubit-atomic"));
+        assert!(!installation.contains("qubit-lock ="));
+        assert!(!installation.contains("parking_lot ="));
+
+        let optional = h2_section(readme, optional)
+            .expect("README should have an optional integrations section");
+        assert!(optional.contains("qubit-atomic"));
+        assert!(optional.contains("qubit-lock"));
+        assert!(optional.contains("parking_lot = \"0.12\""));
     }
 }
 
@@ -162,17 +174,18 @@ fn test_manifest_uses_only_required_qubit_dependencies() {
     assert!(!lock.contains("path ="));
 }
 
-/// Verifies installation snippets opt into the parking-lot feature and name
-/// the manifest's qubit-lock version.
+/// Verifies optional integration snippets match manifest dependency versions.
 #[test]
 fn test_readmes_align_lock_feature_and_dependency_versions() {
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains(
             "qubit-dcl = { version = \"0.12\", features = [\"parking-lot\"] }"
         ));
-        assert!(readme.contains("qubit-lock = \"0.13\""));
         assert!(readme.contains("qubit-dcl = \"0.12\""));
-        assert!(readme.contains(
+    }
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(guide.contains("qubit-atomic = \"0.16\""));
+        assert!(guide.contains(
             "qubit-lock = { version = \"0.13\", default-features = false }"
         ));
     }
@@ -318,4 +331,22 @@ fn final_h2_headings(content: &str) -> [&str; 4] {
     headings[headings.len() - 4..]
         .try_into()
         .expect("README should contain at least four H2 headings")
+}
+
+/// Returns the content of a named level-two Markdown section.
+///
+/// # Parameters
+///
+/// * `content` - Markdown document contents.
+/// * `heading` - Heading text without the `## ` prefix.
+///
+/// # Returns
+///
+/// The section body up to the next level-two heading, or `None` when absent.
+fn h2_section<'a>(content: &'a str, heading: &str) -> Option<&'a str> {
+    let marker = format!("## {heading}\n");
+    let start = content.find(&marker)? + marker.len();
+    let remainder = &content[start..];
+    let end = remainder.find("\n## ").unwrap_or(remainder.len());
+    Some(&remainder[..end])
 }
