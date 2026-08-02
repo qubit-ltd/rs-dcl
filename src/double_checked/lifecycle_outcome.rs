@@ -15,6 +15,12 @@ use crate::double_checked::FinalizationOutcome;
 /// after preparation succeeded and locked execution did not complete
 /// successfully, so invalid task/finalization combinations are not
 /// representable.
+///
+/// # Type Parameters
+///
+/// * `R` - Value type returned by the guarded task.
+/// * `E` - Error type returned by the guarded task.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[derive(Debug)]
 #[must_use = "the lifecycle outcome must be inspected"]
 pub enum LifecycleOutcome<R, E, C> {

@@ -16,6 +16,8 @@ use crate::double_checked::{
 };
 
 /// Builder stage that requires prepare before finalizer selection.
+///
+/// The token and callback types are selected by [`Self::prepare`].
 #[doc(hidden)]
 #[must_use = "the predicate stage must be completed with prepare"]
 pub struct LifecyclePredicateBuilder {
@@ -43,6 +45,12 @@ impl LifecyclePredicateBuilder {
     /// # Parameters
     ///
     /// * `prepare` - Concurrently callable token-producing callback.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Per-invocation token type produced by the callback.
+    /// * `C` - Error type returned by the callback.
+    /// * `F` - Prepare callback type.
     ///
     /// # Returns
     ///

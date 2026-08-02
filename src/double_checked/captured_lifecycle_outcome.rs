@@ -13,6 +13,12 @@ use crate::double_checked::{
 };
 
 /// Describes lifecycle invocation outcomes when panic capture is enabled.
+///
+/// # Type Parameters
+///
+/// * `R` - Value type returned by the guarded task.
+/// * `E` - Error type returned by the guarded task.
+/// * `C` - Error type returned by lifecycle callbacks.
 #[derive(Debug)]
 #[must_use = "the captured lifecycle outcome must be inspected"]
 pub enum CapturedLifecycleOutcome<R, E, C> {

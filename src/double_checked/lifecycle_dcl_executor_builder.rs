@@ -34,6 +34,10 @@ impl LifecycleDclExecutorBuilder {
     ///
     /// * `predicate` - Thread-safe, zero-argument condition callback.
     ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Thread-safe predicate callback type.
+    ///
     /// # Returns
     ///
     /// A builder that accepts lifecycle preparation.
