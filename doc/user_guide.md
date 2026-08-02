@@ -34,30 +34,60 @@ An Acquire load paired with Release store is a common starting protocol for an
 atomic gate. The predicate must not acquire the coordination lock and should
 not block.
 
-`DclExecutor` performs this sequence:
+`DclExecutor` performs the following steps:
 
 ```text
-initial predicate
-  false -> ExecutionOutcome::ConditionNotMet
-  true  -> acquire caller-supplied lock
-             -> second predicate
-                  false -> ConditionNotMet
-                  true  -> task under the same guard
+if the initial predicate is false:
+    return ConditionNotMet without acquiring the lock
+
+acquire the lock supplied by the caller
+
+if the second predicate is false while holding the lock:
+    return ConditionNotMet without running the task
+
+run the task while holding the same lock guard
+
+if the task succeeds:
+    return Success
+otherwise:
+    return TaskFailed
 ```
 
 The first check is the fast path. The second check is the correctness step that
 closes the race between observing the gate and acquiring the lock. The executor
-owns neither the lock nor the business data.
+owns neither the lock nor the business data. Returning from either locked
+branch releases the guard through RAII.
 
 `LifecycleDclExecutor` adds one invocation-local token:
 
 ```text
-initial predicate -> prepare token -> lock -> second predicate -> task
-                                      -> release guard -> commit or rollback
+if the initial predicate is false:
+    return InitialConditionNotMet
+
+prepare an invocation-local token
+if preparation fails:
+    return PrepareFailed
+
+acquire the lock supplied by the caller
+
+if the second predicate is false while holding the lock:
+    release the lock guard
+    finalize the token through the rollback path
+    return SecondConditionNotMet with the rollback outcome
+
+run the task while holding the same lock guard
+release the lock guard
+
+if the task succeeds:
+    finalize the token through the commit path
+    return TaskSucceeded with the commit outcome
+otherwise:
+    finalize the token through the rollback path
+    return TaskFailed with the task error and rollback outcome
 ```
 
-Preparation happens before lock acquisition. Commit and rollback consume the
-token after the guard has been released.
+Preparation happens before lock acquisition. The configured commit or rollback
+callback, when present, consumes the token after the guard has been released.
 
 ## Installation and Optional Integrations
 
