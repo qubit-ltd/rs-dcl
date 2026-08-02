@@ -40,6 +40,10 @@ impl DclCore {
     ///
     /// * `predicate` - Lock-free condition checked twice.
     ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Thread-safe predicate callback type.
+    ///
     /// # Returns
     ///
     /// A core ready to be configured or built into an executor.
@@ -73,6 +77,10 @@ impl DclCore {
     ///
     /// The predicate result or panic metadata classified as
     /// [`PanicPhase::InitialConditionCheck`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Err`] when the predicate panics.
     #[inline]
     pub(crate) fn check_initial_catching(&self) -> Result<bool, PanicInfo> {
         catch_phase(PanicPhase::InitialConditionCheck, || self.check_initial())
@@ -85,6 +93,13 @@ impl DclCore {
     ///
     /// * `lock` - Lock used for the protected phase of this invocation.
     /// * `task` - Task to run only when the second check succeeds.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
+    /// * `F` - One-shot task callback type.
     ///
     /// # Returns
     ///
@@ -125,6 +140,11 @@ impl DclCore {
     /// # Returns
     ///
     /// The locked result or panic metadata with the most precise active phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Err`] when lock acquisition or release, the second predicate
+    /// check, or the task panics.
     pub(crate) fn execute_locked_catching<L, R, E, F>(
         &self,
         lock: &L,

@@ -15,6 +15,9 @@ use crate::double_checked::PanicInfo;
 ///
 /// Error and panic values are borrowed only for the duration of the rollback
 /// callback so the execution report can retain their original owned values.
+///
+/// The `'a` lifetime is the duration for which the rollback callback may
+/// inspect the borrowed error or panic metadata.
 #[derive(Debug)]
 pub enum RollbackCause<'a> {
     /// The second condition check failed after prepare completed.

@@ -54,6 +54,10 @@ impl DclExecutor {
     /// # Returns
     ///
     /// A reusable executor sharing the configured predicate across clones.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `F` - Thread-safe predicate callback type.
     #[inline]
     pub fn new<F>(predicate: F) -> Self
     where
@@ -102,13 +106,20 @@ impl DclExecutor {
     /// * `task` - One-shot task executed inside the lock after the second
     ///   check.
     ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
+    /// * `F` - One-shot task callback type.
+    ///
     /// # Returns
     ///
     /// A structured condition, task, or failure outcome.
     ///
     /// # Errors
     ///
-    /// A task error is preserved in [`ExecutionOutcome::TaskFailed`]. this
+    /// A task error is preserved in [`ExecutionOutcome::TaskFailed`]. This
     /// method does not collapse or transform it.
     ///
     /// # Panics
@@ -132,6 +143,7 @@ impl DclExecutor {
     /// write mode. With an exclusive mode, the task may update its captured
     /// gate directly; later or external conflicting updates must acquire the
     /// same underlying lock.
+    #[inline]
     pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> ExecutionOutcome<R, E>
     where
         L: Lock + ?Sized,
@@ -155,10 +167,23 @@ impl DclExecutor {
     /// * `task` - One-shot task executed inside the lock after the second
     ///   check.
     ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
+    /// * `F` - One-shot task callback type.
+    ///
     /// # Returns
     ///
     /// `Ok` with an execution outcome when no panic occurs, or `Err` with
     /// panic metadata when one is captured.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Err`] when the predicate, lock implementation, task, or lock
+    /// guard release panics. Task errors remain in
+    /// [`ExecutionOutcome::TaskFailed`].
     pub fn run_catching<L, R, E, F>(
         &self,
         lock: &L,

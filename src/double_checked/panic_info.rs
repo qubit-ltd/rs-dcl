@@ -25,6 +25,7 @@ use crate::double_checked::PanicPhase;
 /// [`Self::into_payload`] but are deliberately not formatted by `Debug`.
 /// Dropping this value discards any payload-destructor panic so a captured
 /// panic does not re-propagate while its structured outcome is disposed.
+#[must_use = "captured panic metadata must be inspected or resumed"]
 pub struct PanicInfo {
     /// Phase in which the panic was captured.
     phase: PanicPhase,
@@ -87,6 +88,11 @@ impl PanicInfo {
     /// # Returns
     ///
     /// The payload retained from `catch_unwind`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the payload has already been consumed. This is an internal
+    /// invariant because the method only borrows `self`.
     #[inline(always)]
     pub fn payload(&self) -> &(dyn Any + Send + 'static) {
         self.payload
@@ -99,6 +105,11 @@ impl PanicInfo {
     /// # Returns
     ///
     /// The owned payload suitable for `resume_unwind`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the payload has already been consumed. This is an internal
+    /// invariant because the method consumes `self` only once.
     #[inline(always)]
     pub fn into_payload(mut self) -> Box<dyn Any + Send + 'static> {
         self.payload
@@ -109,6 +120,10 @@ impl PanicInfo {
     /// Resumes panicking with the captured payload.
     ///
     /// This does not rebuild or adapt the payload.
+    ///
+    /// # Panics
+    ///
+    /// Always unwinds with the original captured payload.
     #[inline]
     pub fn resume_unwind(self) -> ! {
         resume_unwind(self.into_payload())
@@ -131,6 +146,10 @@ impl Drop for PanicInfo {
 impl fmt::Debug for PanicInfo {
     /// Formats the panic phase and optional string message without attempting
     /// to format an unknown payload type.
+    ///
+    /// # Errors
+    ///
+    /// Returns the formatter error if writing the debug representation fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("PanicInfo")
