@@ -28,6 +28,9 @@ Qubit DCL 不会让任意 boolean 自动具备线程安全性。使用前，应�
 | 业务数据 | 始终由应用拥有，由 task 捕获和更新。 |
 | Task | 仅在两次检查都通过后，才在 guard 下执行。 |
 
+对于 atomic gate，Acquire load 配对 Release store 是常见起点。predicate 不得获取
+协调锁，也不应阻塞。
+
 `DclExecutor` 执行以下流程：
 
 ```text
@@ -342,9 +345,12 @@ commit 结果、第二次条件拒绝及其 rollback 结果，以及 task failur
 结果。`FinalizationOutcome<C>` 为 `NotRequired`、`Succeeded` 或 `Failed(C)`。
 `RollbackCause` 告诉 rollback callback 执行是因条件拒绝、error 还是 panic 而失败。
 
-`run_catching` 和 `run_with_token_catching` 在 `PanicInfo` 中保留 panic 信息。
-`PanicPhase` 可定位首次检查、prepare、获取锁、第二次检查、task、释放锁、commit 或
-rollback 阶段。捕获模式还会分别报告终结步骤无需执行、成功、error 或 panic。
+`DclExecutor::run_catching` 在 `PanicInfo` 中保留 panic 信息。
+`LifecycleDclExecutor::run_catching` 和 `run_with_token_catching` 返回
+`CapturedLifecycleOutcome`，其中 commit 与 rollback 字段使用
+`CapturedFinalizationOutcome`。`PanicPhase` 可定位首次检查、prepare、获取锁、第二次
+检查、task、释放锁、commit 或 rollback 阶段。捕获模式还会分别报告终结步骤无需
+执行、成功、error 或 panic。
 
 panic 捕获依赖 unwinding。使用 `panic = "abort"` 时，进程会在返回 outcome 或执行
 基于 unwind 的 rollback 前退出。捕获 panic 不会撤销 task 副作用，也不能证明应用

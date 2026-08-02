@@ -30,6 +30,10 @@ Five pieces have different responsibilities:
 | Business data | Remains application-owned; the task captures and updates it. |
 | Task | Runs under the guard only when both checks pass. |
 
+An Acquire load paired with Release store is a common starting protocol for an
+atomic gate. The predicate must not acquire the coordination lock and should
+not block.
+
 `DclExecutor` performs this sequence:
 
 ```text
@@ -364,10 +368,13 @@ and task failure plus rollback result. `FinalizationOutcome<C>` is
 `NotRequired`, `Succeeded`, or `Failed(C)`. `RollbackCause` tells the rollback
 callback whether execution was rejected, returned an error, or panicked.
 
-`run_catching` and `run_with_token_catching` retain panic information in
-`PanicInfo`. `PanicPhase` identifies the initial check, prepare, lock
-acquisition, second check, task, lock release, commit, or rollback phase.
-Captured finalization separately reports not-required, success, error, or panic.
+`DclExecutor::run_catching` retains panic information in `PanicInfo`.
+`LifecycleDclExecutor::run_catching` and `run_with_token_catching` return
+`CapturedLifecycleOutcome`; its commit and rollback fields use
+`CapturedFinalizationOutcome`. `PanicPhase` identifies the initial check,
+prepare, lock acquisition, second check, task, lock release, commit, or rollback
+phase. Captured finalization separately reports not-required, success, error,
+or panic.
 
 Panic capture requires unwinding. With `panic = "abort"`, the process exits
 before an outcome or unwind-based rollback can be produced. Capturing a panic
