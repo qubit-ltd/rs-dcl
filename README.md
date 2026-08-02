@@ -7,118 +7,156 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Qubit DCL provides reusable double-checked-locking executors for Rust. It
-helps a concurrent application skip work that is already unnecessary without
-turning a synchronization protocol into ad-hoc, duplicated lock code. You
-provide an atomic or equivalently synchronized gate and choose the lock mode
-for each execution; the executor performs a lock-free check, rechecks under
-that mode, then runs the task only when both checks succeed.
+Qubit DCL provides reusable synchronous double-checked-lock executors for Rust
+applications that use an atomic or equivalently synchronized gate. It removes
+repeated check-lock-check-task code while keeping lock ownership, protected
+data, and memory-ordering decisions in the application.
+
+A typical use case is lazy initialization: many request handlers may observe
+that an expensive resource is still needed, but only the handler that passes
+the second check under an exclusive lock should initialize it.
 
 ## Installation
+
+Qubit DCL requires Rust 1.94 or later. The standard-library path uses the
+backend-neutral `qubit-lock` capability and the `qubit-atomic` gate wrapper:
+
+```toml
+[dependencies]
+qubit-dcl = "0.12"
+qubit-atomic = "0.16"
+qubit-lock = { version = "0.13", default-features = false }
+```
+
+The `parking-lot` backend is optional. Enable the matching feature in
+`qubit-dcl` and `qubit-lock` when the application uses
+`parking_lot` locks:
 
 ```toml
 [dependencies]
 qubit-dcl = { version = "0.12", features = ["parking-lot"] }
+qubit-atomic = "0.16"
 qubit-lock = "0.13"
 parking_lot = "0.12"
 ```
 
-Qubit DCL requires Rust 1.94 or later. Enable the optional `parking-lot`
-feature when using that backend. Applications using only standard-library locks
-need no DCL feature:
-
-```toml
-qubit-dcl = "0.12"
-qubit-lock = { version = "0.13", default-features = false }
-```
-
-Qubit DCL does not re-export `qubit_lock::Lock` or lock primitives owned by
-other crates. Declare `qubit-lock` and the selected lock backend directly.
+`qubit-atomic` is an application-level choice for the gate; Qubit DCL does not
+require it at runtime. `qubit-lock` is the lock capability used by the
+executor, and the application declares the concrete lock backend directly.
 
 ## Quick Start
 
-Assume several request handlers may initialize one expensive resource. The
-first handler closes an atomic gate while holding the mutex; later handlers
-observe the closed gate and return without attempting lock acquisition.
+This example uses `ArcAtomic<bool>` from `qubit-atomic` and the exclusive
+`write_lock()` adapter from `qubit-lock`:
 
 ```rust
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
-
-use parking_lot::Mutex;
+use qubit_atomic::ArcAtomic;
 use qubit_dcl::{DclExecutor, ExecutionOutcome};
+use qubit_lock::ReadWriteLock;
 
-let lock = Mutex::new(());
-let gate = Arc::new(AtomicBool::new(true));
+let gate = ArcAtomic::new(true);
+let rw_lock = std::sync::RwLock::new(());
+let write_mode = rw_lock.write_lock();
 let executor = DclExecutor::new({
-    let gate = Arc::clone(&gate);
-    move || gate.load(Ordering::Acquire)
+    let gate = gate.clone();
+    move || gate.load()
 });
 
-let outcome = executor.run(&lock, {
-    let gate = Arc::clone(&gate);
+let outcome = executor.run(&write_mode, {
+    let gate = gate.clone();
     move || {
-        // The task already holds this invocation's mutex.
-        gate.store(false, Ordering::Release);
-        Ok::<usize, io::Error>(42)
+        gate.store(false);
+        Ok::<usize, std::io::Error>(42)
     }
 });
 
 assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 assert!(matches!(
-    executor.run(&lock, || Ok::<(), io::Error>(())),
+    executor.run(&write_mode, || Ok::<(), std::io::Error>(())),
     ExecutionOutcome::ConditionNotMet
 ));
 ```
 
-The first `false` predicate result returns
-`ExecutionOutcome::ConditionNotMet` without calling any lock method. A task
-error is preserved as `ExecutionOutcome::TaskFailed(E)`.
+The first check is lock-free. The second check and task run under the same
+guard selected by `write_lock()`. Once the task closes the gate, later calls
+return `ExecutionOutcome::ConditionNotMet` before asking the lock for a guard.
+A task error remains available as `ExecutionOutcome::TaskFailed(error)`.
 
-## Why This Crate Exists
+## Two Execution Models
 
-Double-checked locking is simple to describe but easy to implement
-inconsistently: a fast path may acquire a lock accidentally, the second check
-may be omitted, or a shared read lock may be treated as an at-most-once
-mechanism. Qubit DCL makes the execution sequence explicit while keeping lock
-ownership and protected data in the calling application.
+`DclExecutor` is the small, reusable path. Construct it with
+`DclExecutor::new(predicate)`, pass a `qubit_lock::Lock` mode to each `run`
+call, and choose `run_catching` when a caller needs captured `PanicInfo`.
 
-The lock supplied to `run` is a coordination mode, not executor-owned state.
-This lets a reader and writer use the same executor with paired modes from one
-RWLock when their tasks follow the same gate protocol.
+`LifecycleDclExecutor` is for a per-invocation token that must be prepared
+before locking and finalized after the guard is released. Its typestate builder
+requires a predicate, a prepare callback, and a valid commit/rollback
+combination. Use `run_with_token` when the task must mutate the token; use
+`run` when it does not.
 
-## What It Provides
+The public result model includes:
 
-- `DclExecutor` for a reusable predicate, a caller-selected
-  `qubit_lock::Lock`, and structured `ExecutionOutcome` values. Construct it
-  directly with `DclExecutor::new(predicate)`; use
-  `ExecutionOutcome::into_result()` when `ConditionNotMet` should become
-  `Ok(None)` in a `Result<Option<R>, E>` pipeline.
-- `LifecycleDclExecutor` for workflows that prepare a
-  per-invocation token, then commit or roll it back after locked execution.
-- `LifecycleOutcome`, `FinalizationOutcome`, `RollbackCause`, `PanicInfo`,
-  and `PanicPhase` for inspecting every terminal lifecycle path.
-- `run` for panic propagation and `run_catching` for panic capture when callers
-  need explicit `PanicInfo`.
+- `ExecutionOutcome` for basic success, rejected conditions, and task errors.
+- `LifecycleOutcome` and `FinalizationOutcome` for successful and unsuccessful
+  lifecycle paths.
+- `RollbackCause` for the reason supplied to a rollback callback.
+- `CapturedLifecycleOutcome`, `CapturedFinalizationOutcome`, `PanicInfo`, and
+  `PanicPhase` for panic-aware lifecycle execution.
 
-It does not own a lock, expose protected data, cache task results, choose the
-application's memory ordering, or make a shared lock mode exclusive. A gate
-that changes protected state or requires at-most-once execution needs an
-exclusive lock mode or a separate uniqueness protocol.
+The complete workflows and result tables are in the
+[English User Guide](doc/user_guide.md) and
+[中文用户手册](doc/user_guide.zh_CN.md).
+
+## Why This Project Exists
+
+Double-checked locking is easy to describe and easy to duplicate incorrectly:
+a fast path may acquire a lock unnecessarily, the second check may be omitted,
+or a shared read lock may be mistaken for an at-most-once mechanism. Qubit DCL
+makes the execution order explicit:
+
+```text
+initial predicate -> lock selected by this call -> second predicate -> task
+```
+
+The executor owns neither the lock nor its protected data. A single executor
+can therefore be reused with compatible modes from one read-write lock, while
+the application retains control of the data captured by each task.
+
+## Contract and Limits
+
+- The predicate must read an atomic or equivalently synchronized gate. The
+  usual pairing is an Acquire load with Release stores; `ArcAtomic` supplies
+  those defaults.
+- The predicate must not acquire the same underlying lock and should not block.
+- `write_lock()` or another exclusive mode is required when the task changes
+  the gate or protected protocol, consumes work, or needs serialized execution.
+- `read_lock()` is valid only for a read-only task whose conflicting writers use
+  the paired write mode of the same underlying lock. Shared calls may overlap;
+  they do not provide at-most-once execution.
+- External code that changes the gate or protected state must coordinate through
+  the same underlying lock used by conflicting executor calls.
+- Qubit DCL does not own a lock, expose protected data, cache task results,
+  select the application's memory ordering, or turn a non-atomic predicate into
+  a synchronized one.
+
+## Related Qubit Crates
+
+- [rs-atomic](https://github.com/qubit-ltd/rs-atomic) provides convenient
+  atomic values and shared-owner wrappers such as `ArcAtomic<bool>` for gates.
+- [rs-lock](https://github.com/qubit-ltd/rs-lock) provides backend-neutral
+  synchronous lock capabilities, including `ReadWriteLock`, `read_lock()`, and
+  `write_lock()`.
+- [rs-dcl](https://github.com/qubit-ltd/rs-dcl) combines a synchronized gate
+  with a caller-selected lock mode and double-checked execution policy.
 
 ## Learn More
 
-- Read the full [User Guide](doc/user_guide.md) for the synchronization
-  contract, read/write coordination, lifecycle tokens, panic handling,
-  troubleshooting, and limitations.
+- Read the full [English User Guide](doc/user_guide.md).
 - 阅读[中文用户手册](doc/user_guide.zh_CN.md)。
 - Browse the [API reference](https://docs.rs/qubit-dcl).
 - 阅读[中文 README](README.zh_CN.md)。
+- See the related [rs-atomic](https://github.com/qubit-ltd/rs-atomic) and
+  [rs-lock](https://github.com/qubit-ltd/rs-lock) repositories.
 
 ## Testing
 
