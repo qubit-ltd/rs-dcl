@@ -21,7 +21,7 @@ fn test_readmes_document_final_public_api() {
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains("DclExecutor::new"));
         assert!(!readme.contains("let executor = DclExecutor::builder"));
-        assert!(readme.contains("executor.run(&lock"));
+        assert!(readme.contains("executor.run("));
         assert!(readme.contains("LifecycleDclExecutor"));
         assert!(readme.contains("doc/user_guide"));
         assert!(!readme.contains("ExecutionReport"));
@@ -86,12 +86,56 @@ fn test_readme_dependency_versions_match_package_version() {
     }
 }
 
-/// Verifies installation snippets declare the parking-lot backend used by the
-/// default examples.
+/// Verifies installation snippets identify parking-lot as an optional backend.
 #[test]
 fn test_readme_installation_snippets_declare_parking_lot() {
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains("parking_lot = \"0.12\""));
+        assert!(
+            readme.contains("optional")
+                || readme.contains("可选")
+                || readme.contains("opt-in")
+        );
+    }
+}
+
+/// Verifies README and user guides link the related Qubit crates.
+#[test]
+fn test_readmes_document_qubit_ecosystem_links() {
+    for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(document.contains("https://github.com/qubit-ltd/rs-atomic"));
+        assert!(document.contains("https://github.com/qubit-ltd/rs-lock"));
+        assert!(document.contains("https://github.com/qubit-ltd/rs-dcl"));
+    }
+}
+
+/// Verifies README examples use the documented atomic gate and lock adapter.
+#[test]
+fn test_readmes_document_atomic_and_lock_dependencies() {
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains("qubit-atomic = \"0.16\""));
+        assert!(readme.contains("qubit-lock = \"0.13\""));
+        assert!(readme.contains("ArcAtomic<bool>"));
+        assert!(readme.contains("write_lock()"));
+    }
+}
+
+/// Verifies both user guides cover every stable outcome and panic type.
+#[test]
+fn test_user_guides_cover_stable_outcome_and_panic_types() {
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        for symbol in [
+            "ExecutionOutcome",
+            "LifecycleOutcome",
+            "FinalizationOutcome",
+            "RollbackCause",
+            "CapturedLifecycleOutcome",
+            "CapturedFinalizationOutcome",
+            "PanicInfo",
+            "PanicPhase",
+        ] {
+            assert!(guide.contains(symbol), "missing {symbol}");
+        }
     }
 }
 
