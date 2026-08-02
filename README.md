@@ -105,15 +105,26 @@ cases it skips the expensive load.
 
 ## How It Works
 
-Each call follows the same order:
-
 ```text
-initial predicate -> acquire caller-supplied lock -> second predicate -> task
+if the initial predicate is false:
+    return ConditionNotMet without acquiring the lock
+
+acquire the lock supplied by the caller
+
+if the second predicate is false while holding the lock:
+    return ConditionNotMet without running the task
+
+run the task while holding the same lock guard
+
+if the task succeeds:
+    return Success
+otherwise:
+    return TaskFailed
 ```
 
-The initial predicate avoids lock acquisition when no work is needed. The
-second predicate closes the race between the first observation and acquiring
-the lock. The second check and task run under the same guard.
+The initial predicate avoids lock acquisition when no work is needed, while
+the second check closes the race between the first observation and acquiring
+the lock. Returning from either locked branch releases the guard through RAII.
 
 ## Choosing an Executor
 

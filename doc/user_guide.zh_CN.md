@@ -31,28 +31,59 @@ Qubit DCL 不会让任意 boolean 自动具备线程安全性。使用前，应�
 对于 atomic gate，Acquire load 配对 Release store 是常见起点。predicate 不得获取
 协调锁，也不应阻塞。
 
-`DclExecutor` 执行以下流程：
+`DclExecutor` 按以下步骤执行：
 
 ```text
-initial predicate
-  false -> ExecutionOutcome::ConditionNotMet
-  true  -> acquire caller-supplied lock
-             -> second predicate
-                  false -> ConditionNotMet
-                  true  -> task under the same guard
+如果第一次条件检查不通过：
+    直接返回 ConditionNotMet，不获取锁
+
+获取调用方传入的锁
+
+如果锁内的第二次条件检查不通过：
+    返回 ConditionNotMet，不执行 task
+
+在同一个锁保护范围内执行 task
+
+如果 task 成功：
+    返回 Success
+否则：
+    返回 TaskFailed
 ```
 
 第一次检查是 fast path；第二次检查负责关闭“观察 gate”与“成功获取锁”之间的竞争
-窗口。executor 不拥有锁或业务数据。
+窗口。executor 不拥有锁或业务数据。从任一锁内分支返回时，guard 都会按 RAII 自动
+释放。
 
 `LifecycleDclExecutor` 为每次调用增加一个独有 token：
 
 ```text
-initial predicate -> prepare token -> lock -> second predicate -> task
-                                      -> release guard -> commit or rollback
+如果第一次条件检查不通过：
+    返回 InitialConditionNotMet
+
+为本次调用准备独立的 token
+如果准备失败：
+    返回 PrepareFailed
+
+获取调用方传入的锁
+
+如果锁内的第二次条件检查不通过：
+    释放 lock guard
+    通过 rollback 终结路径处理 token
+    返回 SecondConditionNotMet，并携带 rollback 结果
+
+在同一个锁保护范围内执行 task
+释放 lock guard
+
+如果 task 成功：
+    通过 commit 终结路径处理 token
+    返回 TaskSucceeded，并携带 commit 结果
+否则：
+    通过 rollback 终结路径处理 token
+    返回 TaskFailed，并携带 task error 和 rollback 结果
 ```
 
-prepare 在获取锁前执行；commit 和 rollback 在 guard 释放后消费 token。
+prepare 在获取锁前执行；已配置的 commit 或 rollback callback（若存在）会在 guard
+释放后消费 token。
 
 ## 安装与可选集成
 
