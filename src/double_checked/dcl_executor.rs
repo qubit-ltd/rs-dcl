@@ -74,7 +74,10 @@ impl DclExecutor {
     /// every supplied acquisition mode and cannot determine whether `task` is
     /// read-only. When a shared mode is supplied, upholding the read-only
     /// contract is the caller's responsibility; Rust's type system does not
-    /// enforce it.
+    /// enforce it. Separate shared and exclusive entry-point names would not
+    /// strengthen that guarantee because the executor cannot inspect the
+    /// closure's effects; accepting [`Lock`] keeps the choice of acquisition
+    /// mode explicit without implying otherwise.
     ///
     /// A shared mode is valid when the task is read-only with respect to the
     /// protected protocol, every conflicting writer uses the paired exclusive

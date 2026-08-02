@@ -104,6 +104,10 @@ original task error; it is not converted into a library-wide error type.
 same control flow for shared and exclusive modes. This lets callers pass either
 the read or write mode from one RWLock. Rust cannot prove that the task closure
 is read-only, so a caller supplying a shared mode must uphold that contract.
+Separate `run_shared` and `run_exclusive` method names would not make this
+semantic distinction enforceable because neither method could inspect the
+closure's effects. The single `run` entry point therefore keeps lock-mode
+selection explicit without implying a guarantee that Rust cannot verify.
 
 Use an exclusive mode, such as a mutex or a write-mode adapter, when the task
 changes the gate or protected state, consumes work, initializes something only
