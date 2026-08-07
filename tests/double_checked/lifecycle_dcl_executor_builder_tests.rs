@@ -9,10 +9,8 @@
 
 use std::io;
 
-use qubit_dcl::{
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Verifies the lifecycle builder starts with predicate selection.
 #[test]

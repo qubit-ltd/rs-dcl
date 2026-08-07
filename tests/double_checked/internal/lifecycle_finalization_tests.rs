@@ -7,22 +7,14 @@
 // =============================================================================
 //! Behavior tests for lifecycle finalization branches.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use qubit_dcl::{
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Token that records when lifecycle finalization drops it.
 struct DropToken {

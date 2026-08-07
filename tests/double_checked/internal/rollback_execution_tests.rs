@@ -7,22 +7,14 @@
 // =============================================================================
 //! Behavior tests for lifecycle rollback execution state.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicBool,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
-use qubit_dcl::{
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Verifies a second condition failure maps to rollback after prepare
 /// completes.

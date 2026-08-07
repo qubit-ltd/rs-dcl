@@ -7,10 +7,8 @@
 // =============================================================================
 //! Lock test double whose guard panics when released.
 
-use qubit_lock::{
-    Lock,
-    TryLockError,
-};
+use qubit_lock::Lock;
+use qubit_lock::TryLockError;
 
 /// Lock that always acquires successfully and panics when its guard is dropped.
 pub struct PanickingReleaseLock;

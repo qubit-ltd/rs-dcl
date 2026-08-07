@@ -7,31 +7,20 @@
 // =============================================================================
 //! Tests for the basic double-checked lock executor.
 
-use std::{
-    io,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use crate::support::{
-    CountingLock,
-    NoopLock,
-    PanickingReleaseLock,
-};
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-    PanicPhase,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
+use qubit_dcl::PanicPhase;
+
+use crate::support::CountingLock;
+use crate::support::NoopLock;
+use crate::support::PanickingReleaseLock;
 
 mod parking_lot {
     pub use std::sync::Mutex;

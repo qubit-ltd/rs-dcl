@@ -9,12 +9,10 @@
 
 use std::sync::Arc;
 
-use crate::double_checked::{
-    LifecycleReadyBuilder,
-    PrepareCallback,
-    RollbackCallback,
-    internal::DclCore,
-};
+use crate::double_checked::LifecycleReadyBuilder;
+use crate::double_checked::PrepareCallback;
+use crate::double_checked::RollbackCallback;
+use crate::double_checked::internal::DclCore;
 
 /// Builder stage representing `no_commit` and requiring rollback.
 ///

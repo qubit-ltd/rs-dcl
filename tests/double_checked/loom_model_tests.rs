@@ -7,33 +7,22 @@
 // =============================================================================
 //! Loom models for DCL gate and lock interleavings.
 
-use std::{
-    io,
-    sync::TryLockError as StdTryLockError,
-};
+use std::io;
+use std::sync::TryLockError as StdTryLockError;
 
-use loom::{
-    model,
-    sync::{
-        Arc,
-        Mutex,
-        atomic::{
-            AtomicBool,
-            AtomicUsize,
-            Ordering,
-        },
-    },
-    thread,
-};
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-    LifecycleDclExecutor,
-};
-use qubit_lock::{
-    Lock,
-    TryLockError,
-};
+use loom::model;
+use loom::sync::Arc;
+use loom::sync::Mutex;
+use loom::sync::MutexGuard;
+use loom::sync::atomic::AtomicBool;
+use loom::sync::atomic::AtomicUsize;
+use loom::sync::atomic::Ordering;
+use loom::thread;
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_lock::Lock;
+use qubit_lock::TryLockError;
 
 /// Loom-aware lock implementation used only by model tests.
 #[derive(Clone)]
@@ -81,7 +70,7 @@ where
     T: Send,
 {
     type Guard<'a>
-        = loom::sync::MutexGuard<'a, T>
+        = MutexGuard<'a, T>
     where
         Self: 'a;
 

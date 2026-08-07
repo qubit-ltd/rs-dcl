@@ -9,10 +9,8 @@
 
 use std::io;
 
-use qubit_dcl::{
-    CapturedFinalizationOutcome,
-    CapturedLifecycleOutcome,
-};
+use qubit_dcl::CapturedFinalizationOutcome;
+use qubit_dcl::CapturedLifecycleOutcome;
 
 /// Verifies every non-panic captured lifecycle branch remains distinguishable.
 #[test]

@@ -7,15 +7,11 @@
 // =============================================================================
 //! Captured panic metadata for double-checked execution.
 
-use std::{
-    any::Any,
-    fmt,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-        resume_unwind,
-    },
-};
+use std::any::Any;
+use std::fmt;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::panic::resume_unwind;
 
 use crate::double_checked::PanicPhase;
 

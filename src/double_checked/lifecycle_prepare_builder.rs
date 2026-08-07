@@ -9,13 +9,11 @@
 
 use std::sync::Arc;
 
-use crate::double_checked::{
-    CommitCallback,
-    LifecycleCommitBuilder,
-    LifecycleRollbackBuilder,
-    PrepareCallback,
-    internal::DclCore,
-};
+use crate::double_checked::CommitCallback;
+use crate::double_checked::LifecycleCommitBuilder;
+use crate::double_checked::LifecycleRollbackBuilder;
+use crate::double_checked::PrepareCallback;
+use crate::double_checked::internal::DclCore;
 
 /// Builder stage requiring a successful-path finalizer choice.
 ///

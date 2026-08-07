@@ -7,21 +7,13 @@
 // =============================================================================
 //! Public regression tests for execution inside the acquired lock.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
 
 /// Verifies a failed locked check prevents task execution.
 #[test]

@@ -7,20 +7,14 @@
 // =============================================================================
 //! Lock test double that records every acquisition method call.
 
-use std::sync::{
-    Arc,
-    Mutex,
-    TryLockError as StdTryLockError,
-    atomic::{
-        AtomicUsize,
-        Ordering,
-    },
-};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::TryLockError as StdTryLockError;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use qubit_lock::{
-    Lock,
-    TryLockError,
-};
+use qubit_lock::Lock;
+use qubit_lock::TryLockError;
 
 use super::CountingGuard;
 

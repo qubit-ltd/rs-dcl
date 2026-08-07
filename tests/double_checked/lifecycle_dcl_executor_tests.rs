@@ -7,47 +7,35 @@
 // =============================================================================
 //! Tests for the lifecycle-aware DCL executor.
 
-use std::{
-    error::Error,
-    fmt,
-    io,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::{
-        Arc,
-        Barrier,
-        Mutex,
-        atomic::{
-            AtomicBool,
-            AtomicUsize,
-            Ordering,
-        },
-    },
-    thread,
-};
+use std::error::Error;
+use std::fmt;
+use std::io;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::thread;
 
 mod parking_lot {
     pub use std::sync::Mutex;
 }
 
-use parking_lot::Mutex as ParkingLotMutex;
-use qubit_dcl::{
-    CapturedFinalizationOutcome,
-    CapturedLifecycleOutcome,
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-    PanicPhase,
-    RollbackCause,
-};
+use qubit_dcl::CapturedFinalizationOutcome;
+use qubit_dcl::CapturedLifecycleOutcome;
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
+use qubit_dcl::PanicPhase;
+use qubit_dcl::RollbackCause;
 
-use crate::support::{
-    NoopLock,
-    PanicOnDrop,
-    PanickingReleaseLock,
-};
+use self::parking_lot::Mutex as ParkingLotMutex;
+use crate::support::NoopLock;
+use crate::support::PanicOnDrop;
+use crate::support::PanickingReleaseLock;
 
 /// Rollback error whose destructor panics to exercise panic-priority handling.
 #[derive(Debug)]

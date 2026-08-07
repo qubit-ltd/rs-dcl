@@ -7,10 +7,8 @@
 // =============================================================================
 //! Initial builder stage for the lifecycle DCL executor.
 
-use crate::double_checked::{
-    LifecyclePredicateBuilder,
-    internal::DclCore,
-};
+use crate::double_checked::LifecyclePredicateBuilder;
+use crate::double_checked::internal::DclCore;
 
 /// Builder stage that cannot proceed without a predicate.
 #[doc(hidden)]

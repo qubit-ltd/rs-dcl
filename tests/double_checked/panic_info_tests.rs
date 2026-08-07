@@ -7,19 +7,13 @@
 // =============================================================================
 //! Tests for captured panic metadata.
 
-use std::{
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-        panic_any,
-    },
-    sync::Mutex,
-};
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::panic::panic_any;
+use std::sync::Mutex;
 
-use qubit_dcl::{
-    DclExecutor,
-    PanicPhase,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::PanicPhase;
 
 /// Panic payload whose destructor panics to verify captured metadata disposal.
 struct PanicOnDrop;

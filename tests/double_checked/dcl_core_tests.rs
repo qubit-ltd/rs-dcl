@@ -7,21 +7,13 @@
 // =============================================================================
 //! Public regression tests for the internal DCL core.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
 
 mod parking_lot {
     pub use std::sync::Mutex;

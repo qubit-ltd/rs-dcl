@@ -7,13 +7,11 @@
 // =============================================================================
 //! Complete lifecycle builder stage.
 
-use crate::double_checked::{
-    CommitCallback,
-    LifecycleDclExecutor,
-    PrepareCallback,
-    RollbackCallback,
-    internal::DclCore,
-};
+use crate::double_checked::CommitCallback;
+use crate::double_checked::LifecycleDclExecutor;
+use crate::double_checked::PrepareCallback;
+use crate::double_checked::RollbackCallback;
+use crate::double_checked::internal::DclCore;
 
 /// Typestate-validated lifecycle builder ready to build.
 ///

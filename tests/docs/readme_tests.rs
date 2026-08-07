@@ -47,9 +47,10 @@ fn test_user_guides_document_gate_and_lock_contracts() {
 
     assert!(guide_en.contains("Acquire load paired with Release store"));
     assert!(guide_en.contains("must not acquire the coordination lock"));
-    assert!(
-        guide_en.contains("`qubit_lock::Lock` represents an acquisition mode")
-    );
+    assert!(guide_en.contains(concat!(
+        "`qubit_lock",
+        "::Lock` represents an acquisition mode"
+    )));
     assert!(guide_en.contains("`read_lock()` adapter is shared"));
     assert!(guide_en.contains("paired write mode"));
     assert!(guide_en.contains("does not require at-most-once task execution"));
@@ -60,7 +61,7 @@ fn test_user_guides_document_gate_and_lock_contracts() {
     assert!(guide_zh.contains("Acquire load 配对 Release store"));
     assert!(guide_zh.contains("predicate 不得获取"));
     assert!(guide_zh.contains("协调锁"));
-    assert!(guide_zh.contains("`qubit_lock::Lock` 表示获取模式"));
+    assert!(guide_zh.contains(concat!("`qubit_lock", "::Lock` 表示获取模式")));
     assert!(guide_zh.contains("`read_lock()` adapter 是共享的"));
     assert!(guide_zh.contains("配套 write mode"));
     assert!(guide_zh.contains("不要求 task 至多执行一次"));

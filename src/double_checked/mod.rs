@@ -32,12 +32,10 @@ pub use execution_outcome::ExecutionOutcome;
 pub use finalization_outcome::FinalizationOutcome;
 #[doc(hidden)]
 pub use lifecycle_commit_builder::LifecycleCommitBuilder;
+pub(crate) use lifecycle_dcl_executor::CommitCallback;
 pub use lifecycle_dcl_executor::LifecycleDclExecutor;
-pub(crate) use lifecycle_dcl_executor::{
-    CommitCallback,
-    PrepareCallback,
-    RollbackCallback,
-};
+pub(crate) use lifecycle_dcl_executor::PrepareCallback;
+pub(crate) use lifecycle_dcl_executor::RollbackCallback;
 #[doc(hidden)]
 pub use lifecycle_dcl_executor_builder::LifecycleDclExecutorBuilder;
 pub use lifecycle_outcome::LifecycleOutcome;

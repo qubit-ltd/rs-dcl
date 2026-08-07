@@ -7,30 +7,20 @@
 // =============================================================================
 //! Concurrency tests for atomic gates and shared executor locks.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        Barrier,
-        atomic::{
-            AtomicBool,
-            AtomicUsize,
-            Ordering,
-        },
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-};
-use qubit_lock::{
-    ReadWriteLock,
-    TryLockError,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
+use qubit_lock::ReadWriteLock;
+use qubit_lock::TryLockError;
 
 /// Verifies one executor can run read-only tasks under a shared mode and a
 /// write task over different data under the paired exclusive mode.

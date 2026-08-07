@@ -9,10 +9,8 @@
 
 use std::io;
 
-use qubit_dcl::{
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Verifies the predicate stage accepts lifecycle preparation.
 #[test]

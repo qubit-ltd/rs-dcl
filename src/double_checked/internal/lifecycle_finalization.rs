@@ -7,13 +7,11 @@
 // =============================================================================
 //! Private commit and rollback finalization policy.
 
-use crate::double_checked::{
-    CapturedFinalizationOutcome,
-    FinalizationOutcome,
-    PanicPhase,
-    RollbackCause,
-    internal::catch_phase,
-};
+use crate::double_checked::CapturedFinalizationOutcome;
+use crate::double_checked::FinalizationOutcome;
+use crate::double_checked::PanicPhase;
+use crate::double_checked::RollbackCause;
+use crate::double_checked::internal::catch_phase;
 
 /// Runs an optional commit callback or drops its token after successful work.
 ///
