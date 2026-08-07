@@ -10,12 +10,10 @@
 
 use std::error::Error;
 
-use crate::double_checked::{
-    CapturedFinalizationOutcome,
-    CapturedLifecycleOutcome,
-    PanicInfo,
-    RollbackCause,
-};
+use crate::double_checked::CapturedFinalizationOutcome;
+use crate::double_checked::CapturedLifecycleOutcome;
+use crate::double_checked::PanicInfo;
+use crate::double_checked::RollbackCause;
 
 /// Represents the locked execution state that requires lifecycle rollback when
 /// panic capture is enabled.

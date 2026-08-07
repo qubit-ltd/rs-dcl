@@ -7,10 +7,8 @@
 // =============================================================================
 //! Non-blocking lock test double for sequential executor coverage.
 
-use qubit_lock::{
-    Lock,
-    TryLockError,
-};
+use qubit_lock::Lock;
+use qubit_lock::TryLockError;
 
 /// Lock test double whose guard has no synchronization side effects.
 pub struct NoopLock;

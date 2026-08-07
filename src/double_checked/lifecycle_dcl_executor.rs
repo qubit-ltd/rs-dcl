@@ -7,36 +7,28 @@
 // =============================================================================
 //! Reusable lifecycle-aware double-checked lock executor.
 
-use std::{
-    error::Error,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::Arc,
-};
+use std::error::Error;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
 
 use qubit_lock::Lock;
 
-use crate::double_checked::{
-    CapturedLifecycleOutcome,
-    LifecycleDclExecutorBuilder,
-    LifecycleOutcome,
-    PanicInfo,
-    PanicPhase,
-    RollbackCause,
-    internal::{
-        CapturedRollbackExecution,
-        DclCore,
-        LockedExecution,
-        RollbackExecution,
-        catch_phase,
-        finalize_commit,
-        finalize_commit_catching,
-        finalize_rollback,
-        finalize_rollback_catching,
-    },
-};
+use crate::double_checked::CapturedLifecycleOutcome;
+use crate::double_checked::LifecycleDclExecutorBuilder;
+use crate::double_checked::LifecycleOutcome;
+use crate::double_checked::PanicInfo;
+use crate::double_checked::PanicPhase;
+use crate::double_checked::RollbackCause;
+use crate::double_checked::internal::CapturedRollbackExecution;
+use crate::double_checked::internal::DclCore;
+use crate::double_checked::internal::LockedExecution;
+use crate::double_checked::internal::RollbackExecution;
+use crate::double_checked::internal::catch_phase;
+use crate::double_checked::internal::finalize_commit;
+use crate::double_checked::internal::finalize_commit_catching;
+use crate::double_checked::internal::finalize_rollback;
+use crate::double_checked::internal::finalize_rollback_catching;
 
 /// Shared prepare callback type used by lifecycle executor clones.
 ///

@@ -7,10 +7,8 @@
 // =============================================================================
 //! Captured lifecycle outcomes for panic-aware invocations.
 
-use crate::double_checked::{
-    CapturedFinalizationOutcome,
-    PanicInfo,
-};
+use crate::double_checked::CapturedFinalizationOutcome;
+use crate::double_checked::PanicInfo;
 
 /// Describes lifecycle invocation outcomes when panic capture is enabled.
 ///

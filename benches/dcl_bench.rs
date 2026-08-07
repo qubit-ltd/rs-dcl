@@ -7,36 +7,26 @@
 // =============================================================================
 //! Benchmarks the downstream-style submission and shutdown state machine.
 
-use std::{
-    convert::Infallible,
-    hint::black_box,
-    sync::{
-        Arc,
-        Barrier,
-        Mutex,
-        atomic::{
-            AtomicU8,
-            AtomicUsize,
-            Ordering,
-        },
-    },
-    thread,
-    time::Duration,
-};
+use std::convert::Infallible;
+use std::hint::black_box;
+use std::sync::Arc;
+use std::sync::Barrier;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicU8;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::thread;
+use std::time::Duration;
 
-use criterion::{
-    BenchmarkGroup,
-    Criterion,
-    Throughput,
-    criterion_group,
-    criterion_main,
-    measurement::WallTime,
-};
+use criterion::BenchmarkGroup;
+use criterion::Criterion;
+use criterion::Throughput;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use criterion::measurement::WallTime;
 use parking_lot::Mutex as ParkingLotMutex;
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
 use qubit_lock::Lock;
 
 /// Executor accepts new work in this state.

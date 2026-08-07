@@ -7,18 +7,12 @@
 // =============================================================================
 //! Regression tests for call-scoped, data-independent locks.
 
-use std::{
-    convert::Infallible,
-    sync::{
-        Arc,
-        Mutex,
-    },
-};
+use std::convert::Infallible;
+use std::sync::Arc;
+use std::sync::Mutex;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
 
 /// Verifies one executor accepts a different generic lock on every call.
 #[test]

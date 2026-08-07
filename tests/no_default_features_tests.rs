@@ -7,18 +7,14 @@
 // =============================================================================
 //! Standard-library lock coverage for the minimal feature selection.
 
-use std::{
-    io,
-    sync::Mutex,
-};
+use std::io;
+use std::sync::Mutex;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Verifies both executors support standard-library mutexes without the
 /// optional parking-lot lock implementations.

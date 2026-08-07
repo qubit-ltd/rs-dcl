@@ -9,11 +9,9 @@
 
 use std::io;
 
-use qubit_dcl::{
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Verifies rollback configuration receives a failed task outcome.
 #[test]

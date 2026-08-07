@@ -7,10 +7,8 @@
 // =============================================================================
 //! Tests for structured rollback causes.
 
-use std::{
-    error::Error,
-    io,
-};
+use std::error::Error;
+use std::io;
 
 use qubit_dcl::RollbackCause;
 

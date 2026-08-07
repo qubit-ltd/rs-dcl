@@ -9,12 +9,10 @@
 
 use std::io;
 
-use qubit_dcl::{
-    CapturedFinalizationOutcome,
-    CapturedLifecycleOutcome,
-    LifecycleDclExecutor,
-    RollbackCause,
-};
+use qubit_dcl::CapturedFinalizationOutcome;
+use qubit_dcl::CapturedLifecycleOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::RollbackCause;
 
 /// Verifies a captured task error preserves both the error and rollback result.
 #[test]

@@ -7,25 +7,17 @@
 // =============================================================================
 //! Shared double-checked locking core.
 
-use std::{
-    cell::Cell,
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::Arc,
-};
+use std::cell::Cell;
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
 
 use qubit_lock::Lock;
 
-use crate::double_checked::{
-    PanicInfo,
-    PanicPhase,
-    internal::{
-        LockedExecution,
-        catch_phase,
-    },
-};
+use crate::double_checked::PanicInfo;
+use crate::double_checked::PanicPhase;
+use crate::double_checked::internal::LockedExecution;
+use crate::double_checked::internal::catch_phase;
 
 /// Owns the predicate shared by both public executors.
 pub(crate) struct DclCore {

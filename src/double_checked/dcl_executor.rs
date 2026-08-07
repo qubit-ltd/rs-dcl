@@ -9,11 +9,9 @@
 
 use qubit_lock::Lock;
 
-use crate::double_checked::{
-    ExecutionOutcome,
-    PanicInfo,
-    internal::DclCore,
-};
+use crate::double_checked::ExecutionOutcome;
+use crate::double_checked::PanicInfo;
+use crate::double_checked::internal::DclCore;
 
 /// Executes arbitrary tasks using the double-checked locking pattern.
 ///

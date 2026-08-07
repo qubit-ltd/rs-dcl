@@ -9,11 +9,9 @@
 
 use std::error::Error;
 
-use crate::double_checked::{
-    FinalizationOutcome,
-    LifecycleOutcome,
-    RollbackCause,
-};
+use crate::double_checked::FinalizationOutcome;
+use crate::double_checked::LifecycleOutcome;
+use crate::double_checked::RollbackCause;
 
 /// Represents the locked execution state that requires lifecycle rollback.
 ///

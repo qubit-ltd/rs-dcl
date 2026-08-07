@@ -7,24 +7,16 @@
 // =============================================================================
 //! Demonstrates basic and lifecycle-aware double-checked execution.
 
-use std::{
-    io,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicBool,
-            Ordering,
-        },
-    },
-};
+use std::io;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
-use qubit_dcl::{
-    DclExecutor,
-    ExecutionOutcome,
-    FinalizationOutcome,
-    LifecycleDclExecutor,
-    LifecycleOutcome,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::ExecutionOutcome;
+use qubit_dcl::FinalizationOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::LifecycleOutcome;
 
 /// Runs basic and lifecycle DCL examples using atomic gates.
 fn main() {

@@ -7,15 +7,11 @@
 // =============================================================================
 //! Shared panic capture helpers.
 
-use std::panic::{
-    AssertUnwindSafe,
-    catch_unwind,
-};
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
 
-use crate::double_checked::{
-    PanicInfo,
-    PanicPhase,
-};
+use crate::double_checked::PanicInfo;
+use crate::double_checked::PanicPhase;
 
 /// Executes an operation behind a panic boundary with a fixed phase.
 ///

@@ -9,11 +9,9 @@
 
 use std::sync::Arc;
 
-use crate::double_checked::{
-    LifecyclePrepareBuilder,
-    PrepareCallback,
-    internal::DclCore,
-};
+use crate::double_checked::LifecyclePrepareBuilder;
+use crate::double_checked::PrepareCallback;
+use crate::double_checked::internal::DclCore;
 
 /// Builder stage that requires prepare before finalizer selection.
 ///

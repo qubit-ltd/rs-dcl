@@ -9,10 +9,8 @@
 
 use std::sync::Mutex;
 
-use qubit_dcl::{
-    DclExecutor,
-    PanicPhase,
-};
+use qubit_dcl::DclExecutor;
+use qubit_dcl::PanicPhase;
 
 /// Verifies a captured task panic retains its phase and message.
 #[test]
