@@ -17,7 +17,7 @@ Qubit DCL 要求 Rust 1.94 或更高版本。使用标准库 gate 和 mutex 时�
 
 ```toml
 [dependencies]
-qubit-dcl = "0.12"
+qubit-dcl = "0.13"
 ```
 
 这条最小路径不需要 atomic 辅助库，也不要求应用直接依赖 `qubit-lock`。
@@ -155,7 +155,7 @@ assert_eq!(
 
   ```toml
   [dependencies]
-  qubit-dcl = { version = "0.12", features = ["parking-lot"] }
+  qubit-dcl = { version = "0.13", features = ["parking-lot"] }
   parking_lot = "0.12"
   ```
 
