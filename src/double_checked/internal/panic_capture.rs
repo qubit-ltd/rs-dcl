@@ -34,13 +34,9 @@ use crate::double_checked::PanicPhase;
 ///
 /// Returns [`Err`] when `operation` panics.
 #[inline]
-pub(crate) fn catch_phase<R, F>(
-    phase: PanicPhase,
-    operation: F,
-) -> Result<R, PanicInfo>
+pub(crate) fn catch_phase<R, F>(phase: PanicPhase, operation: F) -> Result<R, PanicInfo>
 where
     F: FnOnce() -> R,
 {
-    catch_unwind(AssertUnwindSafe(operation))
-        .map_err(|payload| PanicInfo::from_payload(phase, payload))
+    catch_unwind(AssertUnwindSafe(operation)).map_err(|payload| PanicInfo::from_payload(phase, payload))
 }

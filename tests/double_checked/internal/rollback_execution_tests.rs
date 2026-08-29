@@ -37,8 +37,7 @@ fn test_second_condition_failure_reports_not_required_rollback() {
         .no_rollback()
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

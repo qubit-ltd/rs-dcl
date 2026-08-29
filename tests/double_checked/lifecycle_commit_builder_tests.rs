@@ -22,8 +22,7 @@ fn test_commit_builder_selects_no_rollback() {
         .commit(|_| Ok::<(), io::Error>(()))
         .no_rollback()
         .build();
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

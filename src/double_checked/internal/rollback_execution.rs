@@ -62,17 +62,10 @@ where
     /// * `R` - Successful task result type.
     /// * `C` - Lifecycle callback error type.
     #[inline]
-    pub(crate) fn into_outcome<R, C>(
-        self,
-        rollback: FinalizationOutcome<C>,
-    ) -> LifecycleOutcome<R, E, C> {
+    pub(crate) fn into_outcome<R, C>(self, rollback: FinalizationOutcome<C>) -> LifecycleOutcome<R, E, C> {
         match self {
-            Self::ConditionNotMet => {
-                LifecycleOutcome::SecondConditionNotMet { rollback }
-            }
-            Self::TaskFailed(error) => {
-                LifecycleOutcome::TaskFailed { error, rollback }
-            }
+            Self::ConditionNotMet => LifecycleOutcome::SecondConditionNotMet { rollback },
+            Self::TaskFailed(error) => LifecycleOutcome::TaskFailed { error, rollback },
         }
     }
 }

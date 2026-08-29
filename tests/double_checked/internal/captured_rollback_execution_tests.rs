@@ -27,9 +27,7 @@ fn test_captured_task_failure_preserves_error_and_rollback() {
         })
         .build();
 
-    let outcome = executor.run_catching(&std::sync::Mutex::new(()), || {
-        Err::<(), _>(io::Error::other("task"))
-    });
+    let outcome = executor.run_catching(&std::sync::Mutex::new(()), || Err::<(), _>(io::Error::other("task")));
 
     assert!(matches!(
         outcome,

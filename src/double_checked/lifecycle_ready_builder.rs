@@ -73,11 +73,6 @@ impl<P, C> LifecycleReadyBuilder<P, C> {
     /// each invocation.
     #[inline]
     pub fn build(self) -> LifecycleDclExecutor<P, C> {
-        LifecycleDclExecutor::from_parts(
-            self.core,
-            self.prepare,
-            self.commit,
-            self.rollback,
-        )
+        LifecycleDclExecutor::from_parts(self.core, self.prepare, self.commit, self.rollback)
     }
 }

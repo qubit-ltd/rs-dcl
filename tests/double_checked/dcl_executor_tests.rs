@@ -34,8 +34,7 @@ type CoverageTask = fn() -> Result<(), io::Error>;
 fn test_new_accepts_predicate() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }
@@ -63,8 +62,7 @@ fn test_run_covers_propagating_and_catching_panic_paths() {
         ExecutionOutcome::ConditionNotMet
     ));
 
-    let catch_initial_panic =
-        DclExecutor::new(|| panic!("coverage initial panic"));
+    let catch_initial_panic = DclExecutor::new(|| panic!("coverage initial panic"));
     assert!(matches!(
         catch_initial_panic.run_catching(&lock, successful_task),
         Err(panic) if panic.phase() == PanicPhase::InitialConditionCheck
@@ -192,8 +190,7 @@ fn test_run_preserves_task_error() {
 fn test_run_catching_preserves_success() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, Ok(ExecutionOutcome::Success(7))));
 }
@@ -203,8 +200,7 @@ fn test_run_catching_preserves_success() {
 fn test_run_captures_initial_condition_panic() {
     let executor = DclExecutor::new(|| panic!("initial check"));
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -228,8 +224,7 @@ fn test_run_captures_second_condition_panic() {
         }
     });
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -243,8 +238,8 @@ fn test_run_captures_second_condition_panic() {
 fn test_run_captures_task_panic() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome: Result<ExecutionOutcome<(), io::Error>, _> = executor
-        .run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome: Result<ExecutionOutcome<(), io::Error>, _> =
+        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
@@ -318,8 +313,7 @@ fn test_run_captures_lock_acquisition_panic() {
 fn test_run_captures_lock_release_panic() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome = executor
-        .run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+    let outcome = executor.run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
 
     assert!(matches!(
         outcome,
@@ -334,10 +328,8 @@ fn test_run_propagates_task_panic_without_catching() {
     let executor = DclExecutor::new(|| true);
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: ExecutionOutcome<(), io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("uncaught task panic")
-            });
+        let _: ExecutionOutcome<(), io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("uncaught task panic"));
     }));
 
     assert!(panic_result.is_err());
@@ -349,8 +341,7 @@ fn test_clone_shares_configuration_without_owning_lock() {
     let executor = DclExecutor::new(|| true);
     let cloned = executor.clone();
 
-    let outcome =
-        cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }

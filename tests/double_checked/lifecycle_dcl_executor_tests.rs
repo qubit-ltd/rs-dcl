@@ -104,9 +104,7 @@ impl Drop for CoverageToken {
         match self.drop_behavior {
             CoverageTokenDrop::Quiet => {}
             CoverageTokenDrop::Panic => panic!("coverage token drop panic"),
-            CoverageTokenDrop::PanickingPayload => {
-                std::panic::panic_any(PanicOnDrop)
-            }
+            CoverageTokenDrop::PanickingPayload => std::panic::panic_any(PanicOnDrop),
         }
     }
 }
@@ -125,8 +123,7 @@ fn prepare_panicking_coverage_token() -> Result<CoverageToken, io::Error> {
 }
 
 /// Produces a token with a destructor that panics with a panicking payload.
-fn prepare_panicking_payload_coverage_token() -> Result<CoverageToken, io::Error>
-{
+fn prepare_panicking_payload_coverage_token() -> Result<CoverageToken, io::Error> {
     Ok(CoverageToken::panicking_payload())
 }
 
@@ -141,9 +138,7 @@ fn panic_coverage_prepare() -> Result<CoverageToken, io::Error> {
 }
 
 /// Completes successfully for the generic coverage matrix.
-fn successful_coverage_task(
-    _token: &mut CoverageToken,
-) -> Result<u32, io::Error> {
+fn successful_coverage_task(_token: &mut CoverageToken) -> Result<u32, io::Error> {
     Ok(42)
 }
 
@@ -153,21 +148,15 @@ fn failing_coverage_task(_token: &mut CoverageToken) -> Result<u32, io::Error> {
 }
 
 /// Panics for the generic coverage matrix.
-fn panicking_coverage_task(
-    _token: &mut CoverageToken,
-) -> Result<u32, io::Error> {
+fn panicking_coverage_task(_token: &mut CoverageToken) -> Result<u32, io::Error> {
     panic!("coverage task panic")
 }
 
 /// Verifies a propagating matrix invocation resumes its original task panic.
-fn assert_original_coverage_task_panic(
-    executor: &LifecycleDclExecutor<CoverageToken, io::Error>,
-    lock: &NoopLock,
-) {
+fn assert_original_coverage_task_panic(executor: &LifecycleDclExecutor<CoverageToken, io::Error>, lock: &NoopLock) {
     let task = panicking_coverage_task as CoverageTask;
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<u32, io::Error, io::Error> =
-            executor.run_with_token(lock, task);
+        let _: LifecycleOutcome<u32, io::Error, io::Error> = executor.run_with_token(lock, task);
     }));
 
     let payload = panic_result.expect_err("coverage task panic should resume");
@@ -306,9 +295,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
     let panicking_commit = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
-        .commit(|_| -> Result<(), io::Error> {
-            panic!("coverage commit panic")
-        })
+        .commit(|_| -> Result<(), io::Error> { panic!("coverage commit panic") })
         .no_rollback()
         .build();
     assert!(matches!(
@@ -323,9 +310,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
-        .rollback(|_, _| {
-            Err::<(), _>(io::Error::other("coverage rollback failed"))
-        })
+        .rollback(|_, _| Err::<(), _>(io::Error::other("coverage rollback failed")))
         .build();
     assert!(matches!(
         failing_rollback.run_with_token_catching(&lock, failing_task),
@@ -340,9 +325,7 @@ fn test_run_catching_covers_all_branches_with_one_task_type() {
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
-        .rollback(|_, _| -> Result<(), io::Error> {
-            panic!("coverage rollback panic")
-        })
+        .rollback(|_, _| -> Result<(), io::Error> { panic!("coverage rollback panic") })
         .build();
     assert!(matches!(
         panicking_rollback.run_with_token_catching(&lock, failing_task),
@@ -497,9 +480,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
-        .rollback(|_, _| {
-            Err::<(), _>(io::Error::other("coverage rollback failed"))
-        })
+        .rollback(|_, _| Err::<(), _>(io::Error::other("coverage rollback failed")))
         .build();
     assert!(matches!(
         failing_rollback.run_with_token(&lock, failing_task),
@@ -528,9 +509,7 @@ fn test_run_propagating_covers_all_branches_with_one_task_type() {
         .when(|| true)
         .prepare(prepare_quiet_coverage_token)
         .no_commit()
-        .rollback(|_, _| -> Result<(), io::Error> {
-            std::panic::panic_any(PanicOnDrop)
-        })
+        .rollback(|_, _| -> Result<(), io::Error> { std::panic::panic_any(PanicOnDrop) })
         .build();
     assert_original_coverage_task_panic(&panicking_rollback, &lock);
 
@@ -582,13 +561,9 @@ fn test_run_initial_false_does_not_prepare_or_finalize() {
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
-    assert!(matches!(
-        outcome,
-        CapturedLifecycleOutcome::InitialConditionNotMet
-    ));
+    assert!(matches!(outcome, CapturedLifecycleOutcome::InitialConditionNotMet));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
     assert_eq!(commit_calls.load(Ordering::Relaxed), 0);
     assert_eq!(rollback_calls.load(Ordering::Relaxed), 0);
@@ -611,8 +586,7 @@ fn test_run_prepare_error_does_not_rollback_without_token() {
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     match outcome {
         CapturedLifecycleOutcome::PrepareFailed(error) => {
@@ -640,8 +614,7 @@ fn test_run_captures_initial_predicate_panic_before_prepare() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -669,8 +642,7 @@ fn test_run_captures_prepare_panic_without_rollback() {
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -697,13 +669,9 @@ fn test_run_catching_initial_false_does_not_prepare() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
-    assert!(matches!(
-        outcome,
-        CapturedLifecycleOutcome::InitialConditionNotMet
-    ));
+    assert!(matches!(outcome, CapturedLifecycleOutcome::InitialConditionNotMet));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
 }
 
@@ -717,8 +685,7 @@ fn test_run_catching_prepare_error_preserves_lifecycle_error() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -750,12 +717,8 @@ fn test_run_second_false_rolls_back_after_unlock() {
             let rollback_obtained_lock = Arc::clone(&rollback_obtained_lock);
             move |token, cause| {
                 rolled_back_token.store(token, Ordering::Relaxed);
-                saw_condition_cause.store(
-                    matches!(cause, RollbackCause::ConditionNotMet),
-                    Ordering::Relaxed,
-                );
-                rollback_obtained_lock
-                    .store(lock.try_lock().is_ok(), Ordering::Relaxed);
+                saw_condition_cause.store(matches!(cause, RollbackCause::ConditionNotMet), Ordering::Relaxed);
+                rollback_obtained_lock.store(lock.try_lock().is_ok(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
@@ -792,17 +755,13 @@ fn test_run_catching_second_false_rolls_back() {
             let saw_condition_cause = Arc::clone(&saw_condition_cause);
             move |token, cause| {
                 rolled_back_token.store(token, Ordering::Relaxed);
-                saw_condition_cause.store(
-                    matches!(cause, RollbackCause::ConditionNotMet),
-                    Ordering::Relaxed,
-                );
+                saw_condition_cause.store(matches!(cause, RollbackCause::ConditionNotMet), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -841,15 +800,13 @@ fn test_run_captures_second_predicate_panic_then_rolls_back() {
                 };
                 *rollback_phase
                     .lock()
-                    .expect("rollback phase mutex should not be poisoned") =
-                    Some(panic.phase());
+                    .expect("rollback phase mutex should not be poisoned") = Some(panic.phase());
                 Ok::<(), io::Error>(())
             }
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -874,9 +831,7 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
     let lock = Arc::new(Mutex::new(()));
     let poison_lock = lock.clone();
     let poison_result = catch_unwind(AssertUnwindSafe(|| {
-        let _guard = poison_lock
-            .lock()
-            .expect("standard mutex should start unpoisoned");
+        let _guard = poison_lock.lock().expect("standard mutex should start unpoisoned");
         panic!("poison lifecycle lock");
     }));
     assert!(poison_result.is_err());
@@ -893,8 +848,7 @@ fn test_run_captures_poisoned_lock_acquisition_then_rolls_back() {
                 };
                 *rollback_phase
                     .lock()
-                    .expect("rollback phase mutex should not be poisoned") =
-                    Some(panic.phase());
+                    .expect("rollback phase mutex should not be poisoned") = Some(panic.phase());
                 Ok::<(), io::Error>(())
             }
         })
@@ -935,15 +889,13 @@ fn test_run_captures_lock_release_panic_then_rolls_back() {
                 };
                 *rollback_phase
                     .lock()
-                    .expect("rollback phase mutex should not be poisoned") =
-                    Some(panic.phase());
+                    .expect("rollback phase mutex should not be poisoned") = Some(panic.phase());
                 Ok::<(), io::Error>(())
             }
         })
         .build();
 
-    let outcome = executor
-        .run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
+    let outcome = executor.run_catching(&PanickingReleaseLock, || Ok::<u32, io::Error>(7));
 
     assert!(matches!(
         outcome,
@@ -976,8 +928,7 @@ fn test_run_success_commits_after_unlock() {
             let commit_obtained_lock = Arc::clone(&commit_obtained_lock);
             move |token| {
                 committed_token.store(token, Ordering::Relaxed);
-                commit_obtained_lock
-                    .store(lock.try_lock().is_ok(), Ordering::Relaxed);
+                commit_obtained_lock.store(lock.try_lock().is_ok(), Ordering::Relaxed);
                 Ok::<(), io::Error>(())
             }
         })
@@ -1017,8 +968,7 @@ fn test_run_task_error_rolls_back_with_original_error_view() {
                     .expect("rollback should see the original io::Error");
                 *rollback_message
                     .lock()
-                    .expect("rollback message mutex should not be poisoned") =
-                    Some(error.to_string());
+                    .expect("rollback message mutex should not be poisoned") = Some(error.to_string());
                 Ok::<(), io::Error>(())
             }
         })
@@ -1058,19 +1008,17 @@ fn test_run_with_token_commits_task_updates() {
             move |token| {
                 *committed_token
                     .lock()
-                    .expect("committed token mutex should not be poisoned") =
-                    Some(token);
+                    .expect("committed token mutex should not be poisoned") = Some(token);
                 Ok::<(), io::Error>(())
             }
         })
         .no_rollback()
         .build();
 
-    let outcome =
-        executor.run_with_token(&parking_lot::Mutex::new(()), |token| {
-            token.push("task");
-            Ok::<usize, io::Error>(token.len())
-        });
+    let outcome = executor.run_with_token(&parking_lot::Mutex::new(()), |token| {
+        token.push("task");
+        Ok::<usize, io::Error>(token.len())
+    });
 
     assert!(matches!(
         outcome,
@@ -1098,9 +1046,7 @@ fn test_run_commit_failure_preserves_success() {
         .no_rollback()
         .build();
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
-        Ok::<u32, io::Error>(42)
-    });
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     match outcome {
         CapturedLifecycleOutcome::TaskSucceeded {
@@ -1123,9 +1069,7 @@ fn test_run_captures_commit_panic_without_overwriting_success() {
         .no_rollback()
         .build();
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
-        Ok::<u32, io::Error>(42)
-    });
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
@@ -1148,9 +1092,7 @@ fn test_run_captures_token_drop_panic_without_commit() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || {
-        Ok::<u32, io::Error>(42)
-    });
+    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
@@ -1208,8 +1150,7 @@ fn test_clone_shares_lifecycle_callbacks() {
         .build();
     let cloned = executor.clone();
 
-    let outcome =
-        cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
@@ -1260,15 +1201,14 @@ fn test_run_captured_task_panic_rolls_back() {
                 };
                 *rollback_phase
                     .lock()
-                    .expect("rollback phase mutex should not be poisoned") =
-                    Some(panic.phase());
+                    .expect("rollback phase mutex should not be poisoned") = Some(panic.phase());
                 Ok::<(), io::Error>(())
             }
         })
         .build();
 
-    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> = executor
-        .run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> =
+        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
@@ -1295,8 +1235,8 @@ fn test_run_captured_task_and_rollback_panics_preserves_both() {
         .rollback(|_, _| panic!("rollback panic"))
         .build();
 
-    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> = executor
-        .run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
+    let outcome: CapturedLifecycleOutcome<(), io::Error, io::Error> =
+        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
@@ -1353,10 +1293,8 @@ fn test_run_uncaptured_task_panic_rolls_back_then_resumes_original() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1372,16 +1310,12 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
-        .rollback(|_, _| {
-            Err::<(), _>(io::Error::other("secondary rollback error"))
-        })
+        .rollback(|_, _| Err::<(), _>(io::Error::other("secondary rollback error")))
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1392,8 +1326,7 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
 /// the process while the original task panic is resumed.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
-    let test_binary = std::env::current_exe()
-        .expect("integration test binary path should be available");
+    let test_binary = std::env::current_exe().expect("integration test binary path should be available");
     let output = std::process::Command::new(test_binary)
         .arg("--exact")
         .arg("double_checked::lifecycle_dcl_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
@@ -1423,9 +1356,7 @@ fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
         let _: LifecycleOutcome<(), io::Error, PanicOnDropRollbackError> =
-            executor.run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1440,16 +1371,12 @@ fn test_run_uncaptured_task_panic_outranks_rollback_panic() {
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
-        .rollback(|_, _| -> Result<(), io::Error> {
-            panic!("secondary rollback panic")
-        })
+        .rollback(|_, _| -> Result<(), io::Error> { panic!("secondary rollback panic") })
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1464,16 +1391,12 @@ fn test_run_uncaptured_task_panic_outranks_panicking_rollback_payload_drop() {
         .when(|| true)
         .prepare(|| Ok::<(), io::Error>(()))
         .no_commit()
-        .rollback(|_, _| -> Result<(), io::Error> {
-            std::panic::panic_any(PanicOnDrop)
-        })
+        .rollback(|_, _| -> Result<(), io::Error> { std::panic::panic_any(PanicOnDrop) })
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1498,16 +1421,11 @@ fn test_run_uncaptured_initial_predicate_panic_propagates() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor
-            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
-    let payload =
-        panic_result.expect_err("initial predicate panic should propagate");
-    assert_eq!(
-        payload.downcast_ref::<&str>(),
-        Some(&"initial predicate panic")
-    );
+    let payload = panic_result.expect_err("initial predicate panic should propagate");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"initial predicate panic"));
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
 }
 
@@ -1530,8 +1448,7 @@ fn test_run_uncaptured_prepare_panic_propagates_without_rollback() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor
-            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
     let payload = panic_result.expect_err("prepare panic should propagate");
@@ -1551,8 +1468,7 @@ fn test_run_uncaptured_commit_panic_propagates() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _report = executor
-            .run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+        let _report = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
     }));
 
     let payload = panic_result.expect_err("commit panic should propagate");
@@ -1592,10 +1508,8 @@ fn test_run_uncaptured_task_panic_without_rollback_resumes_original() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1614,10 +1528,8 @@ fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
         .build();
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: LifecycleOutcome<(), io::Error, io::Error> = executor
-            .run(&parking_lot::Mutex::new(()), || {
-                panic!("original task panic")
-            });
+        let _: LifecycleOutcome<(), io::Error, io::Error> =
+            executor.run(&parking_lot::Mutex::new(()), || panic!("original task panic"));
     }));
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
@@ -1689,12 +1601,8 @@ fn test_run_concurrent_prepare_tokens_do_not_cross_calls() {
         let _report = handle.join().expect("worker should not panic");
     }
 
-    let committed = committed
-        .lock()
-        .expect("commit token mutex should not be poisoned");
-    let rolled_back = rolled_back
-        .lock()
-        .expect("rollback token mutex should not be poisoned");
+    let committed = committed.lock().expect("commit token mutex should not be poisoned");
+    let rolled_back = rolled_back.lock().expect("rollback token mutex should not be poisoned");
     assert_eq!(committed.len(), 1);
     assert_eq!(rolled_back.len(), 1);
     assert_ne!(committed[0], rolled_back[0]);

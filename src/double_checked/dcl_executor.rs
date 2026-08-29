@@ -182,11 +182,7 @@ impl DclExecutor {
     /// Returns [`Err`] when the predicate, lock implementation, task, or lock
     /// guard release panics. Task errors remain in
     /// [`ExecutionOutcome::TaskFailed`].
-    pub fn run_catching<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> Result<ExecutionOutcome<R, E>, PanicInfo>
+    pub fn run_catching<L, R, E, F>(&self, lock: &L, task: F) -> Result<ExecutionOutcome<R, E>, PanicInfo>
     where
         L: Lock + ?Sized,
         F: FnOnce() -> Result<R, E>,

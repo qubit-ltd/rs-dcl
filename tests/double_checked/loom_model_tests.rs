@@ -225,10 +225,8 @@ fn test_loom_prepare_tokens_do_not_cross_invocations() {
             })
         });
 
-        let _first_report =
-            first.join().expect("first loom worker should not panic");
-        let _second_report =
-            second.join().expect("second loom worker should not panic");
+        let _first_report = first.join().expect("first loom worker should not panic");
+        let _second_report = second.join().expect("second loom worker should not panic");
         let committed = committed_mask.load(Ordering::Relaxed);
         assert_eq!(committed, 0b11);
     });

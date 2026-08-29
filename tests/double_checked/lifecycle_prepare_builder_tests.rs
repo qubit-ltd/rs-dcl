@@ -22,8 +22,7 @@ fn test_prepare_builder_selects_no_commit() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

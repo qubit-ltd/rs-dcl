@@ -74,15 +74,9 @@ where
         rollback: CapturedFinalizationOutcome<C>,
     ) -> CapturedLifecycleOutcome<R, E, C> {
         match self {
-            Self::ConditionNotMet => {
-                CapturedLifecycleOutcome::SecondConditionNotMet { rollback }
-            }
-            Self::TaskFailed(error) => {
-                CapturedLifecycleOutcome::TaskFailed { error, rollback }
-            }
-            Self::Panicked(panic) => {
-                CapturedLifecycleOutcome::ExecutionPanicked { panic, rollback }
-            }
+            Self::ConditionNotMet => CapturedLifecycleOutcome::SecondConditionNotMet { rollback },
+            Self::TaskFailed(error) => CapturedLifecycleOutcome::TaskFailed { error, rollback },
+            Self::Panicked(panic) => CapturedLifecycleOutcome::ExecutionPanicked { panic, rollback },
         }
     }
 }

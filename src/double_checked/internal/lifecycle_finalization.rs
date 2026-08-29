@@ -33,10 +33,7 @@ use crate::double_checked::internal::catch_phase;
 /// # Panics
 ///
 /// Propagates a commit callback or token-drop panic.
-pub(crate) fn finalize_commit<P, C, F>(
-    commit: Option<&F>,
-    token: P,
-) -> FinalizationOutcome<C>
+pub(crate) fn finalize_commit<P, C, F>(commit: Option<&F>, token: P) -> FinalizationOutcome<C>
 where
     F: Fn(P) -> Result<(), C> + ?Sized,
 {
@@ -72,16 +69,12 @@ where
 /// # Panics
 ///
 /// Propagates a commit callback or token-drop panic when unwinding.
-pub(crate) fn finalize_commit_catching<P, C, F>(
-    commit: Option<&F>,
-    token: P,
-) -> CapturedFinalizationOutcome<C>
+pub(crate) fn finalize_commit_catching<P, C, F>(commit: Option<&F>, token: P) -> CapturedFinalizationOutcome<C>
 where
     F: Fn(P) -> Result<(), C> + ?Sized,
 {
     match commit {
-        Some(commit) => match catch_phase(PanicPhase::Commit, || commit(token))
-        {
+        Some(commit) => match catch_phase(PanicPhase::Commit, || commit(token)) {
             Ok(Ok(())) => CapturedFinalizationOutcome::Succeeded,
             Ok(Err(error)) => CapturedFinalizationOutcome::Failed(error),
             Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
@@ -166,13 +159,11 @@ where
     F: for<'a> Fn(P, RollbackCause<'a>) -> Result<(), C> + ?Sized,
 {
     match rollback {
-        Some(rollback) => {
-            match catch_phase(PanicPhase::Rollback, || rollback(token, cause)) {
-                Ok(Ok(())) => CapturedFinalizationOutcome::Succeeded,
-                Ok(Err(error)) => CapturedFinalizationOutcome::Failed(error),
-                Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
-            }
-        }
+        Some(rollback) => match catch_phase(PanicPhase::Rollback, || rollback(token, cause)) {
+            Ok(Ok(())) => CapturedFinalizationOutcome::Succeeded,
+            Ok(Err(error)) => CapturedFinalizationOutcome::Failed(error),
+            Err(panic) => CapturedFinalizationOutcome::Panicked(panic),
+        },
         None => match catch_phase(PanicPhase::Rollback, || drop(token)) {
             Ok(()) => CapturedFinalizationOutcome::NotRequired,
             Err(panic) => CapturedFinalizationOutcome::Panicked(panic),

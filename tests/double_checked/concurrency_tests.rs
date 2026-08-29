@@ -31,8 +31,7 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
     let gate = Arc::new(AtomicBool::new(true));
     let written_value = Arc::new(AtomicUsize::new(0));
     let (entered_sender, entered_receiver) = mpsc::channel();
-    let release =
-        Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
+    let release = Arc::new((parking_lot::Mutex::new(false), parking_lot::Condvar::new()));
     let lock = Arc::new(parking_lot::RwLock::new(()));
     let executor = Arc::new(DclExecutor::new({
         let gate = Arc::clone(&gate);
@@ -53,8 +52,7 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
                         .expect("reader entry receiver should remain alive");
                     let (released, release_changed) = &*release;
                     let mut released = released.lock();
-                    release_changed
-                        .wait_while(&mut released, |released| !*released);
+                    release_changed.wait_while(&mut released, |released| !*released);
                     Ok::<(), io::Error>(())
                 })
             })
@@ -62,15 +60,8 @@ fn test_read_lock_allows_concurrent_read_only_tasks_and_excludes_writer() {
         .collect::<Vec<_>>();
     drop(entered_sender);
 
-    let readers_overlapped = (0..READER_COUNT).all(|_| {
-        entered_receiver
-            .recv_timeout(Duration::from_secs(1))
-            .is_ok()
-    });
-    let writer_was_excluded = matches!(
-        ReadWriteLock::try_write(lock.as_ref()),
-        Err(TryLockError::WouldBlock),
-    );
+    let readers_overlapped = (0..READER_COUNT).all(|_| entered_receiver.recv_timeout(Duration::from_secs(1)).is_ok());
+    let writer_was_excluded = matches!(ReadWriteLock::try_write(lock.as_ref()), Err(TryLockError::WouldBlock),);
     {
         let (released, release_changed) = &*release;
         *released.lock() = true;

@@ -101,11 +101,7 @@ impl DclCore {
     ///
     /// Propagates lock, predicate, and task panics through the concrete lock
     /// implementation.
-    pub(crate) fn execute_locked<L, R, E, F>(
-        &self,
-        lock: &L,
-        task: F,
-    ) -> LockedExecution<R, E>
+    pub(crate) fn execute_locked<L, R, E, F>(&self, lock: &L, task: F) -> LockedExecution<R, E>
     where
         L: Lock + ?Sized,
         F: FnOnce() -> Result<R, E>,

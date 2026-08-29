@@ -17,9 +17,7 @@ use qubit_dcl::PanicPhase;
 fn test_panic_capture_retains_task_context() {
     let executor = DclExecutor::new(|| true);
     let panic = executor
-        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
-            panic!("captured")
-        })
+        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> { panic!("captured") })
         .unwrap_err();
 
     assert_eq!(panic.phase(), PanicPhase::Task);
