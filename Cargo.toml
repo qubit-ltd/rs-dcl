@@ -1,6 +1,6 @@
 [package]
 name = "qubit-dcl"
-version = "0.12.1"
+version = "0.13.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -33,7 +33,7 @@ default = []
 parking-lot = ["qubit-lock/parking-lot"]
 
 [dependencies]
-qubit-lock = { default-features = false, version = "0.13" }
+qubit-lock = { default-features = false, version = "0.14" }
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false }
