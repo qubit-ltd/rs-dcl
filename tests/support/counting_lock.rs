@@ -65,10 +65,7 @@ impl Lock for CountingLock {
     #[inline(always)]
     fn lock(&self) -> Self::Guard<'_> {
         self.record_call();
-        CountingGuard::new(
-            Mutex::lock(self.inner.as_ref())
-                .expect("counting lock mutex should not be poisoned"),
-        )
+        CountingGuard::new(Mutex::lock(self.inner.as_ref()).expect("counting lock mutex should not be poisoned"))
     }
 
     /// Records and delegates immediate acquisition.

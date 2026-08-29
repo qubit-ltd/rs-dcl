@@ -48,8 +48,7 @@ fn test_no_commit_drops_token_and_reports_not_required() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -71,8 +70,7 @@ fn test_catching_commit_error_reports_failure() {
         .no_rollback()
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
@@ -102,8 +100,7 @@ fn test_catching_no_commit_drops_token_and_reports_not_required() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

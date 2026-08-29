@@ -23,8 +23,7 @@ fn test_builder_full_lifecycle_combination() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(
         outcome,
@@ -46,9 +45,7 @@ fn test_builder_commit_without_rollback_combination() {
         .no_rollback()
         .build();
 
-    let outcome = executor.run(&std::sync::Mutex::new(()), || {
-        Err::<(), _>(io::Error::other("task"))
-    });
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Err::<(), _>(io::Error::other("task")));
 
     assert!(matches!(
         outcome,
@@ -70,8 +67,7 @@ fn test_builder_rollback_without_commit_combination() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(
         outcome,

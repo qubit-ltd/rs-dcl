@@ -36,21 +36,12 @@ fn test_readmes_document_final_public_api() {
 /// Verifies both user guides state the non-negotiable gate and lock contracts.
 #[test]
 fn test_user_guides_document_gate_and_lock_contracts() {
-    let guide_en = USER_GUIDE_EN
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
-    let guide_zh = USER_GUIDE_ZH
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let guide_en = USER_GUIDE_EN.split_whitespace().collect::<Vec<_>>().join(" ");
+    let guide_zh = USER_GUIDE_ZH.split_whitespace().collect::<Vec<_>>().join(" ");
 
     assert!(guide_en.contains("Acquire load paired with Release store"));
     assert!(guide_en.contains("must not acquire the coordination lock"));
-    assert!(guide_en.contains(concat!(
-        "`qubit_lock",
-        "::Lock` represents an acquisition mode"
-    )));
+    assert!(guide_en.contains(concat!("`qubit_lock", "::Lock` represents an acquisition mode")));
     assert!(guide_en.contains("`read_lock()` adapter is shared"));
     assert!(guide_en.contains("paired write mode"));
     assert!(guide_en.contains("does not require at-most-once task execution"));
@@ -74,14 +65,12 @@ fn test_user_guides_document_gate_and_lock_contracts() {
 /// version.
 #[test]
 fn test_readme_dependency_versions_match_package_version() {
-    let package_version = extract_package_version(CARGO_TOML)
-        .expect("Cargo.toml should contain a package version");
-    let expected = major_minor(package_version)
-        .expect("package version should contain major and minor components");
+    let package_version = extract_package_version(CARGO_TOML).expect("Cargo.toml should contain a package version");
+    let expected = major_minor(package_version).expect("package version should contain major and minor components");
 
     for readme in [README_EN, README_ZH] {
-        let dependency_version = extract_dependency_version(readme)
-            .expect("README should contain a qubit-dcl dependency snippet");
+        let dependency_version =
+            extract_dependency_version(readme).expect("README should contain a qubit-dcl dependency snippet");
         assert_eq!(dependency_version, expected);
     }
 }
@@ -89,10 +78,9 @@ fn test_readme_dependency_versions_match_package_version() {
 /// Verifies installation snippets identify parking-lot as an optional backend.
 #[test]
 fn test_readme_installation_snippets_declare_parking_lot() {
-    let optional_en = h2_section(README_EN, "Optional Integrations")
-        .expect("English README should have optional integrations");
-    let optional_zh = h2_section(README_ZH, "可选集成")
-        .expect("Chinese README should have optional integrations");
+    let optional_en =
+        h2_section(README_EN, "Optional Integrations").expect("English README should have optional integrations");
+    let optional_zh = h2_section(README_ZH, "可选集成").expect("Chinese README should have optional integrations");
 
     assert!(optional_en.contains("parking_lot = \"0.12\""));
     assert!(optional_zh.contains("parking_lot = \"0.12\""));
@@ -118,15 +106,13 @@ fn test_readmes_separate_minimal_and_optional_dependencies() {
         (README_EN, "Installation", "Optional Integrations"),
         (README_ZH, "安装", "可选集成"),
     ] {
-        let installation = h2_section(readme, installation)
-            .expect("README should have an installation section");
+        let installation = h2_section(readme, installation).expect("README should have an installation section");
         assert!(installation.contains("qubit-dcl = \"0.12\""));
         assert!(!installation.contains("qubit-atomic"));
         assert!(!installation.contains("qubit-lock ="));
         assert!(!installation.contains("parking_lot ="));
 
-        let optional = h2_section(readme, optional)
-            .expect("README should have an optional integrations section");
+        let optional = h2_section(readme, optional).expect("README should have an optional integrations section");
         assert!(optional.contains("qubit-atomic"));
         assert!(optional.contains("qubit-lock"));
         assert!(optional.contains("parking_lot = \"0.12\""));
@@ -157,8 +143,7 @@ fn test_user_guides_cover_stable_outcome_and_panic_types() {
 fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
     assert!(CARGO_TOML.contains("[features]\ndefault = []"));
     assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
-    let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock")
-        .expect("Cargo.toml should declare qubit-lock");
+    let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
     assert!(dependency.contains("default-features = false"));
     assert!(dependency.contains("version = \"0.13\""));
     assert!(!dependency.contains("path ="));
@@ -169,8 +154,7 @@ fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
 fn test_manifest_uses_only_required_qubit_dependencies() {
     assert!(find_dependency_spec(CARGO_TOML, "qubit-function").is_none());
 
-    let lock = find_dependency_spec(CARGO_TOML, "qubit-lock")
-        .expect("Cargo.toml should declare qubit-lock");
+    let lock = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
     assert!(lock.contains("version = \"0.13\""));
     assert!(!lock.contains("path ="));
 }
@@ -179,16 +163,12 @@ fn test_manifest_uses_only_required_qubit_dependencies() {
 #[test]
 fn test_readmes_align_lock_feature_and_dependency_versions() {
     for readme in [README_EN, README_ZH] {
-        assert!(readme.contains(
-            "qubit-dcl = { version = \"0.12\", features = [\"parking-lot\"] }"
-        ));
+        assert!(readme.contains("qubit-dcl = { version = \"0.12\", features = [\"parking-lot\"] }"));
         assert!(readme.contains("qubit-dcl = \"0.12\""));
     }
     for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(guide.contains("qubit-atomic = \"0.16\""));
-        assert!(guide.contains(
-            "qubit-lock = { version = \"0.13\", default-features = false }"
-        ));
+        assert!(guide.contains("qubit-lock = { version = \"0.13\", default-features = false }"));
     }
 }
 
@@ -199,10 +179,7 @@ fn test_feature_matrix_covers_minimal_and_parking_lot_backends() {
     assert!(FEATURE_MATRIX.contains("\"name\": \"base-locks\""));
     assert!(FEATURE_MATRIX.contains("\"defaultFeatures\": false"));
     assert!(FEATURE_MATRIX.contains("\"name\": \"parking-lot-locks\""));
-    assert!(
-        FEATURE_MATRIX
-            .contains("\"features\": [\n        \"parking-lot\"\n      ]")
-    );
+    assert!(FEATURE_MATRIX.contains("\"features\": [\n        \"parking-lot\"\n      ]"));
     assert!(FEATURE_MATRIX.contains("\"name\": \"all-features\""));
     assert!(FEATURE_MATRIX.contains("\"allFeatures\": true"));
 }
@@ -240,10 +217,7 @@ fn test_readmes_end_with_required_sections() {
         final_h2_headings(README_EN),
         ["Testing", "License", "Contributing", "Author"]
     );
-    assert_eq!(
-        final_h2_headings(README_ZH),
-        ["测试", "许可证", "贡献", "作者"]
-    );
+    assert_eq!(final_h2_headings(README_ZH), ["测试", "许可证", "贡献", "作者"]);
 }
 
 /// Extracts the package version from the `[package]` table.
@@ -272,10 +246,7 @@ fn extract_package_version(content: &str) -> Option<&str> {
 ///
 /// The right-hand side of the matching dependency declaration, or `None` when
 /// the package is absent.
-fn find_dependency_spec<'a>(
-    content: &'a str,
-    package: &str,
-) -> Option<&'a str> {
+fn find_dependency_spec<'a>(content: &'a str, package: &str) -> Option<&'a str> {
     content
         .lines()
         .find_map(|line| line.strip_prefix(package)?.strip_prefix(" = "))
@@ -291,11 +262,9 @@ fn find_dependency_spec<'a>(
 ///
 /// The quoted dependency version, or `None` when absent.
 fn extract_dependency_version(content: &str) -> Option<&str> {
-    content.lines().find_map(|line| {
-        line.trim()
-            .strip_prefix("qubit-dcl = \"")?
-            .strip_suffix('"')
-    })
+    content
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("qubit-dcl = \"")?.strip_suffix('"'))
 }
 
 /// Returns the `major.minor` prefix of a dotted version.

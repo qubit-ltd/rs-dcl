@@ -50,16 +50,8 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     ///
     /// A builder requiring a rollback choice.
     #[inline]
-    pub(crate) fn new(
-        core: DclCore,
-        prepare: PrepareCallback<P, C>,
-        commit: CommitCallback<P, C>,
-    ) -> Self {
-        Self {
-            core,
-            prepare,
-            commit,
-        }
+    pub(crate) fn new(core: DclCore, prepare: PrepareCallback<P, C>, commit: CommitCallback<P, C>) -> Self {
+        Self { core, prepare, commit }
     }
 
     /// Sets the unsuccessful-path token consumer.
@@ -100,18 +92,10 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     #[inline]
     pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<P, C>
     where
-        F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C>
-            + Send
-            + Sync
-            + 'static,
+        F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C> + Send + Sync + 'static,
     {
         let rollback: RollbackCallback<P, C> = Arc::new(rollback);
-        LifecycleReadyBuilder::new(
-            self.core,
-            self.prepare,
-            Some(self.commit),
-            Some(rollback),
-        )
+        LifecycleReadyBuilder::new(self.core, self.prepare, Some(self.commit), Some(rollback))
     }
 
     /// Declares that unsuccessful invocations do not require rollback.
@@ -121,11 +105,6 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     /// A complete builder ready to build.
     #[inline]
     pub fn no_rollback(self) -> LifecycleReadyBuilder<P, C> {
-        LifecycleReadyBuilder::new(
-            self.core,
-            self.prepare,
-            Some(self.commit),
-            None,
-        )
+        LifecycleReadyBuilder::new(self.core, self.prepare, Some(self.commit), None)
     }
 }

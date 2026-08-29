@@ -53,9 +53,7 @@ fn test_panic_info_preserves_string_payload() {
 fn test_panic_info_preserves_non_string_payload_without_message() {
     let executor = DclExecutor::new(|| true);
     let panic = executor
-        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> {
-            panic_any(123_u32)
-        })
+        .run_catching(&Mutex::new(()), || -> Result<(), std::io::Error> { panic_any(123_u32) })
         .unwrap_err();
     assert_eq!(panic.message(), None);
     assert_eq!(panic.payload().downcast_ref::<u32>(), Some(&123));
@@ -78,8 +76,5 @@ fn test_panic_info_drop_discards_panicking_payload() {
         drop(panic);
     }));
 
-    assert!(
-        drop_result.is_ok(),
-        "dropping captured panic metadata must not panic"
-    );
+    assert!(drop_result.is_ok(), "dropping captured panic metadata must not panic");
 }

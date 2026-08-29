@@ -22,8 +22,7 @@ use qubit_dcl::LifecycleOutcome;
 fn test_standard_mutexes_work_without_parking_lot_feature() {
     let basic_lock = Mutex::new(());
     let basic_executor = DclExecutor::new(|| true);
-    let basic_outcome =
-        basic_executor.run(&basic_lock, || Ok::<usize, io::Error>(7));
+    let basic_outcome = basic_executor.run(&basic_lock, || Ok::<usize, io::Error>(7));
     assert!(matches!(basic_outcome, ExecutionOutcome::Success(7)));
 
     let lifecycle_lock = Mutex::new(());
@@ -33,8 +32,7 @@ fn test_standard_mutexes_work_without_parking_lot_feature() {
         .commit(|_| Ok::<(), io::Error>(()))
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let lifecycle_outcome =
-        lifecycle_executor.run(&lifecycle_lock, || Ok::<usize, io::Error>(11));
+    let lifecycle_outcome = lifecycle_executor.run(&lifecycle_lock, || Ok::<usize, io::Error>(11));
     assert!(matches!(
         lifecycle_outcome,
         LifecycleOutcome::TaskSucceeded {

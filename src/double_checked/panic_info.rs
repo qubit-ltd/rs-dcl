@@ -43,10 +43,7 @@ impl PanicInfo {
     ///
     /// Panic metadata that retains ownership of `payload`.
     #[inline]
-    pub(crate) fn from_payload(
-        phase: PanicPhase,
-        payload: Box<dyn Any + Send + 'static>,
-    ) -> Self {
+    pub(crate) fn from_payload(phase: PanicPhase, payload: Box<dyn Any + Send + 'static>) -> Self {
         let message = payload
             .downcast_ref::<&str>()
             .map(|message| (*message).to_owned())

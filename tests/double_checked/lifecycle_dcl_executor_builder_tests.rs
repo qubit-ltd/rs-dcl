@@ -21,8 +21,7 @@ fn test_lifecycle_builder_accepts_predicate() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome =
-        executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(outcome, LifecycleOutcome::InitialConditionNotMet));
 }
