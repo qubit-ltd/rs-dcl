@@ -3,7 +3,7 @@
 [English](user_guide.md) · [中文 README](../README.zh_CN.md) ·
 [API 文档](https://docs.rs/qubit-dcl)
 
-本手册适用于 qubit-dcl 0.12 和 Rust 1.94 或更高版本，面向需要在并发竞争下复用
+本手册适用于 qubit-dcl 0.13 和 Rust 1.94 或更高版本，面向需要在并发竞争下复用
 同步条件执行策略的 Rust 开发者，也涵盖带 prepare、commit 和 rollback 生命周期的
 工作。
 
@@ -91,7 +91,7 @@ prepare 在获取锁前执行；已配置的 commit 或 rollback callback（若�
 
 ```toml
 [dependencies]
-qubit-dcl = "0.12"
+qubit-dcl = "0.13"
 ```
 
 这已经足够配合标准库 `AtomicBool` 和 `Mutex` 使用。只有应用实际调用额外库的 API 时，
@@ -101,12 +101,12 @@ qubit-dcl = "0.12"
   使用该 gate wrapper。
 - 应用代码直接调用 `ReadWriteLock::read_lock()`、`write_lock()` 或其他
   `qubit-lock` capability 时，添加
-  `qubit-lock = { version = "0.13", default-features = false }`。
+  `qubit-lock = { version = "0.14", default-features = false }`。
 - 直接使用 `parking_lot` 锁类型时，才添加后端并启用匹配 feature：
 
   ```toml
   [dependencies]
-  qubit-dcl = { version = "0.12", features = ["parking-lot"] }
+  qubit-dcl = { version = "0.13", features = ["parking-lot"] }
   parking_lot = "0.12"
   ```
 

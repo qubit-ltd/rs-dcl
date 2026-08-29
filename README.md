@@ -19,7 +19,7 @@ only the following application dependency:
 
 ```toml
 [dependencies]
-qubit-dcl = "0.12"
+qubit-dcl = "0.13"
 ```
 
 No atomic helper crate or direct `qubit-lock` dependency is required for this
@@ -169,7 +169,7 @@ The minimal example above needs none of these additions:
 
   ```toml
   [dependencies]
-  qubit-dcl = { version = "0.12", features = ["parking-lot"] }
+  qubit-dcl = { version = "0.13", features = ["parking-lot"] }
   parking_lot = "0.12"
   ```
 

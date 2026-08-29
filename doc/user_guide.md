@@ -3,7 +3,7 @@
 [中文](user_guide.zh_CN.md) · [README](../README.md) ·
 [API reference](https://docs.rs/qubit-dcl)
 
-This guide applies to qubit-dcl 0.12 and Rust 1.94 or later. It is for Rust
+This guide applies to qubit-dcl 0.13 and Rust 1.94 or later. It is for Rust
 developers who need a reusable synchronous policy for conditional work under
 contention, including work with a prepare/commit/rollback lifecycle.
 
@@ -95,7 +95,7 @@ The minimum application dependency is:
 
 ```toml
 [dependencies]
-qubit-dcl = "0.12"
+qubit-dcl = "0.13"
 ```
 
 This is enough for standard-library `AtomicBool` and `Mutex`. Add another crate
@@ -103,14 +103,14 @@ only when the application uses its API:
 
 - Add `qubit-atomic = "0.16"` when conveniences such as `ArcAtomic<bool>` are
   useful. Qubit DCL does not require that gate wrapper.
-- Add `qubit-lock = { version = "0.13", default-features = false }` when
+- Add `qubit-lock = { version = "0.14", default-features = false }` when
   application code directly calls `ReadWriteLock::read_lock()`, `write_lock()`,
   or another `qubit-lock` capability.
 - Add a `parking_lot` backend only when using its lock types directly:
 
   ```toml
   [dependencies]
-  qubit-dcl = { version = "0.12", features = ["parking-lot"] }
+  qubit-dcl = { version = "0.13", features = ["parking-lot"] }
   parking_lot = "0.12"
   ```
 
