@@ -8,7 +8,7 @@
 //! README contract and version consistency tests for qubit-dcl.
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
-const FEATURE_MATRIX: &str = include_str!("../../.rs-ci-cargo-matrix.json");
+const FEATURE_MATRIX: &str = include_str!("../../.infra/ci/cargo-matrix.json");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
