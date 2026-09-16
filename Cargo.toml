@@ -36,9 +36,9 @@ parking-lot = ["qubit-lock/parking-lot"]
 qubit-lock = { default-features = false, version = "0.14" }
 
 [dev-dependencies]
-criterion = { version = "0.8", default-features = false }
-loom = "0.7"
-parking_lot = "0.12"
+criterion = { version = "^0.8", default-features = false }
+loom = "^0.7"
+parking_lot = "^0.12"
 
 [[bench]]
 name = "dcl_bench"
