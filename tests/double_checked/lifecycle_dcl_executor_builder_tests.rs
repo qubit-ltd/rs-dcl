@@ -8,6 +8,7 @@
 //! Tests for the initial lifecycle builder stage.
 
 use std::io;
+use std::sync::Mutex;
 
 use qubit_dcl::LifecycleDclExecutor;
 use qubit_dcl::LifecycleOutcome;
@@ -21,7 +22,7 @@ fn test_lifecycle_builder_accepts_predicate() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(outcome, LifecycleOutcome::InitialConditionNotMet));
 }

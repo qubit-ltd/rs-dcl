@@ -26,14 +26,14 @@ pub(crate) enum LockedExecution<R, E> {
 impl<R, E> LockedExecution<R, E> {
     /// Converts a completed locked phase into its public execution outcome.
     ///
-    /// # Returns
-    ///
-    /// The corresponding condition, success, or task-failure outcome.
-    ///
     /// # Type Parameters
     ///
     /// * `R` - Successful task result type.
     /// * `E` - Task error type.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding condition, success, or task-failure outcome.
     #[inline]
     pub(crate) fn into_outcome(self) -> ExecutionOutcome<R, E> {
         match self {

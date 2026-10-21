@@ -9,6 +9,7 @@
 
 use std::io;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
@@ -21,7 +22,7 @@ use qubit_dcl::LifecycleOutcome;
 /// Runs basic and lifecycle DCL examples using atomic gates.
 fn main() {
     let gate = Arc::new(AtomicBool::new(true));
-    let lock = std::sync::Mutex::new(());
+    let lock = Mutex::new(());
     let executor = DclExecutor::new({
         let gate = Arc::clone(&gate);
         move || gate.load(Ordering::Acquire)
@@ -35,7 +36,7 @@ fn main() {
     });
     assert!(matches!(outcome, ExecutionOutcome::Success(42)));
 
-    let lifecycle_lock = std::sync::Mutex::new(());
+    let lifecycle_lock = Mutex::new(());
     let lifecycle_executor = LifecycleDclExecutor::builder()
         .when(|| true)
         .prepare(|| Ok::<Vec<&'static str>, io::Error>(vec!["prepare"]))

@@ -8,6 +8,7 @@
 //! Tests for the lifecycle prepare builder stage.
 
 use std::io;
+use std::sync::Mutex;
 
 use qubit_dcl::FinalizationOutcome;
 use qubit_dcl::LifecycleDclExecutor;
@@ -22,7 +23,7 @@ fn test_prepare_builder_selects_no_commit() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome = executor.run(&std::sync::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,

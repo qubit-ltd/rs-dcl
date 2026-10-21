@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use crate::RollbackCause;
 use crate::double_checked::LifecycleReadyBuilder;
 use crate::double_checked::PrepareCallback;
 use crate::double_checked::RollbackCallback;
@@ -88,7 +89,7 @@ impl<P, C> LifecycleRollbackBuilder<P, C> {
     #[inline]
     pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<P, C>
     where
-        F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C> + Send + Sync + 'static,
+        F: for<'a> Fn(P, RollbackCause<'a>) -> Result<(), C> + Send + Sync + 'static,
     {
         let rollback: RollbackCallback<P, C> = Arc::new(rollback);
         LifecycleReadyBuilder::new(self.core, self.prepare, None, Some(rollback))

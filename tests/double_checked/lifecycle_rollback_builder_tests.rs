@@ -8,6 +8,7 @@
 //! Tests for the lifecycle rollback builder stage.
 
 use std::io;
+use std::sync::Mutex;
 
 use qubit_dcl::FinalizationOutcome;
 use qubit_dcl::LifecycleDclExecutor;
@@ -22,7 +23,7 @@ fn test_rollback_builder_configures_rollback() {
         .no_commit()
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
-    let outcome = executor.run(&std::sync::Mutex::new(()), || Err::<(), _>(io::Error::other("task")));
+    let outcome = executor.run(&Mutex::new(()), || Err::<(), _>(io::Error::other("task")));
 
     assert!(matches!(
         outcome,

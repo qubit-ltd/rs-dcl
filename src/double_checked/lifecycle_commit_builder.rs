@@ -13,6 +13,7 @@ use crate::double_checked::CommitCallback;
 use crate::double_checked::LifecycleReadyBuilder;
 use crate::double_checked::PrepareCallback;
 use crate::double_checked::RollbackCallback;
+use crate::double_checked::RollbackCause;
 use crate::double_checked::internal::DclCore;
 
 /// Builder stage requiring a rollback/no-rollback choice.
@@ -92,7 +93,7 @@ impl<P, C> LifecycleCommitBuilder<P, C> {
     #[inline]
     pub fn rollback<F>(self, rollback: F) -> LifecycleReadyBuilder<P, C>
     where
-        F: for<'a> Fn(P, crate::RollbackCause<'a>) -> Result<(), C> + Send + Sync + 'static,
+        F: for<'a> Fn(P, RollbackCause<'a>) -> Result<(), C> + Send + Sync + 'static,
     {
         let rollback: RollbackCallback<P, C> = Arc::new(rollback);
         LifecycleReadyBuilder::new(self.core, self.prepare, Some(self.commit), Some(rollback))
