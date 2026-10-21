@@ -33,7 +33,7 @@ default = []
 parking-lot = ["qubit-lock/parking-lot"]
 
 [dependencies]
-qubit-lock = { default-features = false, version = "0.14" }
+qubit-lock = { default-features = false, version = "^0.14" }
 
 [dev-dependencies]
 criterion = { version = "^0.8", default-features = false }
