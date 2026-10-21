@@ -17,6 +17,19 @@ use crate::double_checked::PanicInfo;
 /// * `R` - Value type returned by the guarded task.
 /// * `E` - Error type returned by the guarded task.
 /// * `C` - Error type returned by lifecycle callbacks.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::CapturedLifecycleOutcome;
+///
+/// let outcome: CapturedLifecycleOutcome<(), (), ()> =
+///     CapturedLifecycleOutcome::InitialConditionNotMet;
+/// assert!(matches!(
+///     outcome,
+///     CapturedLifecycleOutcome::InitialConditionNotMet
+/// ));
+/// ```
 #[derive(Debug)]
 #[must_use = "the captured lifecycle outcome must be inspected"]
 pub enum CapturedLifecycleOutcome<R, E, C> {

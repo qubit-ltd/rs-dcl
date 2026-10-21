@@ -16,6 +16,15 @@ use crate::double_checked::PanicInfo;
 /// # Type Parameters
 ///
 /// * `C` - Error type returned by the commit or rollback callback.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::CapturedFinalizationOutcome;
+///
+/// let outcome: CapturedFinalizationOutcome<()> = CapturedFinalizationOutcome::Succeeded;
+/// assert!(matches!(outcome, CapturedFinalizationOutcome::Succeeded));
+/// ```
 #[derive(Debug)]
 #[must_use = "the captured finalization outcome must be inspected"]
 pub enum CapturedFinalizationOutcome<C> {

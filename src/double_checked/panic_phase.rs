@@ -8,6 +8,15 @@
 //! Panic phase classification for double-checked execution.
 
 /// Identifies the lifecycle phase in which a captured panic occurred.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::PanicPhase;
+///
+/// let phase = PanicPhase::Prepare;
+/// assert_eq!(phase, PanicPhase::Prepare);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PanicPhase {
     /// The lock-free condition check panicked.

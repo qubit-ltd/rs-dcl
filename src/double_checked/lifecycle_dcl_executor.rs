@@ -67,6 +67,25 @@ pub(crate) type RollbackCallback<P, C> =
 /// underlying lock provide the required coordination. This is why each
 /// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
 ///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::LifecycleDclExecutor;
+/// use qubit_dcl::LifecycleOutcome;
+///
+/// let lock = Mutex::new(());
+/// let executor = LifecycleDclExecutor::builder()
+///     .when(|| true)
+///     .prepare(|| Ok::<(), ()>(()))
+///     .commit(|_| Ok::<(), ()>(()))
+///     .no_rollback()
+///     .build();
+/// let outcome = executor.run(&lock, || Ok::<usize, std::io::Error>(42));
+/// assert!(matches!(outcome, LifecycleOutcome::TaskSucceeded { value: 42, .. }));
+/// ```
+///
 /// # Type Parameters
 ///
 /// * `P` - Per-invocation token type produced by `prepare`.
@@ -151,7 +170,7 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// Propagates panics from the predicate, prepare callback, task, lock, and
     /// lifecycle finalization callbacks. Panics from the locked phase are
     /// resumed after rollback cleanup.
-    #[inline(always)]
+    #[inline]
     pub fn run<L, R, E, F>(&self, lock: &L, task: F) -> LifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
@@ -231,6 +250,7 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// # Returns
     ///
     /// Captured lifecycle outcome when execution crosses panic boundaries.
+    #[inline]
     pub fn run_catching<L, R, E, F>(&self, lock: &L, task: F) -> CapturedLifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,

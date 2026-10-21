@@ -13,6 +13,15 @@
 ///
 /// * `R` - Value type returned by the guarded task.
 /// * `E` - Error type returned by the guarded task.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::ExecutionOutcome;
+///
+/// let outcome: ExecutionOutcome<u32, &'static str> = ExecutionOutcome::Success(42);
+/// assert_eq!(outcome.into_result(), Ok(Some(42)));
+/// ```
 #[derive(Debug)]
 #[must_use = "the execution outcome must be inspected"]
 pub enum ExecutionOutcome<R, E> {

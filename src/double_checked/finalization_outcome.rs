@@ -15,6 +15,15 @@
 /// # Type Parameters
 ///
 /// * `C` - Error type returned by the commit or rollback callback.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::FinalizationOutcome;
+///
+/// let outcome: FinalizationOutcome<()> = FinalizationOutcome::Succeeded;
+/// assert!(matches!(outcome, FinalizationOutcome::Succeeded));
+/// ```
 #[derive(Debug)]
 #[must_use = "the finalization outcome must be inspected"]
 pub enum FinalizationOutcome<C> {

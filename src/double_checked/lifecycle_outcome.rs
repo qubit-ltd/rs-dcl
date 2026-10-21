@@ -21,6 +21,18 @@ use crate::double_checked::FinalizationOutcome;
 /// * `R` - Value type returned by the guarded task.
 /// * `E` - Error type returned by the guarded task.
 /// * `C` - Error type returned by lifecycle callbacks.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::{FinalizationOutcome, LifecycleOutcome};
+///
+/// let outcome: LifecycleOutcome<u32, (), ()> = LifecycleOutcome::TaskSucceeded {
+///     value: 42,
+///     commit: FinalizationOutcome::Succeeded,
+/// };
+/// assert!(matches!(outcome, LifecycleOutcome::TaskSucceeded { value: 42, .. }));
+/// ```
 #[derive(Debug)]
 #[must_use = "the lifecycle outcome must be inspected"]
 pub enum LifecycleOutcome<R, E, C> {
