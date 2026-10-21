@@ -33,11 +33,12 @@ where
     ///
     /// # Returns
     ///
-    /// A cause borrowing any task error or panic metadata from this state.
+    /// A cause borrowing the original task error when the task failed.
     ///
     /// # Type Parameters
     ///
     /// * `E` - Task error type stored in the unsuccessful execution state.
+    #[must_use]
     #[inline]
     pub(crate) fn cause(&self) -> RollbackCause<'_> {
         match self {

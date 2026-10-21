@@ -20,7 +20,7 @@ impl Lock for NoopLock {
     type Guard<'a> = NoopGuard;
 
     /// Returns a no-op guard for a sequential test invocation.
-    #[inline(always)]
+    #[inline]
     fn lock(&self) -> Self::Guard<'_> {
         NoopGuard
     }

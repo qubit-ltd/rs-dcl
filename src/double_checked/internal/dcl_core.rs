@@ -39,6 +39,7 @@ impl DclCore {
     /// # Returns
     ///
     /// A core ready to be configured or built into an executor.
+    #[must_use]
     #[inline]
     pub(crate) fn new<F>(predicate: F) -> Self
     where
@@ -58,7 +59,7 @@ impl DclCore {
     /// # Panics
     ///
     /// Propagates a predicate panic.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn check_initial(&self) -> bool {
         (self.predicate)()
     }

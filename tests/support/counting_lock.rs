@@ -46,13 +46,13 @@ impl CountingLock {
     /// # Returns
     ///
     /// The current call count.
-    #[inline(always)]
+    #[inline]
     pub fn calls(&self) -> usize {
         self.calls.load(Ordering::Relaxed)
     }
 
     /// Records one lock API invocation.
-    #[inline(always)]
+    #[inline]
     fn record_call(&self) {
         self.calls.fetch_add(1, Ordering::Relaxed);
     }
@@ -62,14 +62,14 @@ impl Lock for CountingLock {
     type Guard<'a> = CountingGuard<'a>;
 
     /// Records and delegates blocking acquisition.
-    #[inline(always)]
+    #[inline]
     fn lock(&self) -> Self::Guard<'_> {
         self.record_call();
         CountingGuard::new(Mutex::lock(self.inner.as_ref()).expect("counting lock mutex should not be poisoned"))
     }
 
     /// Records and delegates immediate acquisition.
-    #[inline(always)]
+    #[inline]
     fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         self.record_call();
         match Mutex::try_lock(self.inner.as_ref()) {

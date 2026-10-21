@@ -27,13 +27,13 @@ impl Lock for PanickingReleaseLock {
     type Guard<'a> = PanickingReleaseGuard;
 
     /// Returns a guard that panics when dropped.
-    #[inline(always)]
+    #[inline]
     fn lock(&self) -> Self::Guard<'_> {
         PanickingReleaseGuard
     }
 
     /// Returns a guard that panics when dropped.
-    #[inline(always)]
+    #[inline]
     fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         Ok(PanickingReleaseGuard)
     }

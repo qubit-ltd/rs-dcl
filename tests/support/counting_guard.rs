@@ -25,7 +25,7 @@ impl<'a> CountingGuard<'a> {
     /// # Returns
     ///
     /// A counting-lock guard.
-    #[inline(always)]
+    #[inline]
     pub(super) fn new(guard: MutexGuard<'a, ()>) -> Self {
         Self { _guard: guard }
     }

@@ -60,7 +60,7 @@ impl PanicInfo {
     /// # Returns
     ///
     /// The captured panic phase.
-    #[inline(always)]
+    #[inline]
     pub fn phase(&self) -> PanicPhase {
         self.phase
     }
@@ -71,7 +71,7 @@ impl PanicInfo {
     ///
     /// `Some(message)` for `&str` and `String` payloads, or `None` for other
     /// payload types.
-    #[inline(always)]
+    #[inline]
     pub fn message(&self) -> Option<&str> {
         self.message.as_deref()
     }
@@ -86,7 +86,7 @@ impl PanicInfo {
     ///
     /// Panics if the payload has already been consumed. This is an internal
     /// invariant because the method only borrows `self`.
-    #[inline(always)]
+    #[inline]
     pub fn payload(&self) -> &(dyn Any + Send + 'static) {
         self.payload
             .as_deref()
@@ -103,7 +103,7 @@ impl PanicInfo {
     ///
     /// Panics if the payload has already been consumed. This is an internal
     /// invariant because the method consumes `self` only once.
-    #[inline(always)]
+    #[inline]
     pub fn into_payload(mut self) -> Box<dyn Any + Send + 'static> {
         self.payload
             .take()
