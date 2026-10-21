@@ -145,7 +145,7 @@ fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
     assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
     let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
     assert!(dependency.contains("default-features = false"));
-    assert!(dependency.contains("version = \"0.14\""));
+    assert!(dependency.contains("version = \"^0.14\""));
     assert!(!dependency.contains("path ="));
 }
 
@@ -155,7 +155,7 @@ fn test_manifest_uses_only_required_qubit_dependencies() {
     assert!(find_dependency_spec(CARGO_TOML, "qubit-function").is_none());
 
     let lock = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
-    assert!(lock.contains("version = \"0.14\""));
+    assert!(lock.contains("version = \"^0.14\""));
     assert!(!lock.contains("path ="));
 }
 
