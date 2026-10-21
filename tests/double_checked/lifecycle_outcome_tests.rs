@@ -31,7 +31,10 @@ fn test_lifecycle_outcome_non_panic_states_are_distinct() {
     };
 
     assert!(matches!(initial, LifecycleOutcome::InitialConditionNotMet));
-    assert!(matches!(prepare, LifecycleOutcome::PrepareFailed(_)));
+    match prepare {
+        LifecycleOutcome::PrepareFailed(error) => assert_eq!(error.to_string(), "prepare"),
+        other => panic!("expected prepare failure, got {other:?}"),
+    }
     assert!(matches!(
         success,
         LifecycleOutcome::TaskSucceeded {
@@ -45,11 +48,11 @@ fn test_lifecycle_outcome_non_panic_states_are_distinct() {
             rollback: FinalizationOutcome::Succeeded,
         }
     ));
-    assert!(matches!(
-        task,
-        LifecycleOutcome::TaskFailed {
-            rollback: FinalizationOutcome::Failed(_),
-            ..
+    match task {
+        LifecycleOutcome::TaskFailed { error, rollback } => {
+            assert_eq!(error.to_string(), "task");
+            assert!(matches!(rollback, FinalizationOutcome::Failed(error) if error.to_string() == "rollback"));
         }
-    ));
+        other => panic!("expected task failure, got {other:?}"),
+    }
 }

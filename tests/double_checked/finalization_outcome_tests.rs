@@ -20,7 +20,16 @@ fn test_finalization_outcome_non_panic_states_are_distinct() {
         FinalizationOutcome::Failed(io::Error::other("finalization")),
     ];
 
-    assert!(matches!(outcomes[0], FinalizationOutcome::NotRequired));
-    assert!(matches!(outcomes[1], FinalizationOutcome::Succeeded));
-    assert!(matches!(outcomes[2], FinalizationOutcome::Failed(_)));
+    assert!(
+        matches!(outcomes[0], FinalizationOutcome::NotRequired),
+        "not-required finalization should remain distinguishable"
+    );
+    assert!(
+        matches!(outcomes[1], FinalizationOutcome::Succeeded),
+        "successful finalization should remain distinguishable"
+    );
+    assert!(
+        matches!(outcomes[2], FinalizationOutcome::Failed(_)),
+        "failed finalization should remain distinguishable"
+    );
 }
