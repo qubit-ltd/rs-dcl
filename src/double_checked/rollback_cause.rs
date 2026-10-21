@@ -18,6 +18,15 @@ use crate::double_checked::PanicInfo;
 ///
 /// The `'a` lifetime is the duration for which the rollback callback may
 /// inspect the borrowed error or panic metadata.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_dcl::RollbackCause;
+///
+/// let cause = RollbackCause::ConditionNotMet;
+/// assert!(matches!(cause, RollbackCause::ConditionNotMet));
+/// ```
 #[derive(Debug)]
 pub enum RollbackCause<'a> {
     /// The second condition check failed after prepare completed.

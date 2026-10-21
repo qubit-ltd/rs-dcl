@@ -40,15 +40,15 @@ impl LifecyclePredicateBuilder {
 
     /// Sets the callback that creates one token per prepared invocation.
     ///
-    /// # Parameters
-    ///
-    /// * `prepare` - Concurrently callable token-producing callback.
-    ///
     /// # Type Parameters
     ///
     /// * `P` - Per-invocation token type produced by the callback.
     /// * `C` - Error type returned by the callback.
     /// * `F` - Prepare callback type.
+    ///
+    /// # Parameters
+    ///
+    /// * `prepare` - Concurrently callable token-producing callback.
     ///
     /// # Returns
     ///

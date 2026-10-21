@@ -30,6 +30,21 @@ use crate::double_checked::internal::DclCore;
 /// writer runs a write task under the paired write mode. The two tasks may use
 /// different captured data while consulting the same atomic gate. Passing the
 /// mode to each [`Self::run`] call preserves this coordination-only role.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::DclExecutor;
+/// use qubit_dcl::ExecutionOutcome;
+///
+/// let lock = Mutex::new(());
+/// let executor = DclExecutor::new(|| true);
+/// let outcome = executor.run(&lock, || Ok::<u32, ()>(42));
+///
+/// assert!(matches!(outcome, ExecutionOutcome::Success(42)));
+/// ```
 #[must_use = "an executor does nothing until run is called"]
 pub struct DclExecutor {
     /// Shared predicate.

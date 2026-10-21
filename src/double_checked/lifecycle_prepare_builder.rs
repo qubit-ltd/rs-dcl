@@ -65,15 +65,9 @@ impl<P, C> LifecyclePrepareBuilder<P, C> {
     ///
     /// A builder requiring `rollback` or `no_rollback`.
     ///
-    /// # Errors
-    ///
-    /// This method only stores `commit`; an error returned when commit later
-    /// runs is preserved in [`crate::FinalizationOutcome::Failed`].
-    ///
-    /// # Panics
-    ///
-    /// This method does not invoke `commit`. Panic behavior is selected at
-    /// execution time by calling `run` or `run_catching`.
+    /// The callback is stored without being invoked. If it later returns an
+    /// error, that error is preserved in
+    /// [`crate::FinalizationOutcome::Failed`].
     ///
     /// # Synchronization
     ///

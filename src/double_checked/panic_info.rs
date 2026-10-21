@@ -21,6 +21,24 @@ use crate::double_checked::PanicPhase;
 /// [`Self::into_payload`] but are deliberately not formatted by `Debug`.
 /// Dropping this value discards any payload-destructor panic so a captured
 /// panic does not re-propagate while its structured outcome is disposed.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::DclExecutor;
+/// use qubit_dcl::PanicPhase;
+///
+/// let executor = DclExecutor::new(|| true);
+/// let panic = executor
+///     .run_catching(&Mutex::new(()), || -> Result<(), ()> {
+///         panic!("task failed")
+///     })
+///     .expect_err("the task panic should be captured");
+/// assert_eq!(panic.phase(), PanicPhase::Task);
+/// assert_eq!(panic.message(), Some("task failed"));
+/// ```
 #[must_use = "captured panic metadata must be inspected or resumed"]
 pub struct PanicInfo {
     /// Phase in which the panic was captured.

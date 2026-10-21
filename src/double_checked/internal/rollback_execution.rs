@@ -33,7 +33,8 @@ where
     ///
     /// # Returns
     ///
-    /// A cause borrowing the original task error when the task failed.
+    /// A condition-not-met cause, or a task-failed cause borrowing the original
+    /// task error.
     ///
     /// # Type Parameters
     ///
