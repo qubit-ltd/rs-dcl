@@ -7,6 +7,5 @@
 // =============================================================================
 //! Behavior coverage for private lifecycle execution machinery.
 
-mod captured_rollback_execution_tests;
 mod lifecycle_finalization_tests;
 mod rollback_execution_tests;

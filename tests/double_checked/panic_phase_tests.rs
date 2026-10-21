@@ -24,6 +24,9 @@ fn test_panic_phases_are_distinct() {
     ];
 
     for (index, phase) in phases.iter().enumerate() {
-        assert!(!phases[index + 1..].contains(phase));
+        assert!(
+            !phases[index + 1..].contains(phase),
+            "panic phase {phase:?} appears more than once"
+        );
     }
 }

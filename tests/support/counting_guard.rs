@@ -10,6 +10,7 @@
 use std::sync::MutexGuard;
 
 /// Retains the underlying mutex guard until this value is dropped.
+#[must_use = "dropping the guard releases the counting lock"]
 pub struct CountingGuard<'a> {
     /// Underlying guard whose destructor releases the test mutex.
     _guard: MutexGuard<'a, ()>,

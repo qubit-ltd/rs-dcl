@@ -20,7 +20,16 @@ fn test_captured_finalization_outcome_non_panic_states_are_distinct() {
         CapturedFinalizationOutcome::Failed(io::Error::other("finalization")),
     ];
 
-    assert!(matches!(outcomes[0], CapturedFinalizationOutcome::NotRequired));
-    assert!(matches!(outcomes[1], CapturedFinalizationOutcome::Succeeded));
-    assert!(matches!(outcomes[2], CapturedFinalizationOutcome::Failed(_)));
+    assert!(
+        matches!(outcomes[0], CapturedFinalizationOutcome::NotRequired),
+        "not-required captured finalization should remain distinguishable"
+    );
+    assert!(
+        matches!(outcomes[1], CapturedFinalizationOutcome::Succeeded),
+        "successful captured finalization should remain distinguishable"
+    );
+    assert!(
+        matches!(outcomes[2], CapturedFinalizationOutcome::Failed(_)),
+        "failed captured finalization should remain distinguishable"
+    );
 }

@@ -9,6 +9,7 @@
 
 use std::io;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
@@ -24,7 +25,7 @@ fn test_locked_execution_rechecks_before_task() {
         let checks = Arc::clone(&checks);
         move || checks.fetch_add(1, Ordering::Relaxed) == 0
     });
-    let outcome = executor.run(&std::sync::Mutex::new(()), || {
+    let outcome = executor.run(&Mutex::new(()), || {
         task_calls.fetch_add(1, Ordering::Relaxed);
         Ok::<(), io::Error>(())
     });

@@ -8,6 +8,7 @@
 mod builder_typestate_tests;
 mod captured_finalization_outcome_tests;
 mod captured_lifecycle_outcome_tests;
+mod captured_rollback_execution_tests;
 #[cfg(feature = "parking-lot")]
 mod concurrency_tests;
 mod dcl_core_tests;
