@@ -20,6 +20,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::thread;
+use std::time::Duration;
 
 use qubit_dcl::CapturedFinalizationOutcome;
 use qubit_dcl::CapturedLifecycleOutcome;
@@ -28,9 +29,11 @@ use qubit_dcl::LifecycleDclExecutor;
 use qubit_dcl::LifecycleOutcome;
 use qubit_dcl::PanicPhase;
 use qubit_dcl::RollbackCause;
+
 use crate::support::NoopLock;
 use crate::support::PanicOnDrop;
 use crate::support::PanickingReleaseLock;
+use crate::support::run_test_in_subprocess;
 
 const ROLLBACK_DROP_CHILD_COMPLETED: &str = "qubit-dcl:rollback-error-drop-child:completed:v1";
 
@@ -1689,8 +1692,8 @@ fn test_run_uncaptured_task_panic_outranks_token_drop_panic_without_rollback() {
 
 /// Verifies concurrent prepare calls retain distinct tokens for commit and
 /// rollback.
-#[test]
-fn test_run_concurrent_prepare_tokens_do_not_cross_calls() {
+#[rustfmt::skip]
+fn run_concurrent_prepare_tokens_do_not_cross_calls_scenario() {
     let lock = Arc::new(Mutex::new(()));
     let gate = Arc::new(AtomicBool::new(true));
     let prepare_barrier = Arc::new(Barrier::new(2));
@@ -1758,4 +1761,14 @@ fn test_run_concurrent_prepare_tokens_do_not_cross_calls() {
     assert_eq!(rolled_back.len(), 1);
     assert_ne!(committed[0], rolled_back[0]);
     assert_eq!(next_token.load(Ordering::Relaxed), 2);
+}
+
+#[test]
+fn test_run_concurrent_prepare_tokens_do_not_cross_calls() {
+    run_test_in_subprocess(
+        "double_checked::lifecycle_dcl_executor_tests::test_run_concurrent_prepare_tokens_do_not_cross_calls",
+        Duration::from_secs(30),
+        run_concurrent_prepare_tokens_do_not_cross_calls_scenario,
+    )
+    .expect("concurrent prepare token scenario must finish successfully");
 }

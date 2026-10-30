@@ -14,11 +14,14 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::thread;
+use std::time::Duration;
 
 use qubit_dcl::FinalizationOutcome;
 use qubit_dcl::LifecycleDclExecutor;
 use qubit_dcl::LifecycleOutcome;
 use qubit_dcl::RollbackCause;
+
+use crate::support::run_test_in_subprocess;
 
 #[derive(Clone)]
 struct Database {
@@ -172,8 +175,8 @@ fn test_task_error_rollback_reopens_gate_under_coordination_lock() {
     assert!(database.committed().is_empty());
 }
 
-#[test]
-fn test_call_during_commit_sees_claimed_gate_before_database_write() {
+#[rustfmt::skip]
+fn call_during_commit_sees_claimed_gate_before_database_write_scenario() {
     let work_available = Arc::new(AtomicBool::new(true));
     let transaction_lock = Arc::new(Mutex::new(()));
     let entered = Arc::new(Barrier::new(2));
@@ -210,4 +213,14 @@ fn test_call_during_commit_sees_claimed_gate_before_database_write() {
         }
     ));
     assert_eq!(database.committed(), ["record"]);
+}
+
+#[test]
+fn test_call_during_commit_sees_claimed_gate_before_database_write() {
+    run_test_in_subprocess(
+        "docs::lifecycle_transaction_tests::test_call_during_commit_sees_claimed_gate_before_database_write",
+        Duration::from_secs(30),
+        call_during_commit_sees_claimed_gate_before_database_write_scenario,
+    )
+    .expect("commit protocol scenario must finish successfully");
 }
