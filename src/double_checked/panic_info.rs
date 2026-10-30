@@ -78,6 +78,7 @@ impl PanicInfo {
     /// # Returns
     ///
     /// The captured panic phase.
+    #[must_use]
     #[inline]
     pub fn phase(&self) -> PanicPhase {
         self.phase
@@ -104,6 +105,7 @@ impl PanicInfo {
     ///
     /// Panics if the payload has already been consumed. This is an internal
     /// invariant because the method only borrows `self`.
+    #[must_use]
     #[inline]
     pub fn payload(&self) -> &(dyn Any + Send + 'static) {
         self.payload
@@ -121,6 +123,7 @@ impl PanicInfo {
     ///
     /// Panics if the payload has already been consumed. This is an internal
     /// invariant because the method consumes `self` only once.
+    #[must_use]
     #[inline]
     pub fn into_payload(mut self) -> Box<dyn Any + Send + 'static> {
         self.payload
