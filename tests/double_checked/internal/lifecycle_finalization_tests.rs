@@ -13,6 +13,8 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+use qubit_dcl::CapturedFinalizationOutcome;
+use qubit_dcl::CapturedLifecycleOutcome;
 use qubit_dcl::FinalizationOutcome;
 use qubit_dcl::LifecycleDclExecutor;
 use qubit_dcl::LifecycleOutcome;
@@ -71,13 +73,13 @@ fn test_catching_commit_error_reports_failure() {
         .no_rollback()
         .build();
 
-    let outcome = executor.run(&Mutex::new(()), || Ok::<u32, io::Error>(42));
+    let outcome = executor.run_catching(&Mutex::new(()), || Ok::<u32, io::Error>(42));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskSucceeded {
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: 42,
-            commit: FinalizationOutcome::Failed(error),
+            commit: CapturedFinalizationOutcome::Failed(error),
         } if error.to_string() == "commit failed"
     ));
 }
@@ -101,13 +103,13 @@ fn test_catching_no_commit_drops_token_and_reports_not_required() {
         .rollback(|_, _| Ok::<(), io::Error>(()))
         .build();
 
-    let outcome = executor.run(&Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskSucceeded {
+        CapturedLifecycleOutcome::TaskSucceeded {
             value: (),
-            commit: FinalizationOutcome::NotRequired,
+            commit: CapturedFinalizationOutcome::NotRequired,
         }
     ));
     assert_eq!(drops.load(Ordering::Relaxed), 1);
@@ -132,13 +134,13 @@ fn test_catching_no_rollback_drops_token_and_reports_not_required() {
         .no_rollback()
         .build();
 
-    let outcome = executor.run(&Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
+    let outcome = executor.run_catching(&Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
 
     assert!(matches!(
         outcome,
-        LifecycleOutcome::TaskFailed {
+        CapturedLifecycleOutcome::TaskFailed {
             error,
-            rollback: FinalizationOutcome::NotRequired,
+            rollback: CapturedFinalizationOutcome::NotRequired,
         } if error.to_string() == "task failed"
     ));
     assert_eq!(drops.load(Ordering::Relaxed), 1);

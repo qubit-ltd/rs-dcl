@@ -9,15 +9,12 @@
 
 use std::io;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_dcl::DclExecutor;
 use qubit_dcl::ExecutionOutcome;
-
-mod parking_lot {
-    pub use std::sync::Mutex;
-}
 
 /// Verifies the shared core evaluates the predicate before and after locking.
 #[test]
@@ -30,7 +27,7 @@ fn test_core_performs_two_condition_checks() {
             true
         }
     });
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(())));
     assert_eq!(checks.load(Ordering::Relaxed), 2);

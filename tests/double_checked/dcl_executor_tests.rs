@@ -11,9 +11,12 @@ use std::io;
 use std::panic::AssertUnwindSafe;
 use std::panic::catch_unwind;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+#[cfg(feature = "parking-lot")]
+use parking_lot::Mutex as ParkingLotMutex;
 use qubit_dcl::DclExecutor;
 use qubit_dcl::ExecutionOutcome;
 use qubit_dcl::PanicPhase;
@@ -22,10 +25,6 @@ use crate::support::CountingLock;
 use crate::support::NoopLock;
 use crate::support::PanicOnDrop;
 use crate::support::PanickingReleaseLock;
-
-mod parking_lot {
-    pub use std::sync::Mutex;
-}
 
 /// Common task signature used to merge generic coverage across executor modes.
 type CoverageTask = fn() -> Result<(), io::Error>;
@@ -224,9 +223,7 @@ fn test_run_two_true_checks_preserves_success() {
 fn test_run_preserves_task_error() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome = executor.run(&parking_lot::Mutex::new(()), || {
-        Err::<(), _>(io::Error::other("task failed"))
-    });
+    let outcome = executor.run(&Mutex::new(()), || Err::<(), _>(io::Error::other("task failed")));
 
     match outcome {
         ExecutionOutcome::TaskFailed(error) => {
@@ -241,7 +238,7 @@ fn test_run_preserves_task_error() {
 fn test_run_catching_preserves_success() {
     let executor = DclExecutor::new(|| true);
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = executor.run_catching(&Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, Ok(ExecutionOutcome::Success(7))));
 }
@@ -251,7 +248,7 @@ fn test_run_catching_preserves_success() {
 fn test_run_captures_initial_condition_panic() {
     let executor = DclExecutor::new(|| panic!("initial check"));
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -275,7 +272,7 @@ fn test_run_captures_second_condition_panic() {
         }
     });
 
-    let outcome = executor.run_catching(&parking_lot::Mutex::new(()), || Ok::<(), io::Error>(()));
+    let outcome = executor.run_catching(&Mutex::new(()), || Ok::<(), io::Error>(()));
 
     assert!(matches!(
         outcome,
@@ -290,7 +287,7 @@ fn test_run_captures_task_panic() {
     let executor = DclExecutor::new(|| true);
 
     let outcome: Result<ExecutionOutcome<(), io::Error>, _> =
-        executor.run_catching(&parking_lot::Mutex::new(()), || panic!("task panic"));
+        executor.run_catching(&Mutex::new(()), || panic!("task panic"));
 
     assert!(matches!(
         outcome,
@@ -324,7 +321,7 @@ fn test_captured_task_panic_preserves_standard_mutex_poisoning() {
 #[cfg(feature = "parking-lot")]
 #[test]
 fn test_captured_task_panic_preserves_parking_lot_non_poisoning() {
-    let lock = ::parking_lot::Mutex::new(());
+    let lock = ParkingLotMutex::new(());
     let executor = DclExecutor::new(|| true);
 
     let first: Result<ExecutionOutcome<(), io::Error>, _> =
@@ -379,8 +376,7 @@ fn test_run_propagates_task_panic_without_catching() {
     let executor = DclExecutor::new(|| true);
 
     let panic_result = catch_unwind(AssertUnwindSafe(|| {
-        let _: ExecutionOutcome<(), io::Error> =
-            executor.run(&parking_lot::Mutex::new(()), || panic!("uncaught task panic"));
+        let _: ExecutionOutcome<(), io::Error> = executor.run(&Mutex::new(()), || panic!("uncaught task panic"));
     }));
 
     assert!(panic_result.is_err());
@@ -392,7 +388,7 @@ fn test_clone_shares_configuration_without_owning_lock() {
     let executor = DclExecutor::new(|| true);
     let cloned = executor.clone();
 
-    let outcome = cloned.run(&parking_lot::Mutex::new(()), || Ok::<u32, io::Error>(7));
+    let outcome = cloned.run(&Mutex::new(()), || Ok::<u32, io::Error>(7));
 
     assert!(matches!(outcome, ExecutionOutcome::Success(7)));
 }
