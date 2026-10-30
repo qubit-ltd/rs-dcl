@@ -25,6 +25,7 @@ use crate::double_checked::internal::DclCore;
 use crate::double_checked::internal::LockedExecution;
 use crate::double_checked::internal::RollbackExecution;
 use crate::double_checked::internal::catch_phase;
+use crate::double_checked::internal::drop_task_catching;
 use crate::double_checked::internal::finalize_commit;
 use crate::double_checked::internal::finalize_commit_catching;
 use crate::double_checked::internal::finalize_rollback;
@@ -235,6 +236,16 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Runs a task with panic capture enabled.
     ///
+    /// This method uses the same early-return cleanup and failure priority as
+    /// [`Self::run_with_token_catching`]. An unexecuted task cleanup panic
+    /// after an initial false check is represented by
+    /// [`CapturedLifecycleOutcome::TaskCleanupPanicked`].
+    ///
+    /// Capture requires unwinding; `panic=abort` and panic hooks that abort
+    /// cannot produce a result. It does not undo side effects, cover panics
+    /// from dropping returned values after this method returns, or guarantee
+    /// recovery from a second panic during an active unwind.
+    ///
     /// # Parameters
     ///
     /// * `lock` - Lock used for this invocation.
@@ -276,7 +287,17 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// # Returns
     ///
-    /// Captured lifecycle outcome preserving task/rollback panics.
+    /// Captured lifecycle outcome preserving task/rollback panics. If the
+    /// first condition is false, an unexecuted task cleanup panic is returned
+    /// as [`CapturedLifecycleOutcome::TaskCleanupPanicked`]. When predicate or
+    /// prepare failure already exists, that original failure takes priority
+    /// over a task cleanup panic. Prepare error and prepare panic occur without
+    /// a token, so neither commit nor rollback runs.
+    ///
+    /// Capture requires unwinding; `panic=abort` and panic hooks that abort
+    /// cannot produce a result. Capturing a panic does not undo side effects,
+    /// cover panics from dropping returned values after this method returns,
+    /// or guarantee recovery from a second panic during an active unwind.
     pub fn run_with_token_catching<L, R, E, F>(&self, lock: &L, task: F) -> CapturedLifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
@@ -286,9 +307,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         match self.core.check_initial_catching() {
             Ok(true) => {}
             Ok(false) => {
-                return CapturedLifecycleOutcome::InitialConditionNotMet;
+                return match drop_task_catching(task) {
+                    Ok(()) => CapturedLifecycleOutcome::InitialConditionNotMet,
+                    Err(panic) => CapturedLifecycleOutcome::TaskCleanupPanicked(panic),
+                };
             }
             Err(panic) => {
+                drop(drop_task_catching(task));
                 return CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic);
             }
         }
@@ -296,9 +321,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
         let mut token = match catch_phase(PanicPhase::Prepare, || (self.prepare)()) {
             Ok(Ok(token)) => token,
             Ok(Err(error)) => {
+                drop(drop_task_catching(task));
                 return CapturedLifecycleOutcome::PrepareFailed(error);
             }
             Err(panic) => {
+                drop(drop_task_catching(task));
                 return CapturedLifecycleOutcome::PreparePanicked(panic);
             }
         };

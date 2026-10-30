@@ -9,6 +9,9 @@
 
 /// Identifies the lifecycle phase in which a captured panic occurred.
 ///
+/// Because this is a public enum, exhaustive matches must include
+/// [`Self::TaskCleanup`] for panics while dropping an unexecuted task.
+///
 /// # Examples
 ///
 /// ```
@@ -35,4 +38,6 @@ pub enum PanicPhase {
     Commit,
     /// Rollback finalization panicked after the lock was released.
     Rollback,
+    /// An unexecuted task panicked while being dropped before an early return.
+    TaskCleanup,
 }

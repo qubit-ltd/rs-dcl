@@ -40,3 +40,19 @@ where
 {
     catch_unwind(AssertUnwindSafe(operation)).map_err(|payload| PanicInfo::from_payload(phase, payload))
 }
+
+/// Drops an unexecuted task behind the cleanup panic boundary.
+///
+/// # Parameters
+///
+/// * `task` - Task whose execution was skipped and whose captures must be
+///   released.
+///
+/// # Returns
+///
+/// `Ok(())` if the task is dropped, or `Err(PanicInfo)` with phase
+/// [`PanicPhase::TaskCleanup`] if its destructor unwinds.
+#[inline]
+pub(crate) fn drop_task_catching<F>(task: F) -> Result<(), PanicInfo> {
+    catch_phase(PanicPhase::TaskCleanup, move || drop(task))
+}

@@ -22,4 +22,5 @@ pub(crate) use lifecycle_finalization::finalize_rollback;
 pub(crate) use lifecycle_finalization::finalize_rollback_catching;
 pub(crate) use locked_execution::LockedExecution;
 pub(crate) use panic_capture::catch_phase;
+pub(crate) use panic_capture::drop_task_catching;
 pub(crate) use rollback_execution::RollbackExecution;

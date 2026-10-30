@@ -8,9 +8,14 @@
 //! Tests for captured lifecycle execution outcomes.
 
 use std::io;
+use std::sync::Mutex;
 
 use qubit_dcl::CapturedFinalizationOutcome;
 use qubit_dcl::CapturedLifecycleOutcome;
+use qubit_dcl::LifecycleDclExecutor;
+use qubit_dcl::PanicPhase;
+
+use crate::support::PanicOnDrop;
 
 /// Verifies every non-panic captured lifecycle branch remains distinguishable.
 #[test]
@@ -51,5 +56,27 @@ fn test_captured_lifecycle_outcome_non_panic_states_are_distinct() {
             rollback: CapturedFinalizationOutcome::Failed(_),
             ..
         }
+    ));
+}
+
+/// Verifies the new cleanup-panic outcome carries its dedicated phase.
+#[test]
+fn test_task_cleanup_panic_branch_is_distinct() {
+    let executor = LifecycleDclExecutor::builder()
+        .when(|| false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    let captured = PanicOnDrop;
+    let outcome = executor.run_catching(&Mutex::new(()), move || {
+        drop(captured);
+        Ok::<(), io::Error>(())
+    });
+
+    assert!(matches!(
+        outcome,
+        CapturedLifecycleOutcome::TaskCleanupPanicked(panic)
+            if panic.phase() == PanicPhase::TaskCleanup
     ));
 }

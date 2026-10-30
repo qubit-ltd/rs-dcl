@@ -12,6 +12,7 @@ use qubit_lock::Lock;
 use crate::double_checked::ExecutionOutcome;
 use crate::double_checked::PanicInfo;
 use crate::double_checked::internal::DclCore;
+use crate::double_checked::internal::drop_task_catching;
 
 /// Executes arbitrary tasks using the double-checked locking pattern.
 ///
@@ -170,9 +171,17 @@ impl DclExecutor {
 
     /// Runs `task` with panic capture enabled.
     ///
-    /// Panic boundaries include both predicate invocations, lock acquisition,
-    /// task execution, and guard drop. Any panic is converted into
-    /// [`PanicInfo`].
+    /// Panic boundaries include the initial predicate, task cleanup when an
+    /// initial check rejects or panics, lock acquisition, the second
+    /// predicate, task execution, and guard drop. An initial predicate panic
+    /// remains the reported panic if dropping the skipped task also panics.
+    /// Cleanup after an ordinary initial rejection is reported as
+    /// [`crate::double_checked::PanicPhase::TaskCleanup`].
+    ///
+    /// Capture requires unwinding; `panic=abort` and panic hooks that abort
+    /// cannot produce a result. Capturing a panic does not undo side effects,
+    /// cover panics from dropping returned values after this method returns,
+    /// or guarantee recovery from a second panic during an active unwind.
     ///
     /// # Parameters
     ///
@@ -194,8 +203,9 @@ impl DclExecutor {
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] when the predicate, lock implementation, task, or lock
-    /// guard release panics. Task errors remain in
+    /// Returns [`Err`] when the predicate, skipped task cleanup, lock
+    /// implementation, task, or lock guard release panics. Task errors remain
+    /// in
     /// [`ExecutionOutcome::TaskFailed`].
     pub fn run_catching<L, R, E, F>(&self, lock: &L, task: F) -> Result<ExecutionOutcome<R, E>, PanicInfo>
     where
@@ -204,8 +214,14 @@ impl DclExecutor {
     {
         match self.core.check_initial_catching() {
             Ok(true) => {}
-            Ok(false) => return Ok(ExecutionOutcome::ConditionNotMet),
-            Err(panic) => return Err(panic),
+            Ok(false) => {
+                drop_task_catching(task)?;
+                return Ok(ExecutionOutcome::ConditionNotMet);
+            }
+            Err(panic) => {
+                drop(drop_task_catching(task));
+                return Err(panic);
+            }
         }
 
         match self.core.execute_locked_catching(lock, task) {

@@ -675,6 +675,163 @@ fn test_run_catching_initial_false_does_not_prepare() {
     assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
 }
 
+/// Verifies skipped task cleanup is captured by both lifecycle entry points.
+#[test]
+fn test_catching_initial_false_captures_task_cleanup_panic() {
+    for with_token in [false, true] {
+        let prepare_calls = Arc::new(AtomicUsize::new(0));
+        let commit_calls = Arc::new(AtomicUsize::new(0));
+        let rollback_calls = Arc::new(AtomicUsize::new(0));
+        let executor = LifecycleDclExecutor::builder()
+            .when(|| false)
+            .prepare({
+                let prepare_calls = Arc::clone(&prepare_calls);
+                move || {
+                    prepare_calls.fetch_add(1, Ordering::Relaxed);
+                    Ok::<(), io::Error>(())
+                }
+            })
+            .commit({
+                let commit_calls = Arc::clone(&commit_calls);
+                move |_| {
+                    commit_calls.fetch_add(1, Ordering::Relaxed);
+                    Ok::<(), io::Error>(())
+                }
+            })
+            .rollback({
+                let rollback_calls = Arc::clone(&rollback_calls);
+                move |_, _| {
+                    rollback_calls.fetch_add(1, Ordering::Relaxed);
+                    Ok::<(), io::Error>(())
+                }
+            })
+            .build();
+        let lock = crate::support::CountingLock::new();
+        let captured = PanicOnDrop;
+        let outcome = if with_token {
+            executor.run_with_token_catching(&lock, move |_| {
+                drop(captured);
+                Ok::<(), io::Error>(())
+            })
+        } else {
+            executor.run_catching(&lock, move || {
+                drop(captured);
+                Ok::<(), io::Error>(())
+            })
+        };
+
+        assert!(matches!(
+            outcome,
+            CapturedLifecycleOutcome::TaskCleanupPanicked(panic)
+                if panic.phase() == PanicPhase::TaskCleanup
+        ));
+        assert_eq!(prepare_calls.load(Ordering::Relaxed), 0);
+        assert_eq!(commit_calls.load(Ordering::Relaxed), 0);
+        assert_eq!(rollback_calls.load(Ordering::Relaxed), 0);
+        assert_eq!(lock.calls(), 0);
+    }
+}
+
+/// Verifies existing predicate and prepare failures outrank task cleanup
+/// panics.
+#[test]
+fn test_catching_early_failure_preserves_priority_over_task_cleanup_panic() {
+    let lock = crate::support::CountingLock::new();
+    for failure in ["predicate", "prepare-error", "prepare-panic"] {
+        let prepare_calls = Arc::new(AtomicUsize::new(0));
+        let commit_calls = Arc::new(AtomicUsize::new(0));
+        let rollback_calls = Arc::new(AtomicUsize::new(0));
+        let executor = LifecycleDclExecutor::builder()
+            .when(move || match failure {
+                "predicate" => panic!("original predicate panic"),
+                _ => true,
+            })
+            .prepare({
+                let prepare_calls = Arc::clone(&prepare_calls);
+                move || {
+                    prepare_calls.fetch_add(1, Ordering::Relaxed);
+                    match failure {
+                        "prepare-error" => Err::<(), _>(io::Error::other("original prepare error")),
+                        "prepare-panic" => panic!("original prepare panic"),
+                        _ => Ok::<(), io::Error>(()),
+                    }
+                }
+            })
+            .commit({
+                let commit_calls = Arc::clone(&commit_calls);
+                move |_| {
+                    commit_calls.fetch_add(1, Ordering::Relaxed);
+                    Ok::<(), io::Error>(())
+                }
+            })
+            .rollback({
+                let rollback_calls = Arc::clone(&rollback_calls);
+                move |_, _| {
+                    rollback_calls.fetch_add(1, Ordering::Relaxed);
+                    Ok::<(), io::Error>(())
+                }
+            })
+            .build();
+        let captured = PanicOnDrop;
+        let outcome = executor.run_with_token_catching(&lock, move |_| {
+            drop(captured);
+            Ok::<(), io::Error>(())
+        });
+
+        match (failure, outcome) {
+            ("predicate", CapturedLifecycleOutcome::InitialConditionCheckPanicked(panic)) => {
+                assert_eq!(panic.message(), Some("original predicate panic"));
+            }
+            ("prepare-error", CapturedLifecycleOutcome::PrepareFailed(error)) => {
+                assert_eq!(error.to_string(), "original prepare error");
+            }
+            ("prepare-panic", CapturedLifecycleOutcome::PreparePanicked(panic)) => {
+                assert_eq!(panic.message(), Some("original prepare panic"));
+            }
+            (_, outcome) => panic!("unexpected outcome: {outcome:?}"),
+        }
+        assert_eq!(
+            prepare_calls.load(Ordering::Relaxed),
+            usize::from(failure != "predicate")
+        );
+        assert_eq!(commit_calls.load(Ordering::Relaxed), 0);
+        assert_eq!(rollback_calls.load(Ordering::Relaxed), 0);
+    }
+    assert_eq!(lock.calls(), 0);
+}
+
+/// Verifies discarding the secondary cleanup panic payload cannot escape.
+#[test]
+fn test_catching_task_cleanup_contains_panicking_panic_payload_drop() {
+    struct CleanupPanicsWithPanickingPayload;
+    impl Drop for CleanupPanicsWithPanickingPayload {
+        fn drop(&mut self) {
+            std::panic::panic_any(PanicOnDrop);
+        }
+    }
+
+    let executor = LifecycleDclExecutor::builder()
+        .when(|| false)
+        .prepare(|| Ok::<(), io::Error>(()))
+        .commit(|_| Ok::<(), io::Error>(()))
+        .no_rollback()
+        .build();
+    let captured = CleanupPanicsWithPanickingPayload;
+    let outer = catch_unwind(AssertUnwindSafe(|| {
+        executor.run_catching(&ParkingLotMutex::new(()), move || {
+            drop(captured);
+            Ok::<(), io::Error>(())
+        })
+    }));
+
+    let outcome = outer.expect("cleanup and panic payload destructor must stay contained");
+    assert!(matches!(
+        outcome,
+        CapturedLifecycleOutcome::TaskCleanupPanicked(panic)
+            if panic.phase() == PanicPhase::TaskCleanup
+    ));
+}
+
 /// Verifies the capturing state machine retains a returned prepare error.
 #[test]
 fn test_run_catching_prepare_error_preserves_lifecycle_error() {

@@ -20,6 +20,7 @@ use qubit_dcl::PanicPhase;
 
 use crate::support::CountingLock;
 use crate::support::NoopLock;
+use crate::support::PanicOnDrop;
 use crate::support::PanickingReleaseLock;
 
 mod parking_lot {
@@ -118,6 +119,56 @@ fn test_run_catching_initial_false_skips_lock_and_task() {
     ));
     assert_eq!(lock.calls(), 0);
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
+}
+
+/// Verifies a panic while dropping a skipped task is captured on initial false.
+#[test]
+fn test_run_catching_captures_initial_false_task_cleanup_panic() {
+    let captured = PanicOnDrop;
+    let outcome = DclExecutor::new(|| false).run_catching(&std::sync::Mutex::new(()), move || {
+        drop(captured);
+        Ok::<(), io::Error>(())
+    });
+
+    let panic = outcome.expect_err("task cleanup panic must be captured");
+    assert_eq!(panic.phase(), PanicPhase::TaskCleanup);
+}
+
+/// Verifies an initial predicate panic takes priority over skipped task
+/// cleanup.
+#[test]
+fn test_run_catching_preserves_initial_panic_over_task_cleanup_panic() {
+    let captured = PanicOnDrop;
+    let outcome =
+        DclExecutor::new(|| panic!("original predicate panic")).run_catching(&std::sync::Mutex::new(()), move || {
+            drop(captured);
+            Ok::<(), io::Error>(())
+        });
+
+    let panic = outcome.expect_err("predicate panic must be preserved");
+    assert_eq!(panic.phase(), PanicPhase::InitialConditionCheck);
+    assert_eq!(panic.message(), Some("original predicate panic"));
+}
+
+/// Verifies a normally skipped task is destroyed exactly once.
+#[test]
+fn test_run_catching_drops_skipped_task_once() {
+    struct CountDrop(Arc<AtomicUsize>);
+    impl Drop for CountDrop {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    let drops = Arc::new(AtomicUsize::new(0));
+    let captured = CountDrop(Arc::clone(&drops));
+    let outcome = DclExecutor::new(|| false).run_catching(&std::sync::Mutex::new(()), move || {
+        drop(captured);
+        Ok::<(), io::Error>(())
+    });
+
+    assert!(matches!(outcome, Ok(ExecutionOutcome::ConditionNotMet)));
+    assert_eq!(drops.load(Ordering::Relaxed), 1);
 }
 
 /// Verifies a failed second check prevents task execution after one lock call.

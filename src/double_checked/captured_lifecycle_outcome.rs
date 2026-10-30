@@ -12,6 +12,9 @@ use crate::double_checked::PanicInfo;
 
 /// Describes lifecycle invocation outcomes when panic capture is enabled.
 ///
+/// Exhaustive matches must handle [`Self::TaskCleanupPanicked`] as a cleanup
+/// failure before execution, with no token and no rollback callback.
+///
 /// # Type Parameters
 ///
 /// * `R` - Value type returned by the guarded task.
@@ -37,6 +40,9 @@ pub enum CapturedLifecycleOutcome<R, E, C> {
     InitialConditionNotMet,
     /// The lock-free condition check panicked before prepare started.
     InitialConditionCheckPanicked(PanicInfo),
+    /// Dropping the unexecuted task panicked after the initial condition was
+    /// false. No token was created and no lock or finalization callback ran.
+    TaskCleanupPanicked(PanicInfo),
     /// Prepare returned its original lifecycle error without producing a token.
     PrepareFailed(C),
     /// Prepare panicked without producing a usable token.

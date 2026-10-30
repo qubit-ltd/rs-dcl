@@ -21,6 +21,7 @@ fn test_panic_phases_are_distinct() {
         PanicPhase::LockRelease,
         PanicPhase::Commit,
         PanicPhase::Rollback,
+        PanicPhase::TaskCleanup,
     ];
 
     for (index, phase) in phases.iter().enumerate() {
