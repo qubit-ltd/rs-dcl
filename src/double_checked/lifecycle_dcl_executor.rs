@@ -68,6 +68,29 @@ pub(crate) type RollbackCallback<P, C> =
 /// underlying lock provide the required coordination. This is why each
 /// [`Self::run`] or [`Self::run_with_token`] call supplies its lock mode.
 ///
+/// # Locking and synchronization
+///
+/// The predicate must read an atomic or equivalently synchronized gate and
+/// must not acquire the same underlying lock supplied to this invocation.
+/// The second check and task share one guard. Shared/read modes allow tasks
+/// to overlap and do not provide at-most-once execution; use them only for
+/// tasks that are read-only relative to the coordinated protocol, unless
+/// the caller provides an independent uniqueness protocol.
+///
+/// Tasks that change the gate, consume work, or modify coordinated state
+/// require an exclusive mode or an independent uniqueness protocol. An
+/// exclusive mode alone does not guarantee at-most-once execution: the
+/// application must also update its gate correctly under that protocol.
+/// Paired read/write modes must use the same underlying lock, and all
+/// conflicting updates, including updates outside this executor, must
+/// coordinate through that lock or an equivalent synchronization protocol.
+///
+/// Prepare runs before lock acquisition, and commit or rollback runs after
+/// guard release. These callbacks may overlap with other invocations.
+/// Finalization does not extend the task's critical section; callbacks that
+/// change the gate or conflicting shared state must provide their own
+/// coordination. Panic capture does not change these requirements.
+///
 /// # Examples
 ///
 /// ```
@@ -155,6 +178,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// * `task` - One-shot task executed inside the lock after the second
     ///   check.
     ///
+    /// See the locking and synchronization contract on
+    /// [LifecycleDclExecutor](crate::LifecycleDclExecutor), including
+    /// shared-mode limitations and coordination of callbacks outside the
+    /// guard.
+    ///
     /// # Type Parameters
     ///
     /// * `L` - Lock type used for the protected phase.
@@ -186,6 +214,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// The token exists on the invocation stack rather than in shared executor
     /// state. The task runs while the executor guard is held; commit or
     /// rollback later consumes the same token outside that guard.
+    ///
+    /// See the locking and synchronization contract on
+    /// [LifecycleDclExecutor](crate::LifecycleDclExecutor), including
+    /// shared-mode limitations and coordination of callbacks outside the
+    /// guard.
     ///
     /// # Parameters
     ///
@@ -250,6 +283,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// from dropping returned values after this method returns, or guarantee
     /// recovery from a second panic during an active unwind.
     ///
+    /// See the locking and synchronization contract on
+    /// [LifecycleDclExecutor](crate::LifecycleDclExecutor), including
+    /// shared-mode limitations and coordination of callbacks outside the
+    /// guard.
+    ///
     /// # Parameters
     ///
     /// * `lock` - Lock used for this invocation.
@@ -276,6 +314,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Runs a task with panic capture enabled.
+    ///
+    /// See the locking and synchronization contract on
+    /// [LifecycleDclExecutor](crate::LifecycleDclExecutor), including
+    /// shared-mode limitations and coordination of callbacks outside the
+    /// guard.
     ///
     /// # Parameters
     ///
@@ -306,6 +349,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// cannot produce a result. Capturing a panic does not undo side effects,
     /// cover panics from dropping returned values after this method returns,
     /// or guarantee recovery from a second panic during an active unwind.
+    ///
+    /// See the locking and synchronization contract on
+    /// [LifecycleDclExecutor](crate::LifecycleDclExecutor), including
+    /// shared-mode limitations and coordination of callbacks outside the
+    /// guard.
     pub fn run_with_token_catching<L, R, E, F>(&self, lock: &L, task: F) -> CapturedLifecycleOutcome<R, E, C>
     where
         L: Lock + ?Sized,
