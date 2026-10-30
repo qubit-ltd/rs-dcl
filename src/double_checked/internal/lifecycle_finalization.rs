@@ -66,9 +66,12 @@ where
 ///
 /// The finalization outcome preserving callback errors or captured panics.
 ///
-/// # Panics
-///
-/// Propagates a commit callback or token-drop panic when unwinding.
+/// A commit callback or token-drop panic is captured as
+/// [`CapturedFinalizationOutcome::Panicked`] with [`PanicPhase::Commit`]. This
+/// also applies when dropping a token without a commit callback. With unwinding
+/// enabled, these panics are captured. Capture cannot produce an outcome with
+/// `panic=abort` and does not guarantee recovery from a second panic during
+/// active unwinding.
 pub(crate) fn finalize_commit_catching<P, C, F>(commit: Option<&F>, token: P) -> CapturedFinalizationOutcome<C>
 where
     F: Fn(P) -> Result<(), C> + ?Sized,
@@ -147,9 +150,12 @@ where
 ///
 /// The finalization outcome preserving callback errors or captured panics.
 ///
-/// # Panics
-///
-/// Propagates a rollback callback or token-drop panic when unwinding.
+/// A rollback callback or token-drop panic is captured as
+/// [`CapturedFinalizationOutcome::Panicked`] with [`PanicPhase::Rollback`].
+/// This also applies when dropping a token without a rollback callback. With
+/// unwinding enabled, these panics are captured. Capture cannot produce
+/// an outcome with `panic=abort` and does not guarantee recovery from a second
+/// panic during active unwinding.
 pub(crate) fn finalize_rollback_catching<P, C, F>(
     rollback: Option<&F>,
     token: P,
