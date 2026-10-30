@@ -351,6 +351,7 @@ dependencies = [
  "loom",
  "parking_lot",
  "qubit-lock",
+ "serde_json",
 ]
 
 [[package]]

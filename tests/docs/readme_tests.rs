@@ -9,7 +9,10 @@
 
 use std::fs;
 use std::io;
+use std::panic::catch_unwind;
 use std::path::Path;
+
+use serde_json::Value;
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const FEATURE_MATRIX: &str = include_str!("../../.infra/ci/cargo-matrix.json");
@@ -191,12 +194,100 @@ fn test_readmes_align_lock_feature_and_dependency_versions() {
 /// backends.
 #[test]
 fn test_feature_matrix_covers_minimal_and_parking_lot_backends() {
-    assert!(FEATURE_MATRIX.contains("\"name\": \"base-locks\""));
-    assert!(FEATURE_MATRIX.contains("\"defaultFeatures\": false"));
-    assert!(FEATURE_MATRIX.contains("\"name\": \"parking-lot-locks\""));
-    assert!(FEATURE_MATRIX.contains("\"features\": [\n        \"parking-lot\"\n      ]"));
-    assert!(FEATURE_MATRIX.contains("\"name\": \"all-features\""));
-    assert!(FEATURE_MATRIX.contains("\"allFeatures\": true"));
+    let matrix: Value = serde_json::from_str(FEATURE_MATRIX).expect("feature matrix should be valid JSON");
+    assert_feature_matrix_contract(&matrix);
+}
+
+/// Checks required backend configurations independently of JSON formatting.
+fn assert_feature_matrix_contract(matrix: &Value) {
+    assert_eq!(matrix["version"], 1, "matrix version should be supported");
+    let checks = matrix["checks"].as_array().expect("checks should be an array");
+    for name in ["base-locks", "parking-lot-locks", "all-features"] {
+        let matching = checks.iter().filter(|check| check["name"] == name).collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "matrix should contain exactly one {name}");
+        let check = matching[0];
+        match name {
+            "base-locks" => {
+                assert_eq!(check["defaultFeatures"], false, "base-locks should disable defaults");
+                assert_eq!(check["features"], serde_json::json!([]));
+                assert!(check.get("allFeatures").is_none_or(|value| value == false));
+            }
+            "parking-lot-locks" => {
+                assert_eq!(
+                    check["defaultFeatures"], false,
+                    "parking-lot-locks should disable defaults"
+                );
+                assert_eq!(check["features"], serde_json::json!(["parking-lot"]));
+                assert!(check.get("allFeatures").is_none_or(|value| value == false));
+            }
+            "all-features" => assert_eq!(check["allFeatures"], true),
+            _ => unreachable!("required names are fixed"),
+        }
+        let commands = check["commands"].as_array().expect("commands should be an array");
+        for command in ["test", "doc", "doc-test", "clippy"] {
+            assert!(
+                commands.iter().any(|value| value == command),
+                "{name} should run {command}"
+            );
+        }
+    }
+}
+
+/// Verifies equivalent formatting and check order preserve the contract.
+#[test]
+fn test_feature_matrix_contract_accepts_equivalent_serializations() {
+    let mut matrix: Value = serde_json::from_str(FEATURE_MATRIX).expect("matrix should parse");
+    matrix["checks"]
+        .as_array_mut()
+        .expect("checks should be an array")
+        .reverse();
+    for serialized in [
+        serde_json::to_string(&matrix).expect("compact matrix should serialize"),
+        serde_json::to_string_pretty(&matrix).expect("pretty matrix should serialize"),
+    ] {
+        let parsed: Value = serde_json::from_str(&serialized).expect("serialized matrix should parse");
+        assert_feature_matrix_contract(&parsed);
+    }
+}
+
+/// Verifies globally present fields cannot hide a broken required entry.
+#[test]
+fn test_feature_matrix_contract_rejects_invalid_entries() {
+    let original: Value = serde_json::from_str(FEATURE_MATRIX).expect("matrix should parse");
+    let base = original["checks"]
+        .as_array()
+        .expect("checks should be an array")
+        .iter()
+        .position(|check| check["name"] == "base-locks")
+        .expect("base entry should exist");
+    let parking = original["checks"]
+        .as_array()
+        .expect("checks should be an array")
+        .iter()
+        .position(|check| check["name"] == "parking-lot-locks")
+        .expect("parking entry should exist");
+
+    let mut swapped = original.clone();
+    swapped["checks"][base]["features"] = serde_json::json!(["parking-lot"]);
+    swapped["checks"][parking]["features"] = serde_json::json!([]);
+    let mut missing_command = original.clone();
+    missing_command["checks"][parking]["commands"]
+        .as_array_mut()
+        .expect("commands should be an array")
+        .retain(|value| value != "clippy");
+    let mut missing_entry = original.clone();
+    missing_entry["checks"]
+        .as_array_mut()
+        .expect("checks should be an array")
+        .remove(base);
+    let mut duplicate_entry = original.clone();
+    duplicate_entry["checks"]
+        .as_array_mut()
+        .expect("checks should be an array")
+        .push(original["checks"][base].clone());
+    for invalid in [swapped, missing_command, missing_entry, duplicate_entry] {
+        assert!(catch_unwind(|| assert_feature_matrix_contract(&invalid)).is_err());
+    }
 }
 
 /// Verifies public documentation does not retain migration guidance.
