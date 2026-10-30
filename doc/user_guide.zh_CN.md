@@ -229,15 +229,19 @@ assert!(matches!(outcome, ExecutionOutcome::TaskFailed(error)
 
 下面的同步适配器模拟所有权，不引入数据库驱动依赖：
 
+下面两个代码块组成一个完整示例。把第一个代码块的导入项和类型定义放在模块级，再把第二个
+代码块的语句放入 `main`。
+
 ```rust
 use std::{
     io,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
 };
 
 #[derive(Clone, Default)]
 struct Database {
     committed: Arc<Mutex<Vec<String>>>,
+    fail_next_commit: Arc<AtomicBool>,
 }
 
 impl Database {
@@ -267,6 +271,9 @@ impl DatabaseTransaction {
     }
 
     fn commit(self) -> Result<(), io::Error> {
+        if self.database.fail_next_commit.swap(false, Ordering::AcqRel) {
+            return Err(io::Error::other("commit failed before writing"));
+        }
         self.database
             .committed
             .lock()
@@ -284,19 +291,21 @@ impl DatabaseTransaction {
 配置生命周期，并执行需要可变访问 token 的 task：
 
 ```rust
-use std::sync::atomic::{AtomicBool, Ordering};
 use qubit_dcl::{
     FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
 };
 
-let refresh_needed = Arc::new(AtomicBool::new(true));
+let work_available = Arc::new(AtomicBool::new(true));
 let transaction_lock = Mutex::new(());
-let database = Database::default();
+let database = Database {
+    committed: Arc::default(),
+    fail_next_commit: Arc::new(AtomicBool::new(true)),
+};
 
 let executor = LifecycleDclExecutor::builder()
     .when({
-        let refresh_needed = Arc::clone(&refresh_needed);
-        move || refresh_needed.load(Ordering::Acquire)
+        let work_available = Arc::clone(&work_available);
+        move || work_available.load(Ordering::Acquire)
     })
     .prepare({
         let database = database.clone();
@@ -315,26 +324,51 @@ let executor = LifecycleDclExecutor::builder()
 
 let outcome = executor.run_with_token(&transaction_lock, |transaction| {
     transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    refresh_needed.store(false, Ordering::Release);
+    work_available.store(false, Ordering::Release);
     Ok::<usize, io::Error>(1)
 });
 
-assert!(matches!(
-    outcome,
+match outcome {
+    LifecycleOutcome::TaskSucceeded {
+        value: 1,
+        commit: FinalizationOutcome::Failed(error),
+    } => assert_eq!(error.to_string(), "commit failed before writing"),
+    other => panic!("首次调用结果不符合预期：{other:?}"),
+}
+assert!(database.committed().is_empty());
+{
+    let _guard = transaction_lock.lock().expect("协调锁不应 poisoned");
+    work_available.store(true, Ordering::Release);
+}
+let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+    work_available.store(false, Ordering::Release);
+    Ok::<usize, io::Error>(1)
+});
+match outcome {
     LifecycleOutcome::TaskSucceeded {
         value: 1,
         commit: FinalizationOutcome::Succeeded,
-    }
-));
+    } => {}
+    other => panic!("第二次调用结果不符合预期：{other:?}"),
+}
 assert_eq!(
     database.committed(),
     ["INSERT INTO audit_log VALUES ('routes refreshed')"],
 );
 ```
 
-token 属于单次调用。`prepare` 在获取 `transaction_lock` 前执行；task 在 guard 下修改
-事务；`commit` 在 guard 释放后消费事务。task 不需要访问 token 时使用 `run`，否则
-使用 `run_with_token`。
+token 属于单次调用。`prepare` 在获取 `transaction_lock` 前执行；task 在 guard 下关闭
+`work_available` 以领取工作；`commit` 在 guard 释放后消费事务。gate 表示工作已被领取，
+不表示已经持久化。只有 `TaskSucceeded` 且 commit 为 `Succeeded` 才代表本例提交成功。
+第一次 commit 在写入前失败，因此调用方重新获取同一个协调 mutex 并重新开放 gate；第二次
+调用成功后数据库只有一条记录。task 不需要访问 token 时使用 `run`，否则使用
+`run_with_token`。
+
+如果 task 返回 error 且 rollback 完成，并且工作可以安全重试，则也应在同一个协调 mutex
+下重新开放 gate。此模拟适配器能确定第一次 commit 尚未写入。真实数据库可能在提交已生效后
+才返回 error；结果不明时，应先查询事务结果或使用幂等键再决定是否重试，不要盲目重新开放
+gate。
 
 builder 只暴露以下三种终结结构：
 
@@ -380,8 +414,12 @@ commit 结果、第二次条件拒绝及其 rollback 结果，以及 task failur
 `LifecycleDclExecutor::run_catching` 和 `run_with_token_catching` 返回
 `CapturedLifecycleOutcome`，其中 commit 与 rollback 字段使用
 `CapturedFinalizationOutcome`。`PanicPhase` 可定位首次检查、prepare、获取锁、第二次
-检查、task、释放锁、commit 或 rollback 阶段。捕获模式还会分别报告终结步骤无需
-执行、成功、error 或 panic。
+检查、task、释放锁、commit、rollback 或 `TaskCleanup` 阶段。`TaskCleanup` 表示尚未执行的
+task 在提前返回时于锁外销毁，且此时没有 token。若首次检查拒绝而销毁 task 时 panic，
+`CapturedLifecycleOutcome` 会返回 `TaskCleanupPanicked`，不执行 rollback。若 predicate
+panic、prepare error 或 prepare panic 已先发生，即使销毁 task 也 panic，仍保留原始失败。
+穷尽匹配这些公开枚举的调用方需要处理新增分支。捕获模式还会分别报告终结步骤无需执行、
+成功、error 或 panic。
 
 panic 捕获依赖 unwinding。使用 `panic = "abort"` 时，进程会在返回 outcome 或执行
 基于 unwind 的 rollback 前退出。捕获 panic 不会撤销 task 副作用，也不能证明应用

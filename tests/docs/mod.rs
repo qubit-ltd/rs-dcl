@@ -7,4 +7,5 @@
 // =============================================================================
 //! Documentation consistency tests.
 
+mod lifecycle_transaction_tests;
 mod readme_tests;

@@ -244,15 +244,20 @@ commit or roll back after the guard is released.
 This small synchronous adapter models ownership without adding a database
 driver dependency:
 
+The two code blocks below form one example. Place the first block's imports and
+type definitions at module scope, then put the second block's statements inside
+`main`.
+
 ```rust
 use std::{
     io,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
 };
 
 #[derive(Clone, Default)]
 struct Database {
     committed: Arc<Mutex<Vec<String>>>,
+    fail_next_commit: Arc<AtomicBool>,
 }
 
 impl Database {
@@ -282,6 +287,9 @@ impl DatabaseTransaction {
     }
 
     fn commit(self) -> Result<(), io::Error> {
+        if self.database.fail_next_commit.swap(false, Ordering::AcqRel) {
+            return Err(io::Error::other("commit failed before writing"));
+        }
         self.database
             .committed
             .lock()
@@ -299,19 +307,21 @@ impl DatabaseTransaction {
 Configure the lifecycle and run a task that needs mutable access to the token:
 
 ```rust
-use std::sync::atomic::{AtomicBool, Ordering};
 use qubit_dcl::{
     FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
 };
 
-let refresh_needed = Arc::new(AtomicBool::new(true));
+let work_available = Arc::new(AtomicBool::new(true));
 let transaction_lock = Mutex::new(());
-let database = Database::default();
+let database = Database {
+    committed: Arc::default(),
+    fail_next_commit: Arc::new(AtomicBool::new(true)),
+};
 
 let executor = LifecycleDclExecutor::builder()
     .when({
-        let refresh_needed = Arc::clone(&refresh_needed);
-        move || refresh_needed.load(Ordering::Acquire)
+        let work_available = Arc::clone(&work_available);
+        move || work_available.load(Ordering::Acquire)
     })
     .prepare({
         let database = database.clone();
@@ -330,17 +340,34 @@ let executor = LifecycleDclExecutor::builder()
 
 let outcome = executor.run_with_token(&transaction_lock, |transaction| {
     transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    refresh_needed.store(false, Ordering::Release);
+    work_available.store(false, Ordering::Release);
     Ok::<usize, io::Error>(1)
 });
 
-assert!(matches!(
-    outcome,
+match outcome {
+    LifecycleOutcome::TaskSucceeded {
+        value: 1,
+        commit: FinalizationOutcome::Failed(error),
+    } => assert_eq!(error.to_string(), "commit failed before writing"),
+    other => panic!("unexpected first outcome: {other:?}"),
+}
+assert!(database.committed().is_empty());
+{
+    let _guard = transaction_lock.lock().expect("coordination lock should not be poisoned");
+    work_available.store(true, Ordering::Release);
+}
+let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+    work_available.store(false, Ordering::Release);
+    Ok::<usize, io::Error>(1)
+});
+match outcome {
     LifecycleOutcome::TaskSucceeded {
         value: 1,
         commit: FinalizationOutcome::Succeeded,
-    }
-));
+    } => {}
+    other => panic!("unexpected second outcome: {other:?}"),
+}
 assert_eq!(
     database.committed(),
     ["INSERT INTO audit_log VALUES ('routes refreshed')"],
@@ -348,9 +375,20 @@ assert_eq!(
 ```
 
 The token is invocation-local. `prepare` runs before `transaction_lock` is
-acquired; the task mutates the transaction under the guard; `commit` consumes
-it after the guard has been released. Use `run` instead of `run_with_token`
-when the task does not need access to the token.
+acquired; the task closes `work_available` under the guard to claim the work;
+`commit` consumes the token after the guard has been released. The gate means
+the work has been claimed, not that it has been persisted. Only
+`TaskSucceeded` with commit `Succeeded` means this example committed. The first
+commit fails before writing, so the caller reacquires the same coordination
+mutex and reopens the gate; the second call commits exactly one record. Use
+`run` instead of `run_with_token` when the task does not need access to the
+token.
+
+If the task returns an error and rollback completes, reopen the gate under the
+same coordination mutex when the work is safe to retry. This mock adapter knows
+the first commit failed before writing. A real database can report an error
+after the commit took effect; in that uncertain case, query the transaction
+result or use an idempotency key before retrying. Do not blindly reopen the gate.
 
 The builder exposes exactly these finalization shapes:
 
@@ -402,9 +440,15 @@ callback whether execution was rejected, returned an error, or panicked.
 `LifecycleDclExecutor::run_catching` and `run_with_token_catching` return
 `CapturedLifecycleOutcome`; its commit and rollback fields use
 `CapturedFinalizationOutcome`. `PanicPhase` identifies the initial check,
-prepare, lock acquisition, second check, task, lock release, commit, or rollback
-phase. Captured finalization separately reports not-required, success, error,
-or panic.
+prepare, lock acquisition, second check, task, lock release, commit, rollback,
+or `TaskCleanup` phase. `TaskCleanup` means an unstarted task was dropped after
+an early return, outside the lock and without a token. In
+`CapturedLifecycleOutcome`, `TaskCleanupPanicked` is possible when the first
+check rejects and that drop panics; no rollback runs. Existing failures such as
+a predicate panic, prepare error, or prepare panic keep priority if dropping
+the unstarted task also panics. Callers matching these public enums
+exhaustively must handle the new variants. Captured finalization separately
+reports not-required, success, error, or panic.
 
 Panic capture requires unwinding. With `panic = "abort"`, the process exits
 before an outcome or unwind-based rollback can be produced. Capturing a panic
