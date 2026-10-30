@@ -227,10 +227,7 @@ assert!(matches!(outcome, ExecutionOutcome::TaskFailed(error)
 有些工作拥有必须在进入协调锁前准备、离开协调锁后终结的资源。数据库事务就是具体
 场景：创建事务，在 guard 下暂存语句，释放 guard 后再 commit 或 rollback。
 
-下面的同步适配器模拟所有权，不引入数据库驱动依赖：
-
-下面两个代码块组成一个完整示例。把第一个代码块的导入项和类型定义放在模块级，再把第二个
-代码块的语句放入 `main`。
+下面的同步适配器模拟所有权，不引入数据库驱动依赖。下面的完整示例定义事务适配器，演示提交失败后重新开放 gate，并在第二次调用中提交成功。
 
 ```rust
 use std::{
@@ -286,76 +283,75 @@ impl DatabaseTransaction {
         Ok(())
     }
 }
-```
 
-配置生命周期，并执行需要可变访问 token 的 task：
+fn main() {
+    // 配置生命周期，并执行需要可变访问 token 的 task。
+    use qubit_dcl::{
+        FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
+    };
 
-```rust
-use qubit_dcl::{
-    FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
-};
+    let work_available = Arc::new(AtomicBool::new(true));
+    let transaction_lock = Mutex::new(());
+    let database = Database {
+        committed: Arc::default(),
+        fail_next_commit: Arc::new(AtomicBool::new(true)),
+    };
 
-let work_available = Arc::new(AtomicBool::new(true));
-let transaction_lock = Mutex::new(());
-let database = Database {
-    committed: Arc::default(),
-    fail_next_commit: Arc::new(AtomicBool::new(true)),
-};
+    let executor = LifecycleDclExecutor::builder()
+        .when({
+            let work_available = Arc::clone(&work_available);
+            move || work_available.load(Ordering::Acquire)
+        })
+        .prepare({
+            let database = database.clone();
+            move || Ok::<DatabaseTransaction, io::Error>(
+                database.begin_transaction(),
+            )
+        })
+        .commit(|transaction| transaction.commit())
+        .rollback(|transaction, cause| {
+            if let RollbackCause::TaskFailed(error) = cause {
+                eprintln!("database task failed: {error}");
+            }
+            transaction.rollback()
+        })
+        .build();
 
-let executor = LifecycleDclExecutor::builder()
-    .when({
-        let work_available = Arc::clone(&work_available);
-        move || work_available.load(Ordering::Acquire)
-    })
-    .prepare({
-        let database = database.clone();
-        move || Ok::<DatabaseTransaction, io::Error>(
-            database.begin_transaction(),
-        )
-    })
-    .commit(|transaction| transaction.commit())
-    .rollback(|transaction, cause| {
-        if let RollbackCause::TaskFailed(error) = cause {
-            eprintln!("database task failed: {error}");
-        }
-        transaction.rollback()
-    })
-    .build();
+    let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+        transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+        work_available.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(1)
+    });
 
-let outcome = executor.run_with_token(&transaction_lock, |transaction| {
-    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    work_available.store(false, Ordering::Release);
-    Ok::<usize, io::Error>(1)
-});
-
-match outcome {
-    LifecycleOutcome::TaskSucceeded {
-        value: 1,
-        commit: FinalizationOutcome::Failed(error),
-    } => assert_eq!(error.to_string(), "commit failed before writing"),
-    other => panic!("首次调用结果不符合预期：{other:?}"),
+    match outcome {
+        LifecycleOutcome::TaskSucceeded {
+            value: 1,
+            commit: FinalizationOutcome::Failed(error),
+        } => assert_eq!(error.to_string(), "commit failed before writing"),
+        other => panic!("首次调用结果不符合预期：{other:?}"),
+    }
+    assert!(database.committed().is_empty());
+    {
+        let _guard = transaction_lock.lock().expect("协调锁不应 poisoned");
+        work_available.store(true, Ordering::Release);
+    }
+    let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+        transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+        work_available.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(1)
+    });
+    match outcome {
+        LifecycleOutcome::TaskSucceeded {
+            value: 1,
+            commit: FinalizationOutcome::Succeeded,
+        } => {}
+        other => panic!("第二次调用结果不符合预期：{other:?}"),
+    }
+    assert_eq!(
+        database.committed(),
+        ["INSERT INTO audit_log VALUES ('routes refreshed')"],
+    );
 }
-assert!(database.committed().is_empty());
-{
-    let _guard = transaction_lock.lock().expect("协调锁不应 poisoned");
-    work_available.store(true, Ordering::Release);
-}
-let outcome = executor.run_with_token(&transaction_lock, |transaction| {
-    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    work_available.store(false, Ordering::Release);
-    Ok::<usize, io::Error>(1)
-});
-match outcome {
-    LifecycleOutcome::TaskSucceeded {
-        value: 1,
-        commit: FinalizationOutcome::Succeeded,
-    } => {}
-    other => panic!("第二次调用结果不符合预期：{other:?}"),
-}
-assert_eq!(
-    database.committed(),
-    ["INSERT INTO audit_log VALUES ('routes refreshed')"],
-);
 ```
 
 token 属于单次调用。`prepare` 在获取 `transaction_lock` 前执行；task 在 guard 下关闭

@@ -242,11 +242,8 @@ concrete example: create a transaction, stage statements under the guard, then
 commit or roll back after the guard is released.
 
 This small synchronous adapter models ownership without adding a database
-driver dependency:
-
-The two code blocks below form one example. Place the first block's imports and
-type definitions at module scope, then put the second block's statements inside
-`main`.
+driver dependency. The complete runnable example below defines the adapter and
+exercises a failed commit followed by a successful retry.
 
 ```rust
 use std::{
@@ -302,76 +299,75 @@ impl DatabaseTransaction {
         Ok(())
     }
 }
-```
 
-Configure the lifecycle and run a task that needs mutable access to the token:
+fn main() {
+    // Configure the lifecycle and run a task that needs mutable access to the token.
+    use qubit_dcl::{
+        FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
+    };
 
-```rust
-use qubit_dcl::{
-    FinalizationOutcome, LifecycleDclExecutor, LifecycleOutcome, RollbackCause,
-};
+    let work_available = Arc::new(AtomicBool::new(true));
+    let transaction_lock = Mutex::new(());
+    let database = Database {
+        committed: Arc::default(),
+        fail_next_commit: Arc::new(AtomicBool::new(true)),
+    };
 
-let work_available = Arc::new(AtomicBool::new(true));
-let transaction_lock = Mutex::new(());
-let database = Database {
-    committed: Arc::default(),
-    fail_next_commit: Arc::new(AtomicBool::new(true)),
-};
+    let executor = LifecycleDclExecutor::builder()
+        .when({
+            let work_available = Arc::clone(&work_available);
+            move || work_available.load(Ordering::Acquire)
+        })
+        .prepare({
+            let database = database.clone();
+            move || Ok::<DatabaseTransaction, io::Error>(
+                database.begin_transaction(),
+            )
+        })
+        .commit(|transaction| transaction.commit())
+        .rollback(|transaction, cause| {
+            if let RollbackCause::TaskFailed(error) = cause {
+                eprintln!("database task failed: {error}");
+            }
+            transaction.rollback()
+        })
+        .build();
 
-let executor = LifecycleDclExecutor::builder()
-    .when({
-        let work_available = Arc::clone(&work_available);
-        move || work_available.load(Ordering::Acquire)
-    })
-    .prepare({
-        let database = database.clone();
-        move || Ok::<DatabaseTransaction, io::Error>(
-            database.begin_transaction(),
-        )
-    })
-    .commit(|transaction| transaction.commit())
-    .rollback(|transaction, cause| {
-        if let RollbackCause::TaskFailed(error) = cause {
-            eprintln!("database task failed: {error}");
-        }
-        transaction.rollback()
-    })
-    .build();
+    let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+        transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+        work_available.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(1)
+    });
 
-let outcome = executor.run_with_token(&transaction_lock, |transaction| {
-    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    work_available.store(false, Ordering::Release);
-    Ok::<usize, io::Error>(1)
-});
-
-match outcome {
-    LifecycleOutcome::TaskSucceeded {
-        value: 1,
-        commit: FinalizationOutcome::Failed(error),
-    } => assert_eq!(error.to_string(), "commit failed before writing"),
-    other => panic!("unexpected first outcome: {other:?}"),
+    match outcome {
+        LifecycleOutcome::TaskSucceeded {
+            value: 1,
+            commit: FinalizationOutcome::Failed(error),
+        } => assert_eq!(error.to_string(), "commit failed before writing"),
+        other => panic!("unexpected first outcome: {other:?}"),
+    }
+    assert!(database.committed().is_empty());
+    {
+        let _guard = transaction_lock.lock().expect("coordination lock should not be poisoned");
+        work_available.store(true, Ordering::Release);
+    }
+    let outcome = executor.run_with_token(&transaction_lock, |transaction| {
+        transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
+        work_available.store(false, Ordering::Release);
+        Ok::<usize, io::Error>(1)
+    });
+    match outcome {
+        LifecycleOutcome::TaskSucceeded {
+            value: 1,
+            commit: FinalizationOutcome::Succeeded,
+        } => {}
+        other => panic!("unexpected second outcome: {other:?}"),
+    }
+    assert_eq!(
+        database.committed(),
+        ["INSERT INTO audit_log VALUES ('routes refreshed')"],
+    );
 }
-assert!(database.committed().is_empty());
-{
-    let _guard = transaction_lock.lock().expect("coordination lock should not be poisoned");
-    work_available.store(true, Ordering::Release);
-}
-let outcome = executor.run_with_token(&transaction_lock, |transaction| {
-    transaction.execute("INSERT INTO audit_log VALUES ('routes refreshed')");
-    work_available.store(false, Ordering::Release);
-    Ok::<usize, io::Error>(1)
-});
-match outcome {
-    LifecycleOutcome::TaskSucceeded {
-        value: 1,
-        commit: FinalizationOutcome::Succeeded,
-    } => {}
-    other => panic!("unexpected second outcome: {other:?}"),
-}
-assert_eq!(
-    database.committed(),
-    ["INSERT INTO audit_log VALUES ('routes refreshed')"],
-);
 ```
 
 The token is invocation-local. `prepare` runs before `transaction_lock` is

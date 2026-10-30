@@ -115,6 +115,10 @@
 
 pub mod double_checked;
 
+/// Includes the bilingual Markdown examples in rustdoc's test build.
+#[cfg(doctest)]
+mod documentation_examples;
+
 pub use double_checked::CapturedFinalizationOutcome;
 pub use double_checked::CapturedLifecycleOutcome;
 pub use double_checked::DclExecutor;
