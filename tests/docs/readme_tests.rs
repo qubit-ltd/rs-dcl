@@ -7,6 +7,10 @@
 // =============================================================================
 //! README contract and version consistency tests for qubit-dcl.
 
+use std::fs;
+use std::io;
+use std::path::Path;
+
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const FEATURE_MATRIX: &str = include_str!("../../.infra/ci/cargo-matrix.json");
 const README_EN: &str = include_str!("../../README.md");
@@ -141,9 +145,10 @@ fn test_user_guides_cover_stable_outcome_and_panic_types() {
 /// Verifies the optional parking-lot lock implementation remains opt-in.
 #[test]
 fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
-    assert!(CARGO_TOML.contains("[features]\ndefault = []"));
-    assert!(CARGO_TOML.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
-    let dependency = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
+    let manifest = source_manifest();
+    assert!(manifest.contains("[features]\ndefault = []"));
+    assert!(manifest.contains("parking-lot = [\"qubit-lock/parking-lot\"]"));
+    let dependency = find_dependency_spec(&manifest, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
     assert!(dependency.contains("default-features = false"));
     assert!(dependency.contains("version = \"^0.14\""));
     assert!(!dependency.contains("path ="));
@@ -152,11 +157,21 @@ fn test_manifest_exposes_parking_lot_as_an_opt_in_feature() {
 /// Verifies the manifest retains only the lock dependency required at runtime.
 #[test]
 fn test_manifest_uses_only_required_qubit_dependencies() {
-    assert!(find_dependency_spec(CARGO_TOML, "qubit-function").is_none());
+    let manifest = source_manifest();
+    assert!(find_dependency_spec(&manifest, "qubit-function").is_none());
 
-    let lock = find_dependency_spec(CARGO_TOML, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
+    let lock = find_dependency_spec(&manifest, "qubit-lock").expect("Cargo.toml should declare qubit-lock");
     assert!(lock.contains("version = \"^0.14\""));
     assert!(!lock.contains("path ="));
+}
+
+fn source_manifest() -> String {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    match fs::read_to_string(root.join("Cargo.toml.orig")) {
+        Ok(content) => content,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => CARGO_TOML.to_owned(),
+        Err(error) => panic!("cannot read source manifest: {error}"),
+    }
 }
 
 /// Verifies optional integration snippets match manifest dependency versions.
