@@ -16,7 +16,23 @@ use crate::double_checked::internal::DclCore;
 /// Builder stage that requires prepare before finalizer selection.
 ///
 /// The token and callback types are selected by [`Self::prepare`].
-#[doc(hidden)]
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::{LifecycleDclExecutor, LifecycleOutcome};
+///
+/// let predicate_builder = LifecycleDclExecutor::builder().when(|| true);
+/// let outcome = predicate_builder
+///     .prepare(|| Ok::<u32, ()>(1))
+///     .commit(|_| Ok(()))
+///     .no_rollback()
+///     .build()
+///     .run(&Mutex::new(()), || Ok::<u32, std::io::Error>(7));
+/// assert!(matches!(outcome, LifecycleOutcome::TaskSucceeded { value: 7, .. }));
+/// ```
 #[must_use = "the predicate stage must be completed with prepare"]
 pub struct LifecyclePredicateBuilder {
     /// Shared DCL predicate.

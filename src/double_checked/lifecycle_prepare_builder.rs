@@ -21,7 +21,24 @@ use crate::double_checked::internal::DclCore;
 ///
 /// * `P` - Per-invocation token type produced by `prepare`.
 /// * `C` - Error type returned by lifecycle callbacks.
-#[doc(hidden)]
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::{LifecycleDclExecutor, LifecycleOutcome};
+///
+/// let prepare_builder = LifecycleDclExecutor::builder()
+///     .when(|| true)
+///     .prepare(|| Ok::<u32, ()>(1));
+/// let outcome = prepare_builder
+///     .commit(|_| Ok(()))
+///     .no_rollback()
+///     .build()
+///     .run(&Mutex::new(()), || Ok::<u32, std::io::Error>(7));
+/// assert!(matches!(outcome, LifecycleOutcome::TaskSucceeded { value: 7, .. }));
+/// ```
 #[must_use = "the prepare stage requires commit or no_commit"]
 pub struct LifecyclePrepareBuilder<P, C> {
     /// DCL predicate configuration.

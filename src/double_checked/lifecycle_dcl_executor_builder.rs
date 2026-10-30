@@ -11,7 +11,24 @@ use crate::double_checked::LifecyclePredicateBuilder;
 use crate::double_checked::internal::DclCore;
 
 /// Builder stage that cannot proceed without a predicate.
-#[doc(hidden)]
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::{LifecycleDclExecutor, LifecycleOutcome};
+///
+/// let initial_builder = LifecycleDclExecutor::builder();
+/// let outcome = initial_builder
+///     .when(|| true)
+///     .prepare(|| Ok::<u32, ()>(1))
+///     .commit(|_| Ok(()))
+///     .no_rollback()
+///     .build()
+///     .run(&Mutex::new(()), || Ok::<u32, std::io::Error>(7));
+/// assert!(matches!(outcome, LifecycleOutcome::TaskSucceeded { value: 7, .. }));
+/// ```
 #[must_use = "the builder must be completed with when and lifecycle stages"]
 pub struct LifecycleDclExecutorBuilder;
 

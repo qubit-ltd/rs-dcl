@@ -21,7 +21,24 @@ use crate::double_checked::internal::DclCore;
 ///
 /// * `P` - Per-invocation token type produced by `prepare`.
 /// * `C` - Error type returned by lifecycle callbacks.
-#[doc(hidden)]
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Mutex;
+///
+/// use qubit_dcl::{LifecycleDclExecutor, LifecycleOutcome};
+///
+/// let rollback_builder = LifecycleDclExecutor::builder()
+///     .when(|| true)
+///     .prepare(|| Ok::<u32, ()>(1))
+///     .no_commit();
+/// let outcome = rollback_builder
+///     .rollback(|_, _| Ok(()))
+///     .build()
+///     .run(&Mutex::new(()), || Err::<u32, _>(std::io::Error::other("task failed")));
+/// assert!(matches!(outcome, LifecycleOutcome::TaskFailed { .. }));
+/// ```
 #[must_use = "the no-commit stage requires rollback"]
 pub struct LifecycleRollbackBuilder<P, C> {
     /// DCL predicate configuration.
