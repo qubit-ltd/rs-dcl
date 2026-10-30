@@ -442,9 +442,11 @@ callback whether execution was rejected, returned an error, or panicked.
 `CapturedFinalizationOutcome`. `PanicPhase` identifies the initial check,
 prepare, lock acquisition, second check, task, lock release, commit, rollback,
 or `TaskCleanup` phase. `TaskCleanup` means an unstarted task was dropped after
-an early return, outside the lock and without a token. In
-`CapturedLifecycleOutcome`, `TaskCleanupPanicked` is possible when the first
-check rejects and that drop panics; no rollback runs. Existing failures such as
+a condition rejection, outside the lock. On initial rejection no token exists, so a cleanup panic is
+reported as `TaskCleanupPanicked` without rollback. On second-condition
+rejection a token has already been prepared; a cleanup panic is reported as
+`ExecutionPanicked` and the token follows rollback after the guard is released.
+Existing failures such as
 a predicate panic, prepare error, or prepare panic keep priority if dropping
 the unstarted task also panics. Callers matching these public enums
 exhaustively must handle the new variants. Captured finalization separately

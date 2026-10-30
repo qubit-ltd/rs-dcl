@@ -133,7 +133,8 @@ impl DclCore {
     /// # Errors
     ///
     /// Returns [`Err`] when lock acquisition or release, the second predicate
-    /// check, or the task panics.
+    /// check, or the task panics. Dropping an unexecuted task after a condition
+    /// rejection can also panic.
     pub(crate) fn execute_locked_catching<L, R, E, F>(
         &self,
         lock: &L,
@@ -155,6 +156,7 @@ impl DclCore {
             };
             phase.set(PanicPhase::LockRelease);
             drop(guard);
+            phase.set(PanicPhase::TaskCleanup);
             outcome
         }))
         .map_err(|payload| PanicInfo::from_payload(phase.get(), payload))

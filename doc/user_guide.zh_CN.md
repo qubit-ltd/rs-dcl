@@ -414,9 +414,10 @@ commit 结果、第二次条件拒绝及其 rollback 结果，以及 task failur
 `LifecycleDclExecutor::run_catching` 和 `run_with_token_catching` 返回
 `CapturedLifecycleOutcome`，其中 commit 与 rollback 字段使用
 `CapturedFinalizationOutcome`。`PanicPhase` 可定位首次检查、prepare、获取锁、第二次
-检查、task、释放锁、commit、rollback 或 `TaskCleanup` 阶段。`TaskCleanup` 表示尚未执行的
-task 在提前返回时于锁外销毁，且此时没有 token。若首次检查拒绝而销毁 task 时 panic，
-`CapturedLifecycleOutcome` 会返回 `TaskCleanupPanicked`，不执行 rollback。若 predicate
+检查、task、释放锁、commit、rollback 或 `TaskCleanup` 阶段。`TaskCleanup` 表示条件拒绝后
+尚未执行的 task 在锁外销毁。首次拒绝时尚无 token，因此清理 panic 会返回
+`TaskCleanupPanicked`，不执行 rollback。第二次条件拒绝时 token 已准备完成；清理 panic 会以
+`ExecutionPanicked` 返回，并在 guard 释放后对 token 执行 rollback。若 predicate
 panic、prepare error 或 prepare panic 已先发生，即使销毁 task 也 panic，仍保留原始失败。
 穷尽匹配这些公开枚举的调用方需要处理新增分支。捕获模式还会分别报告终结步骤无需执行、
 成功、error 或 panic。

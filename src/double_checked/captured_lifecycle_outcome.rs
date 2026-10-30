@@ -13,7 +13,9 @@ use crate::double_checked::PanicInfo;
 /// Describes lifecycle invocation outcomes when panic capture is enabled.
 ///
 /// Exhaustive matches must handle [`Self::TaskCleanupPanicked`] as a cleanup
-/// failure before execution, with no token and no rollback callback.
+/// failure after initial rejection, before a token exists and without rollback.
+/// A task cleanup panic after second-condition rejection is represented by
+/// [`Self::ExecutionPanicked`] and follows rollback with its prepared token.
 ///
 /// # Type Parameters
 ///
@@ -69,6 +71,8 @@ pub enum CapturedLifecycleOutcome<R, E, C> {
         rollback: CapturedFinalizationOutcome<C>,
     },
     /// Locked execution panicked after prepare and the token followed rollback.
+    /// A task cleanup panic after second-condition rejection retains
+    /// [`crate::double_checked::PanicPhase::TaskCleanup`] here.
     ExecutionPanicked {
         /// Original panic captured from lock acquisition, the second condition
         /// check, the task, or lock release.

@@ -239,7 +239,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// This method uses the same early-return cleanup and failure priority as
     /// [`Self::run_with_token_catching`]. An unexecuted task cleanup panic
     /// after an initial false check is represented by
-    /// [`CapturedLifecycleOutcome::TaskCleanupPanicked`].
+    /// [`CapturedLifecycleOutcome::TaskCleanupPanicked`]. If the second
+    /// condition rejects and dropping the unexecuted task panics,
+    /// `ExecutionPanicked` retains `TaskCleanup` metadata and the prepared
+    /// token follows rollback. `TaskCleanupPanicked` remains limited to an
+    /// initial rejection before a token exists.
     ///
     /// Capture requires unwinding; `panic=abort` and panic hooks that abort
     /// cannot produce a result. It does not undo side effects, cover panics
@@ -289,10 +293,14 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     ///
     /// Captured lifecycle outcome preserving task/rollback panics. If the
     /// first condition is false, an unexecuted task cleanup panic is returned
-    /// as [`CapturedLifecycleOutcome::TaskCleanupPanicked`]. When predicate or
-    /// prepare failure already exists, that original failure takes priority
-    /// over a task cleanup panic. Prepare error and prepare panic occur without
-    /// a token, so neither commit nor rollback runs.
+    /// as [`CapturedLifecycleOutcome::TaskCleanupPanicked`]. If the second
+    /// condition rejects and dropping the unexecuted task panics,
+    /// `ExecutionPanicked` retains `TaskCleanup` metadata and the prepared
+    /// token follows rollback. `TaskCleanupPanicked` remains limited to an
+    /// initial rejection before a token exists. When predicate or prepare
+    /// failure already exists, that original failure takes priority over
+    /// task cleanup. Prepare error and prepare panic occur without a token,
+    /// so neither commit nor rollback runs.
     ///
     /// Capture requires unwinding; `panic=abort` and panic hooks that abort
     /// cannot produce a result. Capturing a panic does not undo side effects,

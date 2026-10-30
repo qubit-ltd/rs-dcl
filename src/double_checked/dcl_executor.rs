@@ -175,8 +175,9 @@ impl DclExecutor {
     /// initial check rejects or panics, lock acquisition, the second
     /// predicate, task execution, and guard drop. An initial predicate panic
     /// remains the reported panic if dropping the skipped task also panics.
-    /// Cleanup after an ordinary initial rejection is reported as
-    /// [`crate::double_checked::PanicPhase::TaskCleanup`].
+    /// Cleanup after an ordinary initial or second-condition rejection is
+    /// reported as [`crate::double_checked::PanicPhase::TaskCleanup`]. Cleanup
+    /// after second-condition rejection runs after the lock guard is released.
     ///
     /// Capture requires unwinding; `panic=abort` and panic hooks that abort
     /// cannot produce a result. Capturing a panic does not undo side effects,
