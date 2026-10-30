@@ -147,12 +147,15 @@ fn test_external_gate_change_uses_same_underlying_lock() {
     let gate = Arc::new(AtomicBool::new(true));
     let checks = Arc::new(AtomicUsize::new(0));
     let task_calls = Arc::new(AtomicUsize::new(0));
+    let (first_check_sender, first_check_receiver) = mpsc::channel::<()>();
     let executor = DclExecutor::new({
         let gate = Arc::clone(&gate);
         let checks = Arc::clone(&checks);
         move || {
             let result = gate.load(Ordering::Acquire);
-            checks.fetch_add(1, Ordering::Release);
+            if checks.fetch_add(1, Ordering::Release) == 0 {
+                let _ = first_check_sender.send(());
+            }
             result
         }
     });
@@ -166,13 +169,16 @@ fn test_external_gate_change_uses_same_underlying_lock() {
             Ok::<(), io::Error>(())
         })
     });
-    while checks.load(Ordering::Acquire) == 0 {
-        thread::yield_now();
-    }
+    let first_check = first_check_receiver.recv_timeout(Duration::from_secs(5));
     gate.store(false, Ordering::Release);
     drop(guard);
 
-    let outcome = handle.join().expect("worker should not panic");
+    let worker_result = handle.join();
+    assert!(
+        first_check.is_ok(),
+        "initial predicate should run before lock acquisition: {first_check:?}",
+    );
+    let outcome = worker_result.expect("worker should not panic");
     assert!(matches!(outcome, ExecutionOutcome::ConditionNotMet));
     assert_eq!(checks.load(Ordering::Relaxed), 2);
     assert_eq!(task_calls.load(Ordering::Relaxed), 0);
