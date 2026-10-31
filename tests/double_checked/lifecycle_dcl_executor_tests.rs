@@ -12,7 +12,6 @@ use std::fmt;
 use std::io;
 use std::panic::AssertUnwindSafe;
 use std::panic::catch_unwind;
-use std::process::Command;
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::sync::Mutex;
@@ -34,8 +33,6 @@ use crate::support::NoopLock;
 use crate::support::PanicOnDrop;
 use crate::support::PanickingReleaseLock;
 use crate::support::run_test_in_subprocess;
-
-const ROLLBACK_DROP_CHILD_COMPLETED: &str = "qubit-dcl:rollback-error-drop-child:completed:v1";
 
 /// Rollback error whose destructor panics to exercise panic-priority handling.
 #[derive(Debug)]
@@ -1475,32 +1472,15 @@ fn test_run_uncaptured_task_panic_outranks_rollback_error() {
 /// the process while the original task panic is resumed.
 #[test]
 fn test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic() {
-    let test_binary = std::env::current_exe().expect("integration test binary path should be available");
-    let output = Command::new(test_binary)
-        .arg("--exact")
-        .arg("double_checked::lifecycle_dcl_executor_tests::test_uncaptured_task_panic_with_panicking_rollback_error_drop_child")
-        .arg("--ignored")
-        .arg("--nocapture")
-        .output()
-        .expect("child integration test should start");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let completed = stderr.lines().any(|line| line == ROLLBACK_DROP_CHILD_COMPLETED);
-
-    assert!(
-        output.status.success() && completed,
-        "child test should execute and preserve the original panic without aborting; status: {}, completed: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        completed,
-        stdout,
-        stderr,
-    );
+    run_test_in_subprocess(
+        "double_checked::lifecycle_dcl_executor_tests::test_run_uncaptured_task_panic_outranks_rollback_error_drop_panic",
+        Duration::from_secs(30),
+        test_uncaptured_task_panic_with_panicking_rollback_error_drop_child,
+    )
+    .expect("rollback error drop panic scenario must finish successfully");
 }
 
-/// Reproduces the rollback-error destructor panic in a child process because
-/// an abort cannot be observed safely in the parent test process.
-#[test]
-#[ignore]
+/// Reproduces the rollback-error destructor panic in the bounded child process.
 fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
     let executor = LifecycleDclExecutor::builder()
         .when(|| true)
@@ -1516,7 +1496,6 @@ fn test_uncaptured_task_panic_with_panicking_rollback_error_drop_child() {
 
     let payload = panic_result.expect_err("task panic should resume unwinding");
     assert_eq!(payload.downcast_ref::<&str>(), Some(&"original task panic"));
-    eprintln!("{ROLLBACK_DROP_CHILD_COMPLETED}");
 }
 
 /// Verifies a secondary rollback panic cannot replace the original locked
