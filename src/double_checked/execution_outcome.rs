@@ -26,11 +26,18 @@
 #[must_use = "the execution outcome must be inspected"]
 pub enum ExecutionOutcome<R, E> {
     /// The task ran while holding the executor lock and returned `R`.
-    Success(R),
+    Success(
+        /// The value returned by the guarded task after it completed
+        /// successfully.
+        R,
+    ),
     /// A lock-free or lock-protected condition check returned `false`.
     ConditionNotMet,
     /// The task ran and returned its original error value.
-    TaskFailed(E),
+    TaskFailed(
+        /// The original error returned by the guarded task.
+        E,
+    ),
 }
 
 impl<R, E> ExecutionOutcome<R, E> {

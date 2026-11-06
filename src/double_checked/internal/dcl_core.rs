@@ -59,6 +59,7 @@ impl DclCore {
     /// # Panics
     ///
     /// Propagates a predicate panic.
+    #[must_use]
     #[inline]
     pub(crate) fn check_initial(&self) -> bool {
         (self.predicate)()
@@ -125,6 +126,13 @@ impl DclCore {
     ///
     /// * `lock` - Lock used for the protected phase of this invocation.
     /// * `task` - Task to run only when the second check succeeds.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `L` - Lock type used for the protected phase.
+    /// * `R` - Successful task result type.
+    /// * `E` - Task error type.
+    /// * `F` - One-shot task callback type.
     ///
     /// # Returns
     ///

@@ -161,6 +161,10 @@ impl fmt::Debug for PanicInfo {
     /// Formats the panic phase and optional string message without attempting
     /// to format an unknown payload type.
     ///
+    /// # Parameters
+    ///
+    /// * `formatter` - Destination formatter that receives the debug fields.
+    ///
     /// # Errors
     ///
     /// Returns the formatter error if writing the debug representation fails.

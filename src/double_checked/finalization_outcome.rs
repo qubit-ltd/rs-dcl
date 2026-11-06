@@ -32,5 +32,8 @@ pub enum FinalizationOutcome<C> {
     /// The configured commit or rollback callback returned successfully.
     Succeeded,
     /// The configured callback returned its original lifecycle error.
-    Failed(C),
+    Failed(
+        /// Error value returned by the callback, preserved without conversion.
+        C,
+    ),
 }

@@ -25,9 +25,17 @@ pub(crate) enum CapturedRollbackExecution<E> {
     /// The second condition check returned `false`.
     ConditionNotMet,
     /// The task returned its original error.
-    TaskFailed(E),
+    TaskFailed(
+        /// The task error retained for inspection by the rollback callback
+        /// before ownership passes to the terminal lifecycle outcome.
+        E,
+    ),
     /// Lock acquisition, the second check, the task, or lock release panicked.
-    Panicked(PanicInfo),
+    Panicked(
+        /// Captured panic metadata used by the rollback callback and retained
+        /// in the terminal lifecycle outcome.
+        PanicInfo,
+    ),
 }
 
 impl<E> CapturedRollbackExecution<E>
@@ -43,6 +51,7 @@ where
     /// # Type Parameters
     ///
     /// * `E` - Task error type stored in the unsuccessful execution state.
+    #[must_use]
     #[inline]
     pub(crate) fn cause(&self) -> RollbackCause<'_> {
         match self {

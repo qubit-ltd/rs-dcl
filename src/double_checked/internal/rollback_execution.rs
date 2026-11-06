@@ -21,8 +21,13 @@ use crate::double_checked::RollbackCause;
 pub(crate) enum RollbackExecution<E> {
     /// The second condition check returned `false`.
     ConditionNotMet,
-    /// The task returned its original error.
-    TaskFailed(E),
+    /// The task returned its original error, which is retained for the
+    /// rollback callback and the terminal lifecycle outcome.
+    TaskFailed(
+        /// Original task error retained for the rollback callback and final
+        /// lifecycle outcome.
+        E,
+    ),
 }
 
 impl<E> RollbackExecution<E>

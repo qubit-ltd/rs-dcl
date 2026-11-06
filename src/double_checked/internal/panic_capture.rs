@@ -48,6 +48,10 @@ where
 /// * `task` - Task whose execution was skipped and whose captures must be
 ///   released.
 ///
+/// # Type Parameters
+///
+/// * `F` - Task type whose destructor is run inside the panic boundary.
+///
 /// # Returns
 ///
 /// `Ok(())` if the task is dropped, or `Err(PanicInfo)` with phase

@@ -20,7 +20,10 @@ pub(crate) enum LockedExecution<R, E> {
     /// The condition was no longer satisfied after the lock was acquired.
     ConditionNotMet,
     /// The task ran while the executor lock was held.
-    Task(Result<R, E>),
+    Task(
+        /// Preserves the task's success value or error for outcome conversion.
+        Result<R, E>,
+    ),
 }
 
 impl<R, E> LockedExecution<R, E> {

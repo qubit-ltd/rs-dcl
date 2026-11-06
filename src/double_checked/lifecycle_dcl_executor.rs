@@ -400,6 +400,12 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Finalizes a successful task without holding the executor lock.
     ///
+    /// # Parameters
+    ///
+    /// * `token` - Prepared token consumed by the commit callback or dropped
+    ///   when no callback is configured.
+    /// * `value` - Successful task result preserved in the lifecycle outcome.
+    ///
     /// # Type Parameters
     ///
     /// * `R` - Successful task result type.
@@ -416,6 +422,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Finalizes a successful task without holding the executor lock.
     ///
+    /// # Parameters
+    ///
+    /// * `token` - Prepared token consumed by the captured commit callback.
+    /// * `value` - Successful task result preserved in the captured outcome.
+    ///
     /// # Type Parameters
     ///
     /// * `R` - Successful task result type.
@@ -426,6 +437,13 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     }
 
     /// Finalizes an unsuccessful invocation without holding the executor lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `token` - Prepared token consumed by the rollback callback or dropped
+    ///   when no callback is configured.
+    /// * `execution` - Failed or rejected execution whose cause and task error
+    ///   are preserved in the outcome.
     ///
     /// # Type Parameters
     ///
@@ -447,6 +465,12 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Finalizes an unsuccessful invocation without holding the executor lock.
     ///
+    /// # Parameters
+    ///
+    /// * `token` - Prepared token consumed by the captured rollback callback.
+    /// * `execution` - Captured failure whose cause and task error are
+    ///   preserved in the outcome.
+    ///
     /// # Type Parameters
     ///
     /// * `R` - Successful task result type.
@@ -467,6 +491,12 @@ impl<P, C> LifecycleDclExecutor<P, C> {
     /// Attempts rollback after a locked-phase panic and then resumes the
     /// original unwind payload.
     ///
+    /// # Parameters
+    ///
+    /// * `token` - Prepared token offered to rollback or dropped during
+    ///   best-effort cleanup.
+    /// * `panic` - Original locked-phase panic to resume after cleanup.
+    ///
     /// # Panics
     ///
     /// Always resumes unwinding with the original locked-phase panic after
@@ -485,6 +515,11 @@ impl<P, C> LifecycleDclExecutor<P, C> {
 
     /// Runs and discards secondary cleanup work without allowing its result,
     /// panic payload, or destructor panic to replace an earlier panic.
+    ///
+    /// # Parameters
+    ///
+    /// * `operation` - One-shot cleanup operation whose result and panic are
+    ///   discarded if it fails.
     ///
     /// # Type Parameters
     ///

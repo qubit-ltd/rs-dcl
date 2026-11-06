@@ -39,7 +39,11 @@ pub enum LifecycleOutcome<R, E, C> {
     /// The lock-free condition check returned `false` before prepare started.
     InitialConditionNotMet,
     /// Prepare returned its original lifecycle error without producing a token.
-    PrepareFailed(C),
+    PrepareFailed(
+        /// Original error returned by the prepare callback before a token was
+        /// produced.
+        C,
+    ),
     /// The task returned a value and the token followed the commit path.
     TaskSucceeded {
         /// Original value returned by the task.

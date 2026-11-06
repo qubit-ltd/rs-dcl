@@ -33,7 +33,14 @@ pub enum CapturedFinalizationOutcome<C> {
     /// The configured commit or rollback callback returned successfully.
     Succeeded,
     /// The configured callback returned its original lifecycle error.
-    Failed(C),
+    Failed(
+        /// The original error returned by the configured commit or rollback
+        /// callback.
+        C,
+    ),
     /// The callback or token destructor panicked during finalization.
-    Panicked(PanicInfo),
+    Panicked(
+        /// The panic payload and phase captured during finalization.
+        PanicInfo,
+    ),
 }

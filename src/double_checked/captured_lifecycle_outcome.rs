@@ -41,14 +41,26 @@ pub enum CapturedLifecycleOutcome<R, E, C> {
     /// The lock-free condition check returned `false` before prepare started.
     InitialConditionNotMet,
     /// The lock-free condition check panicked before prepare started.
-    InitialConditionCheckPanicked(PanicInfo),
+    InitialConditionCheckPanicked(
+        /// Captured panic details identifying the initial condition phase.
+        PanicInfo,
+    ),
     /// Dropping the unexecuted task panicked after the initial condition was
     /// false. No token was created and no lock or finalization callback ran.
-    TaskCleanupPanicked(PanicInfo),
+    TaskCleanupPanicked(
+        /// Captured panic details from dropping the task before prepare.
+        PanicInfo,
+    ),
     /// Prepare returned its original lifecycle error without producing a token.
-    PrepareFailed(C),
+    PrepareFailed(
+        /// The lifecycle callback's original prepare error.
+        C,
+    ),
     /// Prepare panicked without producing a usable token.
-    PreparePanicked(PanicInfo),
+    PreparePanicked(
+        /// Captured panic details identifying the prepare phase.
+        PanicInfo,
+    ),
     /// The task returned a value and the token followed the commit path.
     TaskSucceeded {
         /// Original value returned by the task.
