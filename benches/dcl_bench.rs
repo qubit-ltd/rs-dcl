@@ -91,9 +91,11 @@ where
 
 /// Registers predicate-only measurements for a fixed executor state.
 ///
-/// The three entries use identical atomic state reads and differ only in how
-/// the closure is represented. This isolates static and trait-object dispatch
-/// from locking and task work.
+/// The three entries use identical atomic state reads and differ in how the
+/// closure is represented. Because this output-only group constructs its
+/// closures locally, the compiler may devirtualize the trait-object call; the
+/// separate opaque-input group provides a comparison that blocks that input
+/// knowledge.
 fn benchmark_predicate_representations_for_state(
     group: &mut BenchmarkGroup<'_, WallTime>,
     state_name: &str,
@@ -116,6 +118,21 @@ fn benchmark_predicate_representations_for_state(
     });
     group.bench_function(format!("predicate/{state_name}/arc_dynamic"), |bencher| {
         bencher.iter(|| black_box(dynamic()));
+    });
+
+    // Keep a separate input-opaque comparison: output barriers alone may let
+    // the optimizer devirtualize a locally constructed trait object.
+    group.bench_function(
+        format!("predicate_opaque_input/{state_name}/direct_closure"),
+        |bencher| {
+            bencher.iter(|| black_box(black_box(&direct)()));
+        },
+    );
+    group.bench_function(format!("predicate_opaque_input/{state_name}/arc_static"), |bencher| {
+        bencher.iter(|| black_box(black_box(static_arc.as_ref())()));
+    });
+    group.bench_function(format!("predicate_opaque_input/{state_name}/arc_dynamic"), |bencher| {
+        bencher.iter(|| black_box(black_box(dynamic.as_ref())()));
     });
 }
 
