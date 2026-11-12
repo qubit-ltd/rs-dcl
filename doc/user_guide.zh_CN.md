@@ -437,13 +437,17 @@ panic 捕获依赖 unwinding。使用 `panic = "abort"` 时，进程会在返回
 
 | 症状 | 检查项 |
 | --- | --- |
-| task 执行多次。 | 确认所有要求唯一性的调用都使用排他锁；共享模式允许重叠。 |
+| task 执行多次。 | 确认要求唯一性的调用使用排他模式，且 task 按同一协调协议更新 gate。排他锁本身只保证调用串行。 |
 | 外部更新后 task 仍然执行。 | 确认该更新使用同一个底层锁，且 store ordering 与 predicate load 协议一致。 |
-| 执行死锁。 | 确认 predicate 和 callback 没有递归获取协调锁。 |
+| 执行死锁。 | predicate 不得获取协调锁；task 已持有 guard，不得再次获取同一非重入锁，并应检查应用层锁顺序。 |
 | 出现 `PrepareFailed`。 | 检查 prepare error；此时没有 token，无法执行 rollback。 |
 | rollback 失败。 | 同时保留原始 `RollbackCause` 或 task error，以及终结 failure。 |
 | 标准库锁 poisoned。 | 检查 panic 是否跨越 guard；Qubit DCL 保留锁后端的 poisoning 行为。 |
 | 捕获到的 panic phase 不符合预期。 | 检查 `PanicInfo::phase()` 和 `message()`，验证应用状态后再复用。 |
+
+`prepare` 在 executor 获取 guard 前执行；`commit` 和 `rollback` 则在 guard
+释放后执行。按协议需要时，这些 callback 可以获取协调锁。不过，如果调用方本来就持有该锁，
+再调用 executor 仍可能因重入而死锁；callback 等待其他锁时，应用层的锁顺序也可能形成循环等待。
 
 ## 限制与最佳实践
 

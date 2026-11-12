@@ -471,13 +471,19 @@ Start from the observable outcome:
 
 | Symptom | Check |
 | --- | --- |
-| A task runs more than once. | Confirm every uniqueness-sensitive call uses an exclusive lock; shared modes permit overlap. |
+| A task runs more than once. | Confirm uniqueness-sensitive calls use an exclusive mode and the task updates the gate under the same coordination protocol. Exclusive locking alone only serializes calls. |
 | A task runs after an external update. | Confirm that update uses the same underlying lock and a store ordered consistently with the predicate load. |
-| Execution deadlocks. | Confirm the predicate and callbacks do not acquire the coordination lock recursively. |
+| Execution deadlocks. | The predicate must not acquire the coordination lock; the task already holds its guard and must not reacquire the same non-reentrant lock. Check application lock ordering as well. |
 | `PrepareFailed` appears. | Inspect the preparation error; no token exists, so rollback cannot run. |
 | Rollback fails. | Preserve both the original `RollbackCause` or task error and the finalization failure. |
 | A standard lock is poisoned. | Check whether a panic crossed its guard; Qubit DCL preserves the backend's poisoning behavior. |
 | A captured panic has an unexpected phase. | Inspect `PanicInfo::phase()` and `message()`, then validate application state before reuse. |
+
+`prepare` runs before the executor acquires the guard. `commit` and `rollback` run
+after the guard is released. These callbacks may acquire the coordination lock
+when their protocol requires it, but calling the executor while already holding
+that lock can still cause re-entry deadlock; application lock ordering can also
+create a cycle while the callback waits for another lock.
 
 ## Limitations and Best Practices
 
