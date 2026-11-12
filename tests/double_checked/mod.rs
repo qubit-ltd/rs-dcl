@@ -30,3 +30,4 @@ mod panic_capture_tests;
 mod panic_info_tests;
 mod panic_phase_tests;
 mod rollback_cause_tests;
+mod std_rwlock_concurrency_tests;
